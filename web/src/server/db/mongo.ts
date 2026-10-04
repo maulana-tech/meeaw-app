@@ -81,6 +81,55 @@ export type UserDoc = {
   updatedAt: Date;
 };
 
+export type RequestParticipantDoc = {
+  username: string;
+  wallet: string; // lowercase
+  notePubkey: string; // 0x-prefixed, lowercase
+  viewPubkey: string; // 0x-prefixed, lowercase
+};
+
+export type RequestEnvelopeDoc = { ephemeralPk: Binary; ciphertext: Binary };
+
+/** Active payment reservation, embedded so reserve/cancel races are one atomic write. */
+export type RequestReservationDoc = {
+  attemptId: string;
+  phase:
+    | "preparing"
+    | "submitting"
+    | "submitted"
+    | "confirmed"
+    | "failed"
+    | "needsReconciliation";
+  updatedAt: Date;
+};
+
+/**
+ * A private payment request. Holds only signed public metadata, the two
+ * opaque fixed-size envelopes and public status: never a plaintext amount,
+ * note, salt or decrypted payload.
+ */
+export type PaymentRequestDoc = {
+  _id: string; // client-generated UUID v4
+  version: 1;
+  scope: string; // `${chainId}:${poolAddress}`
+  requesterWallet: string; // lowercase
+  addresseeWallet: string; // lowercase
+  requester: RequestParticipantDoc;
+  addressee: RequestParticipantDoc;
+  createdAt: Date; // the signed creation time
+  recipientCommitment: string; // 0x-prefixed, lowercase
+  requesterEnvelope: RequestEnvelopeDoc;
+  addresseeEnvelope: RequestEnvelopeDoc;
+  signature: string;
+  digest: string; // EIP-712 digest of the immutable record
+  status: "pending" | "paid" | "declined" | "cancelled";
+  revision: number;
+  operationId: string | null;
+  reservation: RequestReservationDoc | null;
+  receipt: { txHash: string; leafIndex: number; block: number } | null;
+  updatedAt: Date;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var _maweeMongoClientPromise: Promise<MongoClient> | undefined;
@@ -139,4 +188,10 @@ export async function getUsers(): Promise<Collection<UserDoc>> {
 
 export async function getPaymentLinks(): Promise<Collection<PaymentLinkDoc>> {
   return (await getDb()).collection<PaymentLinkDoc>("payment_links");
+}
+
+export async function getPaymentRequests(): Promise<
+  Collection<PaymentRequestDoc>
+> {
+  return (await getDb()).collection<PaymentRequestDoc>("payment_requests");
 }
