@@ -13,6 +13,7 @@ import {
 import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../lib/crypto";
 import { payIntoNote } from "../../lib/deposit";
 import { accountPubkeys, getAccount } from "../../lib/notes";
+import { useGasless } from "../../lib/useGasless";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -43,6 +44,7 @@ export function AddFundsDialog({
   onComplete?: () => void | Promise<void>;
 }) {
   const { address, getSigner } = useWallet();
+  const gasless = useGasless();
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<"mint" | "shield" | null>(null);
@@ -142,14 +144,23 @@ export function AddFundsDialog({
                 {status ? status.usdc : "…"}
               </span>
             </div>
-            <div>
-              <span className="block text-foreground/60">MON for gas</span>
-              <span className="font-mono text-lg text-foreground tabular-nums">
-                {status ? status.gas : "…"}
-              </span>
-            </div>
+            {gasless === false ? (
+              <div>
+                <span className="block text-foreground/60">MON for gas</span>
+                <span className="font-mono text-lg text-foreground tabular-nums">
+                  {status ? status.gas : "…"}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <span className="block text-foreground/60">Network fees</span>
+                <span className="text-sm text-foreground">
+                  Covered by Mawee
+                </span>
+              </div>
+            )}
           </div>
-          {usdcMintable || gasFaucetUrl ? (
+          {usdcMintable || (gasFaucetUrl && gasless === false) ? (
             <div className="flex flex-wrap gap-2 border-t border-foreground/12 pt-3">
               {usdcMintable ? (
                 <Button
@@ -168,7 +179,7 @@ export function AddFundsDialog({
                   Get {fromBaseUnits(TEST_MINT_UNITS)} test USDC
                 </Button>
               ) : null}
-              {gasFaucetUrl ? (
+              {gasFaucetUrl && gasless === false ? (
                 <Button
                   variant="outline"
                   size="sm"

@@ -20,6 +20,7 @@ import {
 } from "../../../lib/chain";
 import { fromBaseUnits, toBaseUnits } from "../../../lib/crypto";
 import { payIntoNote } from "../../../lib/deposit";
+import { useGasless } from "../../../lib/useGasless";
 
 const payInput = z.object({
   amount: z
@@ -39,6 +40,7 @@ export function PayForm({
   link?: PaymentLink | null;
 }) {
   const { address, connecting, error: walletError, connect } = usePayerWallet();
+  const gasless = useGasless();
   const [status, setStatus] = useState<{
     kind: "ok" | "err";
     msg: string;
@@ -165,7 +167,7 @@ export function PayForm({
         </div>
         <span className="text-xs text-brand-linen/55">
           {address
-            ? `Paying from ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. You need USDC plus a little MON for gas.`
+            ? `Paying from ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : "You need USDC plus a little MON for gas."}`
             : `Pay with any EVM wallet (MetaMask, Rabby…) on ${chain.name}.`}
         </span>
         <ToastFeedback

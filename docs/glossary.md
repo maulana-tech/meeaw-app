@@ -9,7 +9,7 @@ privacy by default — which is the gap Mawee fills.
 accounting, your bank) without revealing your other payments.
 
 **Gas** — The small network fee blockchains charge per action. On Monad it is
-paid in MON.
+paid in MON — and Mawee's relayer covers it for you.
 
 **Nullifier** — A one-time "used" stamp that stops a payment from being spent
 twice — without revealing which deposit it came from.

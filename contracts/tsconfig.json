@@ -7,5 +7,12 @@
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true
+  },
+  "ts-node": {
+    // web/ is an ES-module package; load the shared, dependency-free typed-data
+    // builders as CommonJS so the Hardhat tests can import them directly.
+    "moduleTypes": {
+      "../web/src/lib/typedData.ts": "cjs"
+    }
   }
 }

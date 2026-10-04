@@ -13,8 +13,10 @@ import {
   type Hex,
   http,
   isAddress,
+  keccak256,
   type Log,
   parseEventLogs,
+  parseSignature,
   type TransactionReceipt,
   type WalletClient,
 } from "viem";
@@ -24,6 +26,11 @@ import { api } from "../trpc/client";
 import { erc20Abi, maweePoolAbi, maweeRegistryAbi } from "./abi";
 import { bytesToHex, fromBaseUnits, hexToBytes } from "./crypto";
 import type { EvmProof } from "./prover";
+import {
+  depositTypedData,
+  permitTypedData,
+  registryTypedData,
+} from "./typedData";
 
 const localChain = defineChain({
   id: 31337,
@@ -111,6 +118,207 @@ export function revertErrorName(error: unknown): string | null {
     : null;
 }
 
+// --- gasless relay ---------------------------------------------------------
+//
+// When the server relayer is configured, users only sign: the relayer submits
+// the transaction and pays the MON gas. Withdraw/transfer need no signature
+// at all — their proofs are the authorization — which also keeps the user's
+// wallet out of the withdrawal transaction.
+
+let gaslessStatus: Promise<boolean> | null = null;
+
+/** Whether the server relayer is available (cached per page load). */
+export function gaslessEnabled(): Promise<boolean> {
+  gaslessStatus ??= api.relay.status
+    .query()
+    .then((status) => status.enabled)
+    .catch(() => {
+      gaslessStatus = null; // retry next time instead of caching an outage
+      return false;
+    });
+  return gaslessStatus;
+}
+
+const SIGNATURE_TTL_SECONDS = 15n * 60n;
+
+function signatureDeadline(): bigint {
+  return BigInt(Math.floor(Date.now() / 1000)) + SIGNATURE_TTL_SECONDS;
+}
+
+/** tRPC carries JSON, so uint256 values travel as decimal strings. */
+function proofJson(proof: EvmProof) {
+  const d = (x: bigint) => x.toString();
+  return {
+    a: [d(proof.a[0]), d(proof.a[1])] as [string, string],
+    b: [
+      [d(proof.b[0][0]), d(proof.b[0][1])],
+      [d(proof.b[1][0]), d(proof.b[1][1])],
+    ] as [[string, string], [string, string]],
+    c: [d(proof.c[0]), d(proof.c[1])] as [string, string],
+  };
+}
+
+async function relayRegistryWrite(
+  signer: Signer,
+  rotate: boolean,
+  username: string,
+  notePubkey: Hex,
+  viewPubkey: Hex,
+): Promise<void> {
+  const nonce = await publicClient.readContract({
+    address: registryAddress,
+    abi: maweeRegistryAbi,
+    functionName: "nonces",
+    args: [signer.address],
+  });
+  const deadline = signatureDeadline();
+  const signature = await signer.walletClient.signTypedData({
+    account: signer.address,
+    ...registryTypedData({
+      rotate,
+      chainId: chain.id,
+      registry: registryAddress,
+      owner: signer.address,
+      username,
+      notePubkey,
+      viewPubkey,
+      nonce,
+      deadline,
+    }),
+  });
+  await api.relay.register.mutate({
+    username,
+    notePubkey,
+    viewPubkey,
+    deadline: deadline.toString(),
+    signature,
+    rotate,
+  });
+}
+
+/** EIP-712 domain of the pool asset's permit, read from the token itself. */
+async function permitDomain(): Promise<{
+  name: string;
+  version: string;
+  chainId: number;
+  verifyingContract: Address;
+}> {
+  try {
+    const [, name, version, chainId, verifyingContract] =
+      await publicClient.readContract({
+        address: usdcAddress,
+        abi: erc20Abi,
+        functionName: "eip712Domain",
+      });
+    return { name, version, chainId: Number(chainId), verifyingContract };
+  } catch {
+    // Tokens without ERC-5267 (e.g. FiatToken) expose name()/version().
+    const [name, version] = await Promise.all([
+      publicClient.readContract({
+        address: usdcAddress,
+        abi: erc20Abi,
+        functionName: "name",
+      }),
+      publicClient
+        .readContract({
+          address: usdcAddress,
+          abi: erc20Abi,
+          functionName: "version",
+        })
+        .catch(() => "1"),
+    ]);
+    return { name, version, chainId: chain.id, verifyingContract: usdcAddress };
+  }
+}
+
+async function relayDeposit(
+  signer: Signer,
+  commitment: Hex,
+  amount: bigint,
+  proof: EvmProof,
+  ephemeralPk: Hex,
+  ciphertext: Hex,
+): Promise<{ leafIndex: number; txHash: string }> {
+  const [poolNonce, allowance] = await Promise.all([
+    publicClient.readContract({
+      address: poolAddress,
+      abi: maweePoolAbi,
+      functionName: "nonces",
+      args: [signer.address],
+    }),
+    publicClient.readContract({
+      address: usdcAddress,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [signer.address, poolAddress],
+    }),
+  ]);
+  const deadline = signatureDeadline();
+
+  // Permit only when the pool cannot already pull the funds.
+  let permit: {
+    value: string;
+    deadline: string;
+    v: number;
+    r: Hex;
+    s: Hex;
+  } | null = null;
+  if (allowance < amount) {
+    const tokenNonce = await publicClient.readContract({
+      address: usdcAddress,
+      abi: erc20Abi,
+      functionName: "nonces",
+      args: [signer.address],
+    });
+    const permitSignature = await signer.walletClient.signTypedData({
+      account: signer.address,
+      ...permitTypedData({
+        domain: await permitDomain(),
+        owner: signer.address,
+        spender: poolAddress,
+        value: amount,
+        nonce: tokenNonce,
+        deadline,
+      }),
+    });
+    const { r, s, v, yParity } = parseSignature(permitSignature);
+    permit = {
+      value: amount.toString(),
+      deadline: deadline.toString(),
+      v: Number(v ?? BigInt(yParity + 27)),
+      r,
+      s,
+    };
+  }
+
+  const signature = await signer.walletClient.signTypedData({
+    account: signer.address,
+    ...depositTypedData({
+      chainId: chain.id,
+      pool: poolAddress,
+      payer: signer.address,
+      commitment,
+      amount,
+      ephemeralPk,
+      ciphertextHash: keccak256(ciphertext),
+      nonce: poolNonce,
+      deadline,
+    }),
+  });
+
+  return api.relay.deposit.mutate({
+    payer: signer.address,
+    commitment,
+    amount: amount.toString(),
+    proof: proofJson(proof),
+    ephemeralPk,
+    ciphertext,
+    deadline: deadline.toString(),
+    signature,
+    permit,
+  });
+}
+
 // --- token -----------------------------------------------------------------
 
 export async function usdcBalance(owner: string): Promise<bigint> {
@@ -190,6 +398,16 @@ export async function registerUsername(
   notePubkey: Uint8Array,
   viewPubkey: Uint8Array,
 ): Promise<void> {
+  if (await gaslessEnabled()) {
+    await relayRegistryWrite(
+      signer,
+      false,
+      username,
+      hexOf(notePubkey),
+      hexOf(viewPubkey),
+    );
+    return;
+  }
   try {
     await send(signer, {
       address: registryAddress,
@@ -209,6 +427,11 @@ export async function setUsernamePubkeys(
   viewPubkey: Uint8Array,
 ): Promise<void> {
   const args = [username, hexOf(notePubkey), hexOf(viewPubkey)] as const;
+  if (await gaslessEnabled()) {
+    const owned = await usernameOfOnChain(signer.address);
+    await relayRegistryWrite(signer, owned === username, ...args);
+    return;
+  }
   try {
     await send(signer, {
       address: registryAddress,
@@ -309,6 +532,16 @@ export async function poolDeposit(
   ephemeralPk: Uint8Array,
   ciphertext: Uint8Array,
 ): Promise<{ leafIndex: number; txHash: string }> {
+  if (await gaslessEnabled()) {
+    return relayDeposit(
+      signer,
+      hexOf(commitment),
+      amount,
+      proof,
+      hexOf(ephemeralPk),
+      hexOf(ciphertext),
+    );
+  }
   const allowance = await publicClient.readContract({
     address: usdcAddress,
     abi: erc20Abi,
@@ -352,6 +585,10 @@ export async function mintTestUsdc(
   amount: bigint,
 ): Promise<string> {
   if (!usdcMintable) throw new Error("Test USDC minting is not available.");
+  if (await gaslessEnabled()) {
+    // The relayer mints a fixed amount to the caller's bound wallet.
+    return (await api.relay.mintTestUsdc.mutate()).txHash;
+  }
   const { hash } = await send(signer, {
     address: usdcAddress,
     abi: erc20Abi,
@@ -377,14 +614,29 @@ export async function transferUsdc(
   return hash;
 }
 
+/**
+ * Spend a note to `recipient`. With the relayer, no signer is needed: the
+ * proof binds the recipient and amount, so the relayer cannot redirect it.
+ */
 export async function poolWithdraw(
-  signer: Signer,
+  signer: Signer | null,
   recipient: string,
   amount: bigint,
   root: Uint8Array,
   nullifier: Uint8Array,
   proof: EvmProof,
 ): Promise<string> {
+  if (await gaslessEnabled()) {
+    const { txHash } = await api.relay.withdraw.mutate({
+      recipient: getAddress(recipient),
+      amount: amount.toString(),
+      root: hexOf(root),
+      nullifier: hexOf(nullifier),
+      proof: proofJson(proof),
+    });
+    return txHash;
+  }
+  if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { hash } = await send(signer, {
     address: poolAddress,
     abi: maweePoolAbi,
@@ -407,13 +659,24 @@ const noteOutput = (note: TransferNote) => ({
 });
 
 export async function poolTransfer(
-  signer: Signer,
+  signer: Signer | null,
   root: Uint8Array,
   nullifier: Uint8Array,
   proof: EvmProof,
   recipient: TransferNote,
   change: TransferNote,
 ): Promise<{ recipientIndex: number; changeIndex: number }> {
+  if (await gaslessEnabled()) {
+    const { recipientIndex, changeIndex } = await api.relay.transfer.mutate({
+      root: hexOf(root),
+      nullifier: hexOf(nullifier),
+      proof: proofJson(proof),
+      recipientNote: noteOutput(recipient),
+      changeNote: noteOutput(change),
+    });
+    return { recipientIndex, changeIndex };
+  }
+  if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { receipt } = await send(signer, {
     address: poolAddress,
     abi: maweePoolAbi,

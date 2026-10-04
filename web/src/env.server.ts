@@ -17,6 +17,16 @@ export const serverEnvSchema = z.object({
   CRON_SECRET: optionalString,
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
+  // Hot wallet that submits users' signed/proved transactions and pays gas.
+  // Keep it funded with only a small amount of MON.
+  RELAYER_PRIVATE_KEY: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .trim()
+      .regex(/^0x[0-9a-fA-F]{64}$/, "must be a 0x-prefixed 32-byte hex key")
+      .optional(),
+  ),
   // Max block span per eth_getLogs request; public Monad RPCs cap this.
   MONAD_LOGS_BLOCK_RANGE: z.preprocess(
     emptyToUndefined,
@@ -31,6 +41,7 @@ export function getServerEnv() {
     CRON_SECRET: process.env.CRON_SECRET,
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
+    RELAYER_PRIVATE_KEY: process.env.RELAYER_PRIVATE_KEY,
     MONAD_LOGS_BLOCK_RANGE: process.env.MONAD_LOGS_BLOCK_RANGE,
   });
 }

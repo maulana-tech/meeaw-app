@@ -55,9 +55,10 @@ without linking back to your deposit.
 BN254 precompiles, confirms the nullifier hasn't been used, records it, and
 releases the USDC. Deposit and withdrawal are never publicly connected.
 
-**Gas is paid in MON.** Your Mawee wallet sends the withdrawal and pays a small
-MON fee. Because the proof binds the recipient and amount, anyone could submit
-it for you — a gas-sponsoring relayer is a planned addition.
+**You never touch gas.** Mawee's relayer submits your transactions and pays the
+MON fee. You only sign — and for withdrawals not even that: the proof binds the
+recipient and amount, so the relayer can't redirect your money, and your Mawee
+wallet never appears in the withdrawal transaction.
 
 {% hint style="info" %}
 Want the deeper cuts — the exact hashing, curve, and contract details? See

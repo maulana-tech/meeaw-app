@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 
 interface IERC20 {
@@ -35,12 +39,23 @@ interface IVerifier4 {
 ///   deposit  = [commitment, amount]
 ///   withdraw = [root, nullifier, recipient, amount]
 ///   transfer = [root, nullifier, outCommitmentRecipient, outCommitmentChange]
-contract MaweePool {
+///
+/// Every entry point can be submitted by a relayer, so users never need gas:
+/// withdraw/transfer are authorized by their proofs, and deposits by the
+/// payer's EIP-712 signature (plus an optional EIP-2612 permit).
+contract MaweePool is EIP712, Nonces {
     /// Fixed by the circuits (`Withdraw(20)` / `Transfer(20)`).
     uint32 public constant TREE_DEPTH = 20;
     uint32 public constant ROOT_HISTORY_SIZE = 30;
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
+    /// Binds the payer's funds to one exact note, so whoever relays the
+    /// signature cannot redirect the payment into a different commitment or
+    /// replace the encrypted note the recipient needs to find it.
+    bytes32 public constant DEPOSIT_TYPEHASH = keccak256(
+        "Deposit(address payer,bytes32 commitment,uint256 amount,bytes32 ephemeralPk,bytes32 ciphertextHash,uint256 nonce,uint256 deadline)"
+    );
 
     struct Proof {
         uint256[2] a;
@@ -54,6 +69,16 @@ contract MaweePool {
         bytes ciphertext;
     }
 
+    /// EIP-2612 permit for the pool asset. `deadline == 0` means "no permit,
+    /// the payer already approved the pool".
+    struct PermitData {
+        uint256 value;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     error InvalidAmount();
     error InvalidFieldElement();
     error InvalidProof();
@@ -65,6 +90,8 @@ contract MaweePool {
     error NotPendingAdmin();
     error TokenTransferFailed();
     error ZeroAddress();
+    error SignatureExpired();
+    error InvalidSignature();
 
     /// Encrypted note metadata for recipients to scan. Emitted for direct
     /// deposits and for both outputs of a shielded transfer.
@@ -97,7 +124,7 @@ contract MaweePool {
         IVerifier2 depositVerifier_,
         IVerifier4 withdrawVerifier_,
         IVerifier4 transferVerifier_
-    ) {
+    ) EIP712("MaweePool", "1") {
         if (
             admin_ == address(0) || address(token_) == address(0) || address(depositVerifier_) == address(0)
                 || address(withdrawVerifier_) == address(0) || address(transferVerifier_) == address(0)
@@ -140,14 +167,34 @@ contract MaweePool {
         bytes32 ephemeralPk,
         bytes calldata ciphertext
     ) external whenNotPaused returns (uint32 leafIndex) {
-        if (amount == 0 || amount > type(uint64).max) revert InvalidAmount();
-        uint256 leaf = uint256(commitment);
-        if (leaf >= FIELD_SIZE) revert InvalidFieldElement();
-        if (!depositVerifier.verifyProof(proof.a, proof.b, proof.c, [leaf, amount])) revert InvalidProof();
+        return _deposit(msg.sender, commitment, amount, proof, ephemeralPk, ciphertext);
+    }
 
-        _safeTransferFrom(msg.sender, address(this), amount);
-        leafIndex = _insert(leaf);
-        emit Deposit(leafIndex, commitment, ephemeralPk, ciphertext);
+    /// @notice Gasless deposit: a relayer submits `payer`'s signed authorization
+    /// (and optionally a permit) and the pool pulls the tokens from `payer`.
+    function depositWithAuthorization(
+        address payer,
+        bytes32 commitment,
+        uint256 amount,
+        Proof calldata proof,
+        bytes32 ephemeralPk,
+        bytes calldata ciphertext,
+        uint256 deadline,
+        bytes calldata signature,
+        PermitData calldata permit
+    ) external whenNotPaused returns (uint32 leafIndex) {
+        if (block.timestamp > deadline) revert SignatureExpired();
+        bytes32 digest = _depositDigest(payer, commitment, amount, ephemeralPk, keccak256(ciphertext), deadline);
+        if (!SignatureChecker.isValidSignatureNow(payer, digest, signature)) revert InvalidSignature();
+
+        if (permit.deadline != 0) {
+            // A front-runner may already have submitted this permit; then the
+            // allowance exists and transferFrom below still succeeds.
+            try IERC20Permit(address(token)).permit(
+                payer, address(this), permit.value, permit.deadline, permit.v, permit.r, permit.s
+            ) {} catch {}
+        }
+        return _deposit(payer, commitment, amount, proof, ephemeralPk, ciphertext);
     }
 
     /// @notice Spend a note to `recipient`. Anyone may submit the proof (e.g. a
@@ -203,6 +250,10 @@ contract MaweePool {
         return uint256(uint160(recipient));
     }
 
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
     function currentRoot() external view returns (bytes32) {
         return bytes32(roots[currentRootIndex]);
     }
@@ -246,6 +297,42 @@ contract MaweePool {
     }
 
     // --- internals -----------------------------------------------------------
+
+    /// Consumes `payer`'s nonce, so each signed authorization works once.
+    function _depositDigest(
+        address payer,
+        bytes32 commitment,
+        uint256 amount,
+        bytes32 ephemeralPk,
+        bytes32 ciphertextHash,
+        uint256 deadline
+    ) private returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    DEPOSIT_TYPEHASH, payer, commitment, amount, ephemeralPk, ciphertextHash, _useNonce(payer), deadline
+                )
+            )
+        );
+    }
+
+    function _deposit(
+        address from,
+        bytes32 commitment,
+        uint256 amount,
+        Proof calldata proof,
+        bytes32 ephemeralPk,
+        bytes calldata ciphertext
+    ) private returns (uint32 leafIndex) {
+        if (amount == 0 || amount > type(uint64).max) revert InvalidAmount();
+        uint256 leaf = uint256(commitment);
+        if (leaf >= FIELD_SIZE) revert InvalidFieldElement();
+        if (!depositVerifier.verifyProof(proof.a, proof.b, proof.c, [leaf, amount])) revert InvalidProof();
+
+        _safeTransferFrom(from, address(this), amount);
+        leafIndex = _insert(leaf);
+        emit Deposit(leafIndex, commitment, ephemeralPk, ciphertext);
+    }
 
     function _insert(uint256 leaf) private returns (uint32 index) {
         index = nextIndex;

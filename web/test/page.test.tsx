@@ -58,6 +58,7 @@ vi.mock("../src/lib/chain", () => ({
   gasFaucetUrl: "https://faucet.monad.xyz",
   mintTestUsdc: vi.fn(),
   usdcMintable: true,
+  gaslessEnabled: async () => true,
 }));
 
 import DashboardPage from "../src/app/(dashboard)/dashboard/page";
@@ -252,6 +253,9 @@ describe("Dashboard route", () => {
     expect(
       screen.getByRole("button", { name: /Get 100 test USDC/ }),
     ).toBeInTheDocument();
+    // With the relayer on, users never see gas: no MON balance or faucet.
+    expect(await screen.findByText("Covered by Mawee")).toBeInTheDocument();
+    expect(screen.queryByText("MON faucet")).not.toBeInTheDocument();
     expect(
       screen.getByLabelText("Move to private balance"),
     ).toBeInTheDocument();

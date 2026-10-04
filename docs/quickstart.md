@@ -37,9 +37,8 @@ balance** — visible only to you.
 
 ## 5. Cash out whenever
 
-Withdraw your balance to any Monad wallet (`0x…`). Your Mawee wallet needs a
-little MON for the network fee — on testnet, use the faucet linked in
-**Add funds**.
+Withdraw your balance to any Monad wallet (`0x…`). Network fees are covered by
+Mawee.
 
 ---
 

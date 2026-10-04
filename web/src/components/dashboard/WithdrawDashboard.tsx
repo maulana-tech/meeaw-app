@@ -18,6 +18,7 @@ import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import { useGasless } from "../../lib/useGasless";
 import {
   claimableNotes,
   isAlreadyCashedOut,
@@ -581,6 +582,7 @@ function WalletWithdrawal({
   onBack,
   onConfirm,
 }: WalletWithdrawalProps) {
+  const gasless = useGasless();
   if (step === "form") {
     return (
       <form className="grid gap-5" onSubmit={onReview} noValidate>
@@ -604,8 +606,10 @@ function WalletWithdrawal({
             id="withdraw-destination-hint"
             className="text-xs text-foreground/60"
           >
-            Enter the Monad address that should receive the funds. The
-            transaction is sent from your Mawee wallet, which pays the gas.
+            Enter the Monad address that should receive the funds.{" "}
+            {gasless === false
+              ? "The transaction is sent from your Mawee wallet, which pays the gas."
+              : "Network fees are covered, and your Mawee wallet never appears in the withdrawal."}
           </p>
           <ToastFeedback
             message={fieldError}

@@ -24,13 +24,13 @@ value doesn't swing around like other crypto.
 
 ## What does my client need to pay?
 
-Any EVM wallet (MetaMask, Rabby, …) holding USDC on Monad, plus a little MON for
-the network fee. Paying from other chains is not supported yet.
+Any EVM wallet (MetaMask, Rabby, …) holding USDC on Monad. They only sign —
+Mawee covers the network fee. Paying from other chains is not supported yet.
 
 ## Do I need to hold USDC to receive money?
 
-No. Receiving needs nothing but your Mawee account. To withdraw, your Mawee
-wallet needs a little MON to pay the network fee.
+No. Receiving needs nothing but your Mawee account, and Mawee covers the
+network fees when you withdraw.
 
 ## What's the PIN for?
 

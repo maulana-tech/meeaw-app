@@ -163,8 +163,9 @@ What is intentionally not hidden yet:
 - Withdrawal amount.
 - Withdrawal destination.
 - Timing patterns if users withdraw immediately after receiving funds.
-- The wallet that submits a withdrawal pays its gas. A relayer would remove
-  that link and is a planned addition.
+- Without a relayer (no `RELAYER_PRIVATE_KEY`), the wallet that submits a
+  withdrawal pays its gas and is visible on-chain. With the relayer, the
+  relayer submits it instead.
 
 ## Prerequisites
 
@@ -232,6 +233,9 @@ Important server-only values:
 - `PRIVY_APP_ID` / `PRIVY_APP_SECRET` - server-only Privy token and wallet
   verification.
 - `MONAD_LOGS_BLOCK_RANGE` - max block span per `eth_getLogs` call.
+- `RELAYER_PRIVATE_KEY` - hot wallet for gasless mode. Users then only sign;
+  the relayer submits and pays MON gas. See
+  [docs/reference.md](docs/reference.md#gasless-relay).
 
 Do not commit `web/.env.local`. The repository ignores `.env*` files except the
 examples.
@@ -245,8 +249,9 @@ deposit/nullifier mirror; it never clears user keys or other collections.
 ## Testnet Payment Notes
 
 On testnet the pool asset is `MockUSDC`. Recipients can mint test USDC from the
-dashboard's **Add funds** dialog; payers need USDC and a little MON in their own
-wallet. Receiving never requires the recipient to hold USDC first.
+dashboard's **Add funds** dialog. With the relayer enabled, payers only need
+USDC (they sign a permit and a deposit authorization; no MON). Receiving never
+requires the recipient to hold anything first.
 
 ## Production Work Still Required
 
@@ -255,7 +260,8 @@ This repo is testnet-stage. Before mainnet, Mawee still needs:
 - A real multi-party trusted setup ceremony for production circuits.
 - Independent security review of the contracts, circuits, and web flows.
 - A multisig pool admin and monitoring for the indexer.
-- A withdrawal relayer so the spending wallet is not linked by gas payment.
+- Relayer hardening: fees or sponsorship limits, key management, monitoring of
+  its MON balance.
 - Mainnet USDC, Privy production apps, and a bank off-ramp integration.
 - Clear compliance policy for disclosure, abuse handling, and
   jurisdiction-specific requirements.

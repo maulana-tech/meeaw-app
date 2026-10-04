@@ -41,6 +41,22 @@
 | Transfer public signals | `[root, nullifier, outCommitmentRecipient, outCommitmentChange]` |
 | Admin powers | pause/unpause, two-step admin transfer; no upgrades, no fund movement |
 
+## Gasless relay
+
+With `RELAYER_PRIVATE_KEY` set, users never need MON. Every relayed call is
+simulated first, so a bad proof or signature costs the relayer nothing.
+
+| Action | What the user does | What authorizes it on-chain |
+| --- | --- | --- |
+| Register / rotate keys | Signs EIP-712 `Register` / `SetPubkeys` | `MaweeRegistry.registerFor` / `setPubkeysFor` check the owner's signature and nonce |
+| Pay / add funds | Signs EIP-2612 `Permit` (if no allowance) + EIP-712 `Deposit` | `MaweePool.depositWithAuthorization`: the signature binds payer, commitment, amount and the encrypted note |
+| Withdraw / transfer | Nothing to sign | The Groth16 proof binds recipient and amount (withdraw) or both output notes (transfer) |
+| Test USDC (testnet) | Click | Relayer mints `MockUSDC` to the signed-in user's bound wallet |
+
+Rate limits (per IP for public calls, per Privy user for account calls) bound
+abuse. Typed-data definitions live in `web/src/lib/typedData.ts` and are reused
+by the contract tests.
+
 ## Environment
 
 Public (`NEXT_PUBLIC_*`, baked into the browser bundle):
@@ -63,6 +79,7 @@ Server-only (never committed):
 | `CRON_SECRET` | Bearer token for `/api/cron/pool-indexer` |
 | `PRIVY_APP_ID` / `PRIVY_APP_SECRET` | Server-side Privy token and wallet verification |
 | `MONAD_LOGS_BLOCK_RANGE` | Max blocks per `eth_getLogs` call (default `100`) |
+| `RELAYER_PRIVATE_KEY` | Hot wallet that submits signed/proved transactions and pays gas (gasless mode) |
 
 ## Prerequisites & build
 
