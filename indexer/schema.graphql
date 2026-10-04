@@ -1,0 +1,80 @@
+# Public pool data only. Note contents stay encrypted to each recipient's
+# viewing key; the app decrypts them in the browser.
+
+"""A note commitment added to the pool (a payment or a transfer output)."""
+type Note {
+  id: ID! # leaf index
+  leafIndex: Int! @index
+  commitment: String!
+  ephemeralPk: String!
+  ciphertext: String!
+  blockNumber: Int! @index
+  timestamp: Int!
+  txHash: String!
+}
+
+"""A spent note's nullifier. The pool never reveals which note it spent."""
+type Nullifier {
+  id: ID! # nullifier hex, lowercase, no 0x
+  blockNumber: Int! @index
+  timestamp: Int!
+  txHash: String!
+  "Set when the spend paid out of the pool (absent for shielded transfers)."
+  withdrawal: Withdrawal
+}
+
+type Withdrawal {
+  id: ID! # nullifier hex, lowercase, no 0x
+  recipient: String! @index
+  amount: BigInt!
+  blockNumber: Int!
+  timestamp: Int!
+  txHash: String!
+}
+
+"""A @username in the registry with its current public keys."""
+type Account {
+  id: ID! # username
+  username: String!
+  owner: String! @index
+  notePubkey: String!
+  viewPubkey: String!
+  registeredAt: Int!
+  keyRotations: Int!
+  history: [KeyRotation!]! @derivedFrom(field: "account")
+}
+
+type KeyRotation {
+  id: ID! # chainId_block_logIndex
+  account: Account!
+  notePubkey: String!
+  viewPubkey: String!
+  blockNumber: Int!
+  timestamp: Int!
+}
+
+"""Pool-wide aggregates (single row, id "global")."""
+type PoolStats {
+  id: ID!
+  notes: Int!
+  spent: Int!
+  "Unspent notes: how many notes a withdrawal could have come from."
+  anonymitySet: Int!
+  withdrawals: Int!
+  shieldedTransfers: Int!
+  totalWithdrawn: BigInt!
+  accounts: Int!
+  paused: Boolean!
+  updatedAt: Int!
+}
+
+"""Per-day activity (UTC), for charts."""
+type DailyStats {
+  id: ID! # YYYY-MM-DD
+  dayStart: Int!
+  notes: Int!
+  spent: Int!
+  withdrawals: Int!
+  withdrawnVolume: BigInt!
+  newAccounts: Int!
+}

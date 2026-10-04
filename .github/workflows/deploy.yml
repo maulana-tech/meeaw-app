@@ -84,11 +84,13 @@ jobs:
           PRIVY_APP_ID: ${{ secrets.PRIVY_APP_ID }}
           PRIVY_APP_SECRET: ${{ secrets.PRIVY_APP_SECRET }}
           RELAYER_PRIVATE_KEY: ${{ secrets.RELAYER_PRIVATE_KEY }}
+          RELAYER_RPC_URL: ${{ secrets.RELAYER_RPC_URL }}
+          ENVIO_GRAPHQL_URL: ${{ vars.ENVIO_GRAPHQL_URL }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: MONGODB_URI,CRON_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET,RELAYER_PRIVATE_KEY
+          envs: MONGODB_URI,CRON_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET,RELAYER_PRIVATE_KEY,RELAYER_RPC_URL,ENVIO_GRAPHQL_URL
           script: |
             set -euo pipefail
             cd /home/${{ secrets.SSH_USER }}/mawee
@@ -98,13 +100,15 @@ jobs:
             test -n "${PRIVY_APP_ID}"
             test -n "${PRIVY_APP_SECRET}"
             secret_env="$(mktemp)"
-            grep -Ev '^(MONGODB_URI|CRON_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET|RELAYER_PRIVATE_KEY)=' .env.production > "${secret_env}" || true
+            grep -Ev '^(MONGODB_URI|CRON_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET|RELAYER_PRIVATE_KEY|RELAYER_RPC_URL|ENVIO_GRAPHQL_URL)=' .env.production > "${secret_env}" || true
             {
               printf '%s\n' "MONGODB_URI=${MONGODB_URI}"
               printf '%s\n' "CRON_SECRET=${CRON_SECRET}"
               printf '%s\n' "PRIVY_APP_ID=${PRIVY_APP_ID}"
               printf '%s\n' "PRIVY_APP_SECRET=${PRIVY_APP_SECRET}"
               printf '%s\n' "RELAYER_PRIVATE_KEY=${RELAYER_PRIVATE_KEY}"
+              printf '%s\n' "RELAYER_RPC_URL=${RELAYER_RPC_URL}"
+              printf '%s\n' "ENVIO_GRAPHQL_URL=${ENVIO_GRAPHQL_URL}"
             } >> "${secret_env}"
             mv "${secret_env}" .env.production
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

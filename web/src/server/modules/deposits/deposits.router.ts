@@ -6,8 +6,13 @@ import {
   listDepositsInput,
   poolSnapshotInput,
   poolSnapshotOutput,
+  poolStatsOutput,
 } from "./deposits.schema";
-import { getPoolSnapshot, listDeposits } from "./deposits.service";
+import {
+  getPoolSnapshot,
+  getPoolStats,
+  listDeposits,
+} from "./deposits.service";
 
 function mapError(e: unknown): never {
   if (e instanceof DepositIndexGapError) {
@@ -26,6 +31,9 @@ export const depositsRouter = createTRPCRouter({
         input?.spentAfterBlock ?? 0,
       ).catch(mapError),
     ),
+  stats: publicProcedure
+    .output(poolStatsOutput)
+    .query(() => getPoolStats().catch(mapError)),
   list: publicProcedure
     .input(listDepositsInput)
     .output(depositOutput.array())

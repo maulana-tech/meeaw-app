@@ -26,6 +26,7 @@ import {
   withdrawAll,
   withdrawNote,
 } from "../../lib/withdraw";
+import { PrivacyPoolStat } from "../PrivacyPoolStat";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
@@ -309,6 +310,8 @@ export function WithdrawDashboard() {
           </div>
         </section>
       )}
+
+      <PrivacyPoolStat className="pt-8" />
 
       <Dialog
         open={target !== null}

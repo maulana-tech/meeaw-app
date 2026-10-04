@@ -10,6 +10,43 @@ import path from "node:path";
 import hre from "hardhat";
 
 const ENV_FILE = path.join(__dirname, "../../web/.env.local");
+const INDEXER_CONFIG = path.join(__dirname, "../../indexer/config.yaml");
+
+/**
+ * Points the Envio indexer at the fresh deployment: chain id, start block and
+ * the address listed under each named contract in indexer/config.yaml.
+ */
+function updateIndexerConfig(
+  file: string,
+  chainId: number,
+  startBlock: bigint,
+  addresses: Record<string, string>,
+) {
+  if (!fs.existsSync(file)) return;
+  const lines = fs.readFileSync(file, "utf8").split("\n");
+  let current: string | null = null;
+  const seen = new Set<string>();
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const chain = line.match(/^(\s*- id: )\d+\s*$/);
+    if (chain) lines[i] = `${chain[1]}${chainId}`;
+    const start = line.match(/^(\s*start_block: )\d+\s*$/);
+    if (start) lines[i] = `${start[1]}${startBlock}`;
+    const name = line.match(/^\s*- name: (\w+)\s*$/);
+    if (name) current = name[1];
+    const address = line.match(/^(\s*- )"0x[0-9a-fA-F]{40}"\s*$/);
+    if (address && current && addresses[current] && !seen.has(current)) {
+      lines[i] = `${address[1]}"${addresses[current]}"`;
+      seen.add(current);
+    }
+  }
+  for (const contract of Object.keys(addresses)) {
+    if (!seen.has(contract)) {
+      throw new Error(`indexer/config.yaml has no address entry for ${contract}`);
+    }
+  }
+  fs.writeFileSync(file, lines.join("\n"));
+}
 
 function upsertEnv(file: string, values: Record<string, string>) {
   const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : [];
@@ -28,6 +65,8 @@ async function main() {
   const chainId = await publicClient.getChainId();
   const admin = (process.env.POOL_ADMIN as `0x${string}` | undefined) ?? deployer.account.address;
   console.log(`network=${hre.network.name} chainId=${chainId} deployer=${deployer.account.address}`);
+  // Index from just before the first deployment transaction.
+  const firstBlock = await publicClient.getBlockNumber();
 
   let usdc = process.env.USDC_ADDRESS as `0x${string}` | undefined;
   let usdcDecimals = process.env.USDC_DECIMALS ?? "6";
@@ -67,6 +106,12 @@ async function main() {
     NEXT_PUBLIC_USDC_MINTABLE: usdcMintable,
   });
   console.log(`wrote ${path.relative(process.cwd(), ENV_FILE)}`);
+
+  updateIndexerConfig(INDEXER_CONFIG, chainId, firstBlock, {
+    Pool: pool.address,
+    Registry: registry.address,
+  });
+  console.log(`updated ${path.relative(process.cwd(), INDEXER_CONFIG)} (start_block ${firstBlock})`);
 }
 
 main().catch((error) => {

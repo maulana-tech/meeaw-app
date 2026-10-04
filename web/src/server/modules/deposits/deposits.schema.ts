@@ -40,6 +40,18 @@ export const poolSnapshotOutput = z.object({
   }),
 });
 
+export const poolStatsOutput = z.object({
+  source: z.enum(["envio", "rpc"]),
+  notes: z.number().int().nonnegative(),
+  spent: z.number().int().nonnegative(),
+  anonymitySet: z.number().int().nonnegative(),
+  withdrawals: z.number().int().nonnegative().nullable(),
+  shieldedTransfers: z.number().int().nonnegative().nullable(),
+  accounts: z.number().int().nonnegative().nullable(),
+  paused: z.boolean(),
+});
+
 export type ListDepositsInput = z.infer<typeof listDepositsInput>;
 export type DepositOutput = z.infer<typeof depositOutput>;
 export type PoolSnapshotOutput = z.infer<typeof poolSnapshotOutput>;
+export type PoolStatsOutput = z.infer<typeof poolStatsOutput>;

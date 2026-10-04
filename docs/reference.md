@@ -57,6 +57,22 @@ Rate limits (per IP for public calls, per Privy user for account calls) bound
 abuse. Typed-data definitions live in `web/src/lib/typedData.ts` and are reused
 by the contract tests.
 
+## Indexing (Envio HyperIndex)
+
+`indexer/` is an Envio HyperIndex project (config, schema, handlers, tests).
+With `ENVIO_GRAPHQL_URL` set, `deposits.snapshot` reads `Note`/`Nullifier`
+rows bounded by Envio's `_meta.progressBlock`, publishes only a contiguous
+leaf prefix (Merkle proofs need every leaf), and `deposits.stats` serves
+`PoolStats` — the anonymity set shown on the pay and withdraw pages. Without
+it, the server falls back to polling `eth_getLogs` into MongoDB. See
+[indexer/README.md](../indexer/README.md).
+
+## RPC (Alchemy)
+
+The relayer simulates, submits and waits for receipts through
+`RELAYER_RPC_URL` (Alchemy's Monad testnet endpoint works well). Reads stay
+on Envio: Alchemy's free tier allows only 10 blocks per `eth_getLogs`.
+
 ## Environment
 
 Public (`NEXT_PUBLIC_*`, baked into the browser bundle):
@@ -80,6 +96,8 @@ Server-only (never committed):
 | `PRIVY_APP_ID` / `PRIVY_APP_SECRET` | Server-side Privy token and wallet verification |
 | `MONAD_LOGS_BLOCK_RANGE` | Max blocks per `eth_getLogs` call (default `100`) |
 | `RELAYER_PRIVATE_KEY` | Hot wallet that submits signed/proved transactions and pays gas (gasless mode) |
+| `RELAYER_RPC_URL` | Dedicated RPC for the relayer, e.g. Alchemy `https://monad-testnet.g.alchemy.com/v2/<key>` |
+| `ENVIO_GRAPHQL_URL` | Envio HyperIndex GraphQL endpoint; replaces the `eth_getLogs` poller when set |
 
 ## Prerequisites & build
 

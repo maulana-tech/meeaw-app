@@ -75,6 +75,8 @@ it does not learn which deposit event produced that note.
   transfers.
 - `web/` - Next.js app for onboarding, payment links, payer checkout, local note
   scanning, proof generation, withdrawals, and disclosure bundles.
+- `indexer/` - Envio HyperIndex project: notes, nullifiers, withdrawals,
+  accounts with key history, and pool/daily aggregates (anonymity set).
 
 ## Core Flows
 
@@ -233,6 +235,9 @@ Important server-only values:
 - `PRIVY_APP_ID` / `PRIVY_APP_SECRET` - server-only Privy token and wallet
   verification.
 - `MONAD_LOGS_BLOCK_RANGE` - max block span per `eth_getLogs` call.
+- `ENVIO_GRAPHQL_URL` - Envio HyperIndex endpoint; when set it replaces the
+  `eth_getLogs` poller for wallet scanning and pool stats.
+- `RELAYER_RPC_URL` - dedicated RPC for the relayer (e.g. Alchemy).
 - `RELAYER_PRIVATE_KEY` - hot wallet for gasless mode. Users then only sign;
   the relayer submits and pays MON gas. See
   [docs/reference.md](docs/reference.md#gasless-relay).

@@ -27,6 +27,19 @@ export const serverEnvSchema = z.object({
       .regex(/^0x[0-9a-fA-F]{64}$/, "must be a 0x-prefixed 32-byte hex key")
       .optional(),
   ),
+  // RPC for the relayer's writes (e.g. Alchemy:
+  // https://monad-testnet.g.alchemy.com/v2/<key>). Server-only because the
+  // URL embeds an API key. Falls back to NEXT_PUBLIC_MONAD_RPC_URL.
+  RELAYER_RPC_URL: z.preprocess(
+    emptyToUndefined,
+    z.string().trim().url().optional(),
+  ),
+  // Envio HyperIndex GraphQL endpoint (indexer/). When set, wallet scanning
+  // and pool stats read from Envio instead of the eth_getLogs poller.
+  ENVIO_GRAPHQL_URL: z.preprocess(
+    emptyToUndefined,
+    z.string().trim().url().optional(),
+  ),
   // Max block span per eth_getLogs request; public Monad RPCs cap this.
   MONAD_LOGS_BLOCK_RANGE: z.preprocess(
     emptyToUndefined,
@@ -42,6 +55,8 @@ export function getServerEnv() {
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
     RELAYER_PRIVATE_KEY: process.env.RELAYER_PRIVATE_KEY,
+    ENVIO_GRAPHQL_URL: process.env.ENVIO_GRAPHQL_URL,
+    RELAYER_RPC_URL: process.env.RELAYER_RPC_URL,
     MONAD_LOGS_BLOCK_RANGE: process.env.MONAD_LOGS_BLOCK_RANGE,
   });
 }

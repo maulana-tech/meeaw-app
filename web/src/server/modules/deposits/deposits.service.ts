@@ -7,6 +7,7 @@ import { Binary, MongoServerError } from "mongodb";
 import { getServerEnv } from "../../../env.server";
 import { maweePoolAbi } from "../../../lib/abi";
 import {
+  chain,
   fetchPoolLogs,
   network,
   poolAddress,
@@ -20,8 +21,19 @@ import {
   getIndexerState,
   getSpentNullifiers,
 } from "../../db/mongo";
+import {
+  envioConfigured,
+  envioMeta,
+  envioNotesAfter,
+  envioNullifiersBetween,
+  envioPoolStats,
+} from "../../lib/envio";
 import { DepositIndexGapError } from "./deposits.errors";
-import type { DepositOutput, PoolSnapshotOutput } from "./deposits.schema";
+import type {
+  DepositOutput,
+  PoolSnapshotOutput,
+  PoolStatsOutput,
+} from "./deposits.schema";
 
 const LEASE_MS = 50_000;
 const STALE_AFTER_MS = 120_000;
@@ -118,7 +130,8 @@ async function blockTimestamps(blocks: bigint[]): Promise<Map<bigint, Date>> {
 export async function syncPoolIndex(): Promise<PoolSyncResult> {
   const startedAt = Date.now();
   const owner = randomUUID();
-  if (!(await acquireLease(owner))) {
+  // With Envio HyperIndex configured, Envio is the mirror; nothing to poll.
+  if (envioConfigured() || !(await acquireLease(owner))) {
     return {
       status: "skipped",
       fromBlock: 0,
@@ -292,10 +305,127 @@ function healMirror(): Promise<PoolSyncResult> {
   return healInFlight;
 }
 
+const strip0x = (hex: string) =>
+  (hex.startsWith("0x") ? hex.slice(2) : hex).toLowerCase();
+
+function toDate(value: string | number | null): Date | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    return new Date(value < 1e12 ? value * 1000 : value);
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : new Date(parsed);
+}
+
+/**
+ * Snapshot served from Envio HyperIndex. Envio's progress block is the
+ * watermark; rows beyond it are excluded so client watermarks never skip data.
+ */
+async function getEnvioSnapshot(
+  afterLeafIndex: number,
+  spentAfterBlock: number,
+): Promise<PoolSnapshotOutput> {
+  const meta = await envioMeta(chain.id);
+  const publishedBlock = meta?.progressBlock ?? 0;
+  const [notes, spent] = meta
+    ? await Promise.all([
+        envioNotesAfter(afterLeafIndex, publishedBlock),
+        envioNullifiersBetween(spentAfterBlock, publishedBlock),
+      ])
+    : [[], []];
+
+  // Merkle proofs need every leaf, so only publish a contiguous prefix.
+  const deposits: DepositOutput[] = [];
+  let expected = afterLeafIndex + 1;
+  for (const note of notes) {
+    if (note.leafIndex !== expected) break;
+    deposits.push({
+      leafIndex: note.leafIndex,
+      commitmentHex: strip0x(note.commitment),
+      ephemeralPkHex: strip0x(note.ephemeralPk),
+      ciphertextHex: strip0x(note.ciphertext),
+      block: note.blockNumber,
+      txHash: note.txHash,
+      ts: new Date(note.timestamp * 1000).toISOString(),
+    });
+    expected += 1;
+  }
+  const gap = deposits.length !== notes.length;
+  if (gap) {
+    console.warn(
+      `[pool-snapshot] Envio leaf gap after ${expected - 1}; serving the contiguous prefix`,
+    );
+  }
+
+  const indexedAt = toDate(meta?.progressBlockTime ?? null);
+  const stale = !indexedAt || Date.now() - indexedAt.getTime() > STALE_AFTER_MS;
+  return {
+    deposits,
+    spentNullifiers: spent.map((row) => ({
+      nullifierHex: strip0x(row.id),
+      block: row.blockNumber,
+      ts: new Date(row.timestamp * 1000).toISOString(),
+    })),
+    index: {
+      poolAddress,
+      network,
+      // A gap means a later leaf is missing; hold the spend watermark back so
+      // nothing is skipped once the gap fills.
+      publishedBlock: gap ? Math.max(0, spentAfterBlock) : publishedBlock,
+      publishedLeafIndex: expected - 1,
+      indexedAt: (indexedAt ?? new Date(0)).toISOString(),
+      health:
+        !meta || !meta.isReady || gap
+          ? "degraded"
+          : stale
+            ? "stale"
+            : "healthy",
+    },
+  };
+}
+
+/** Pool-wide privacy stats (anonymity set etc.). */
+export async function getPoolStats(): Promise<PoolStatsOutput> {
+  if (envioConfigured()) {
+    const stats = await envioPoolStats();
+    return {
+      source: "envio",
+      notes: stats?.notes ?? 0,
+      spent: stats?.spent ?? 0,
+      anonymitySet: stats?.anonymitySet ?? 0,
+      withdrawals: stats?.withdrawals ?? null,
+      shieldedTransfers: stats?.shieldedTransfers ?? null,
+      accounts: stats?.accounts ?? null,
+      paused: stats?.paused ?? false,
+    };
+  }
+  const [deposits, nullifiers] = await Promise.all([
+    getDeposits(),
+    getSpentNullifiers(),
+  ]);
+  const [notes, spent] = await Promise.all([
+    deposits.countDocuments(),
+    nullifiers.countDocuments(),
+  ]);
+  return {
+    source: "rpc",
+    notes,
+    spent,
+    anonymitySet: Math.max(0, notes - spent),
+    withdrawals: null,
+    shieldedTransfers: null,
+    accounts: null,
+    paused: false,
+  };
+}
+
 export async function getPoolSnapshot(
   afterLeafIndex: number,
   spentAfterBlock: number,
 ): Promise<PoolSnapshotOutput> {
+  if (envioConfigured()) {
+    return getEnvioSnapshot(afterLeafIndex, spentAfterBlock);
+  }
   const startedAt = Date.now();
   const [states, deposits, nullifiers] = await Promise.all([
     getIndexerState(),

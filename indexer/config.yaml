@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+# Envio HyperIndex for Mawee on Monad. `pnpm deploy:testnet` (contracts/)
+# rewrites the addresses and start_block below after each deployment.
+name: mawee-indexer
+# Lowercase addresses so the app can match owners/recipients with plain
+# string equality.
+address_format: lowercase
+field_selection:
+  transaction_fields:
+    - hash
+chains:
+  - id: 10143
+    start_block: 0
+    contracts:
+      - name: Pool
+        address:
+          - "0x0000000000000000000000000000000000000000"
+        events:
+          - event: Deposit(uint32 indexed leafIndex, bytes32 commitment, bytes32 ephemeralPk, bytes ciphertext)
+          - event: Spend(bytes32 indexed nullifier)
+          - event: Withdrawal(bytes32 indexed nullifier, address indexed recipient, uint256 amount)
+          - event: PausedSet(bool paused)
+      - name: Registry
+        address:
+          - "0x0000000000000000000000000000000000000000"
+        events:
+          - event: Registered(bytes32 indexed usernameHash, string username, address indexed owner, bytes32 notePubkey, bytes32 viewPubkey)
+          - event: PubkeysRotated(bytes32 indexed usernameHash, address indexed owner, bytes32 notePubkey, bytes32 viewPubkey)
