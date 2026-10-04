@@ -10,11 +10,15 @@ import {
   chain,
   fetchPoolLogs,
   network,
-  poolAddress,
-  poolDeployBlock,
   publicClient,
 } from "../../../lib/chain";
 import { bytesToHex } from "../../../lib/crypto";
+import {
+  activePool,
+  findPool,
+  listPools,
+  type PoolDescriptor,
+} from "../../../lib/pools";
 import {
   type DepositDoc,
   getDeposits,
@@ -28,23 +32,34 @@ import {
   envioNullifiersBetween,
   envioPoolStats,
 } from "../../lib/envio";
-import { DepositIndexGapError } from "./deposits.errors";
+import { DepositIndexGapError, UnknownPoolError } from "./deposits.errors";
 import type {
   DepositOutput,
   PoolSnapshotOutput,
   PoolStatsOutput,
 } from "./deposits.schema";
+import { depositDocId, nullifierDocId, poolStateId } from "./poolScope";
 
 const LEASE_MS = 50_000;
 const STALE_AFTER_MS = 120_000;
 // Bounds one cron run (each chunk is one eth_getLogs call).
 const MAX_CHUNKS_PER_RUN = 400;
 
-const scope = () => `${network}:${poolAddress.toLowerCase()}`;
-const startBlock = () =>
-  Number(poolDeployBlock > 0n ? poolDeployBlock - 1n : 0n);
+const startBlock = (pool: PoolDescriptor) => Math.max(0, pool.deployBlock - 1);
+
+/** Envio indexes the active pool; legacy pools use the RPC poller (Task 5 widens Envio). */
+const servedByEnvio = (pool: PoolDescriptor) =>
+  envioConfigured() && pool.role === "active";
+
+function resolveSnapshotPool(scope: string | undefined): PoolDescriptor {
+  if (scope === undefined) return activePool();
+  const pool = findPool(scope);
+  if (!pool) throw new UnknownPoolError();
+  return pool;
+}
 
 export type PoolSyncResult = {
+  pool: string;
   status: "synced" | "skipped" | "degraded";
   fromBlock: number;
   toBlock: number;
@@ -55,14 +70,17 @@ export type PoolSyncResult = {
   error?: string;
 };
 
-async function acquireLease(owner: string): Promise<boolean> {
+async function acquireLease(
+  pool: PoolDescriptor,
+  owner: string,
+): Promise<boolean> {
   const now = new Date();
   const leaseUntil = new Date(now.getTime() + LEASE_MS);
   const states = await getIndexerState();
   try {
     const state = await states.findOneAndUpdate(
       {
-        _id: "pool",
+        _id: poolStateId(pool.scope),
         $or: [
           { leaseUntil: { $exists: false } },
           { leaseUntil: { $lte: now } },
@@ -71,7 +89,13 @@ async function acquireLease(owner: string): Promise<boolean> {
       },
       {
         $set: { leaseOwner: owner, leaseUntil },
-        $setOnInsert: { updatedAt: now },
+        $setOnInsert: {
+          scope: pool.scope,
+          publishedBlock: startBlock(pool),
+          publishedLeafIndex: -1,
+          health: "degraded",
+          updatedAt: now,
+        },
       },
       { upsert: true, returnDocument: "after" },
     );
@@ -83,35 +107,14 @@ async function acquireLease(owner: string): Promise<boolean> {
   }
 }
 
-async function releaseLease(owner: string): Promise<void> {
+async function releaseLease(
+  pool: PoolDescriptor,
+  owner: string,
+): Promise<void> {
   const states = await getIndexerState();
   await states.updateOne(
-    { _id: "pool", leaseOwner: owner },
+    { _id: poolStateId(pool.scope), leaseOwner: owner },
     { $unset: { leaseOwner: "", leaseUntil: "" } },
-  );
-}
-
-/** A new chain or pool address invalidates every mirrored row. */
-async function resetForConfiguredPool(owner: string): Promise<void> {
-  const [deposits, nullifiers, states] = await Promise.all([
-    getDeposits(),
-    getSpentNullifiers(),
-    getIndexerState(),
-  ]);
-  await Promise.all([deposits.deleteMany({}), nullifiers.deleteMany({})]);
-  await states.updateOne(
-    { _id: "pool", leaseOwner: owner },
-    {
-      $set: {
-        scope: scope(),
-        publishedBlock: startBlock(),
-        publishedLeafIndex: -1,
-        updatedAt: new Date(),
-        health: "degraded",
-        lastError: "Pool mirror is awaiting its initial synchronization",
-      },
-      $unset: { indexedAt: "" },
-    },
   );
 }
 
@@ -127,12 +130,17 @@ async function blockTimestamps(blocks: bigint[]): Promise<Map<bigint, Date>> {
   return out;
 }
 
-export async function syncPoolIndex(): Promise<PoolSyncResult> {
+/** Mirror one pool's public events (the active pool by default). */
+export async function syncPoolIndex(
+  pool: PoolDescriptor = activePool(),
+): Promise<PoolSyncResult> {
   const startedAt = Date.now();
   const owner = randomUUID();
-  // With Envio HyperIndex configured, Envio is the mirror; nothing to poll.
-  if (envioConfigured() || !(await acquireLease(owner))) {
+  const stateId = poolStateId(pool.scope);
+  // With Envio HyperIndex serving this pool, Envio is the mirror; nothing to poll.
+  if (servedByEnvio(pool) || !(await acquireLease(pool, owner))) {
     return {
+      pool: pool.scope,
       status: "skipped",
       fromBlock: 0,
       toBlock: 0,
@@ -144,19 +152,18 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
   }
 
   const states = await getIndexerState();
-  let fromBlock = startBlock();
+  let fromBlock = startBlock(pool);
   try {
-    let state = await states.findOne({ _id: "pool" });
-    if (state?.scope !== scope()) {
-      await resetForConfiguredPool(owner);
-      state = await states.findOne({ _id: "pool" });
-    }
-    fromBlock = state?.publishedBlock ?? startBlock();
+    // Each pool has its own watermark; configuring a new active pool starts a
+    // fresh one and never deletes another pool's mirrored history.
+    const state = await states.findOne({ _id: stateId });
+    fromBlock = state?.publishedBlock ?? startBlock(pool);
 
     const { logs, scannedTo, latestBlock } = await fetchPoolLogs({
       afterBlock: BigInt(fromBlock),
       blockRange: getServerEnv().MONAD_LOGS_BLOCK_RANGE,
       maxChunks: MAX_CHUNKS_PER_RUN,
+      pool,
     });
     const timestamps = await blockTimestamps(logs.map((l) => l.blockNumber));
 
@@ -167,9 +174,11 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
       if (log.deposit) {
         depositOps.push({
           updateOne: {
-            filter: { _id: log.deposit.leafIndex },
+            filter: { _id: depositDocId(pool.scope, log.deposit.leafIndex) },
             update: {
               $set: {
+                scope: pool.scope,
+                leafIndex: log.deposit.leafIndex,
                 commitment: new Binary(Buffer.from(log.deposit.commitment)),
                 ephemeralPk: new Binary(Buffer.from(log.deposit.ephemeralPk)),
                 ciphertext: new Binary(Buffer.from(log.deposit.ciphertext)),
@@ -185,9 +194,13 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
       if (log.spent) {
         nullifierOps.push({
           updateOne: {
-            filter: { _id: log.spent.nullifierHex },
+            filter: {
+              _id: nullifierDocId(pool.scope, log.spent.nullifierHex),
+            },
             update: {
               $set: {
+                scope: pool.scope,
+                nullifierHex: log.spent.nullifierHex,
                 block: Number(log.blockNumber),
                 txHash: log.txHash,
                 ts,
@@ -216,12 +229,15 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
     // contract had inserted by then must be mirrored.
     const [onChainCount, mirroredCount] = await Promise.all([
       publicClient.readContract({
-        address: poolAddress,
+        address: pool.address,
         abi: maweePoolAbi,
         functionName: "nextIndex",
         blockNumber: scannedTo,
       }),
-      deposits.countDocuments({ block: { $lte: Number(scannedTo) } }),
+      deposits.countDocuments({
+        scope: pool.scope,
+        block: { $lte: Number(scannedTo) },
+      }),
     ]);
     if (onChainCount !== mirroredCount) {
       throw new DepositIndexGapError(onChainCount, mirroredCount);
@@ -229,10 +245,10 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
 
     const indexedAt = new Date();
     await states.updateOne(
-      { _id: "pool", leaseOwner: owner },
+      { _id: stateId, leaseOwner: owner },
       {
         $set: {
-          scope: scope(),
+          scope: pool.scope,
           publishedBlock: Number(scannedTo),
           publishedLeafIndex: onChainCount - 1,
           indexedAt,
@@ -244,6 +260,7 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
     );
 
     return {
+      pool: pool.scope,
       status: "synced",
       fromBlock,
       toBlock: Number(scannedTo),
@@ -256,7 +273,7 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
     const message =
       error instanceof Error ? error.message : "Indexer sync failed";
     await states.updateOne(
-      { _id: "pool", leaseOwner: owner },
+      { _id: stateId, leaseOwner: owner },
       {
         $set: {
           health: "degraded",
@@ -266,6 +283,7 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
       },
     );
     return {
+      pool: pool.scope,
       status: "degraded",
       fromBlock,
       toBlock: fromBlock,
@@ -276,13 +294,28 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
       error: message,
     };
   } finally {
-    await releaseLease(owner);
+    await releaseLease(pool, owner);
   }
+}
+
+/** Cron entry point: every configured pool, one after another. */
+export async function syncAllPoolIndexes(): Promise<{
+  status: PoolSyncResult["status"];
+  pools: PoolSyncResult[];
+}> {
+  const pools: PoolSyncResult[] = [];
+  for (const pool of listPools()) pools.push(await syncPoolIndex(pool));
+  const status = pools.some((r) => r.status === "degraded")
+    ? "degraded"
+    : pools.some((r) => r.status === "synced")
+      ? "synced"
+      : "skipped";
+  return { status, pools };
 }
 
 function toDepositOutput(d: DepositDoc): DepositOutput {
   return {
-    leafIndex: d._id,
+    leafIndex: d.leafIndex,
     commitmentHex: bytesToHex(d.commitment.buffer),
     ephemeralPkHex: bytesToHex(d.ephemeralPk.buffer),
     ciphertextHex: bytesToHex(d.ciphertext.buffer),
@@ -292,17 +325,19 @@ function toDepositOutput(d: DepositDoc): DepositOutput {
   };
 }
 
-let healInFlight: Promise<PoolSyncResult> | null = null;
-let lastHealAttempt = 0;
+const healInFlight = new Map<string, Promise<PoolSyncResult>>();
+const lastHealAttempt = new Map<string, number>();
 const HEAL_COOLDOWN_MS = 15_000;
 
-function healMirror(): Promise<PoolSyncResult> {
-  if (healInFlight) return healInFlight;
-  lastHealAttempt = Date.now();
-  healInFlight = syncPoolIndex().finally(() => {
-    healInFlight = null;
+function healMirror(pool: PoolDescriptor): Promise<PoolSyncResult> {
+  const pending = healInFlight.get(pool.scope);
+  if (pending) return pending;
+  lastHealAttempt.set(pool.scope, Date.now());
+  const heal = syncPoolIndex(pool).finally(() => {
+    healInFlight.delete(pool.scope);
   });
-  return healInFlight;
+  healInFlight.set(pool.scope, heal);
+  return heal;
 }
 
 const strip0x = (hex: string) =>
@@ -367,7 +402,7 @@ async function getEnvioSnapshot(
       ts: new Date(row.timestamp * 1000).toISOString(),
     })),
     index: {
-      poolAddress,
+      poolAddress: activePool().address,
       network,
       // A gap means a later leaf is missing; hold the spend watermark back so
       // nothing is skipped once the gap fills.
@@ -379,7 +414,7 @@ async function getEnvioSnapshot(
   };
 }
 
-/** Pool-wide privacy stats (anonymity set etc.). */
+/** Active-pool privacy stats (anonymity set etc.). */
 export async function getPoolStats(): Promise<PoolStatsOutput> {
   if (envioConfigured()) {
     const stats = await envioPoolStats();
@@ -398,9 +433,10 @@ export async function getPoolStats(): Promise<PoolStatsOutput> {
     getDeposits(),
     getSpentNullifiers(),
   ]);
+  const { scope } = activePool();
   const [notes, spent] = await Promise.all([
-    deposits.countDocuments(),
-    nullifiers.countDocuments(),
+    deposits.countDocuments({ scope }),
+    nullifiers.countDocuments({ scope }),
   ]);
   return {
     source: "rpc",
@@ -414,11 +450,17 @@ export async function getPoolStats(): Promise<PoolStatsOutput> {
   };
 }
 
+/**
+ * Public mirror rows for one configured pool (the active pool by default).
+ * Unknown scopes are rejected rather than served another pool's leaves.
+ */
 export async function getPoolSnapshot(
   afterLeafIndex: number,
   spentAfterBlock: number,
+  poolScope?: string,
 ): Promise<PoolSnapshotOutput> {
-  if (envioConfigured()) {
+  const pool = resolveSnapshotPool(poolScope);
+  if (servedByEnvio(pool)) {
     return getEnvioSnapshot(afterLeafIndex, spentAfterBlock);
   }
   const startedAt = Date.now();
@@ -427,22 +469,26 @@ export async function getPoolSnapshot(
     getDeposits(),
     getSpentNullifiers(),
   ]);
-  let state = await states.findOne({ _id: "pool" });
+  const stateId = poolStateId(pool.scope);
+  let state = await states.findOne({ _id: stateId });
 
-  const published = state?.scope === scope() && state.indexedAt !== undefined;
-  const cooled = Date.now() - lastHealAttempt > HEAL_COOLDOWN_MS;
+  const published =
+    state?.scope === pool.scope && state.indexedAt !== undefined;
+  const cooled =
+    Date.now() - (lastHealAttempt.get(pool.scope) ?? 0) > HEAL_COOLDOWN_MS;
+  const healing = healInFlight.has(pool.scope);
   if (!published) {
-    if (healInFlight || cooled) {
-      await healMirror().catch(() => {});
-      state = await states.findOne({ _id: "pool" });
+    if (healing || cooled) {
+      await healMirror(pool).catch(() => {});
+      state = await states.findOne({ _id: stateId });
     }
   } else {
     const isStale =
       !state?.indexedAt ||
       Date.now() - state.indexedAt.getTime() > STALE_AFTER_MS;
-    if (isStale && (healInFlight || cooled)) void healMirror().catch(() => {});
+    if (isStale && (healing || cooled)) void healMirror(pool).catch(() => {});
   }
-  const configuredPool = state?.scope === scope();
+  const configuredPool = state?.scope === pool.scope;
   const publishedBlock = configuredPool ? (state?.publishedBlock ?? 0) : 0;
   const publishedLeafIndex = configuredPool
     ? (state?.publishedLeafIndex ?? -1)
@@ -458,11 +504,17 @@ export async function getPoolSnapshot(
 
   const [depositDocs, spentDocs] = await Promise.all([
     deposits
-      .find({ _id: { $gt: afterLeafIndex, $lte: publishedLeafIndex } })
-      .sort({ _id: 1 })
+      .find({
+        scope: pool.scope,
+        leafIndex: { $gt: afterLeafIndex, $lte: publishedLeafIndex },
+      })
+      .sort({ leafIndex: 1 })
       .toArray(),
     nullifiers
-      .find({ block: { $gt: spentAfterBlock, $lte: publishedBlock } })
+      .find({
+        scope: pool.scope,
+        block: { $gt: spentAfterBlock, $lte: publishedBlock },
+      })
       .sort({ block: 1, _id: 1 })
       .toArray(),
   ]);
@@ -470,12 +522,12 @@ export async function getPoolSnapshot(
   const snapshot: PoolSnapshotOutput = {
     deposits: depositDocs.map(toDepositOutput),
     spentNullifiers: spentDocs.map((doc) => ({
-      nullifierHex: doc._id,
+      nullifierHex: doc.nullifierHex,
       block: doc.block,
       ts: doc.ts.toISOString(),
     })),
     index: {
-      poolAddress,
+      poolAddress: pool.address,
       network,
       publishedBlock: Math.max(0, publishedBlock),
       publishedLeafIndex,
@@ -486,6 +538,7 @@ export async function getPoolSnapshot(
   console.info(
     "[pool-snapshot]",
     JSON.stringify({
+      pool: pool.scope,
       durationMs: Date.now() - startedAt,
       deposits: snapshot.deposits.length,
       nullifiers: snapshot.spentNullifiers.length,

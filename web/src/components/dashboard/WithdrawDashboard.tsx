@@ -18,6 +18,13 @@ import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import {
+  activePool,
+  legacyPools,
+  type PoolDescriptor,
+  type PoolScope,
+  resolvePool,
+} from "../../lib/pools";
 import { useGasless } from "../../lib/useGasless";
 import {
   claimableNotes,
@@ -42,6 +49,7 @@ import { Label } from "../ui/label";
 import { ToastFeedback } from "../ui/toast-feedback";
 import { useWallet } from "../WalletProvider";
 import { DashboardPageHeader } from "./DashboardPageHeader";
+import { useLegacyBalances } from "./useLegacyBalances";
 import { useMyNotes } from "./useMyNotes";
 
 type WalletStep = "form" | "review" | "proving";
@@ -89,13 +97,20 @@ function targetTotal(target: WithdrawalTarget | null): bigint {
 
 export function WithdrawDashboard() {
   const { address, accountUnlocked, promptUnlock, getSigner } = useWallet();
+  const [poolScope, setPoolScope] = useState<PoolScope>(
+    () => activePool().scope,
+  );
+  const pool = useMemo(() => resolvePool(poolScope), [poolScope]);
+  const legacyBalances = useLegacyBalances(
+    accountUnlocked ? address : undefined,
+  );
   const {
     notes,
     claimable,
     loading,
     error: notesError,
     refresh,
-  } = useMyNotes(accountUnlocked ? address : undefined);
+  } = useMyNotes(accountUnlocked ? address : undefined, pool);
   const [target, setTarget] = useState<WithdrawalTarget | null>(null);
   const [walletStep, setWalletStep] = useState<WalletStep>("form");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -153,7 +168,8 @@ export function WithdrawDashboard() {
     try {
       const account = getAccount();
       if (!account) throw new Error("Unlock your private account to continue.");
-      const scan = await scanMyNotes(account);
+      // Scan the pool the selected payments live in; never mix pools.
+      const scan = await scanMyNotes(account, { pool });
 
       if (target.kind === "all") {
         const batch = await withdrawAll({
@@ -194,7 +210,9 @@ export function WithdrawDashboard() {
 
       const note = scan.notes.find(
         (candidate) =>
-          candidate.leafIndex === target.note.leafIndex && !candidate.spent,
+          candidate.scope === target.note.scope &&
+          candidate.leafIndex === target.note.leafIndex &&
+          !candidate.spent,
       );
       if (!note) throw new Error("That payment is no longer available.");
       const withdrawal = await withdrawNote({
@@ -256,6 +274,17 @@ export function WithdrawDashboard() {
         }
       />
 
+      {accountUnlocked ? (
+        <PoolSelector
+          selected={pool}
+          legacyBalances={legacyBalances}
+          onSelect={(next) => {
+            closeWithdrawal();
+            setPoolScope(next);
+          }}
+        />
+      ) : null}
+
       {!accountUnlocked ? (
         <LockedState onUnlock={promptUnlock} />
       ) : loading ? (
@@ -301,7 +330,7 @@ export function WithdrawDashboard() {
             ) : null}
             {options.map((note, index) => (
               <PaymentCard
-                key={note.leafIndex}
+                key={`${note.scope}:${note.leafIndex}`}
                 note={note}
                 index={index}
                 onClick={() => openWithdrawal({ kind: "one", note })}
@@ -382,6 +411,62 @@ export function WithdrawDashboard() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * Shown only while a previous (legacy) pool still holds funds. Legacy pools
+ * are withdraw-only; their balance is never mixed into the current one.
+ */
+function PoolSelector({
+  selected,
+  legacyBalances,
+  onSelect,
+}: {
+  selected: PoolDescriptor;
+  legacyBalances: ReadonlyMap<PoolScope, bigint>;
+  onSelect: (scope: PoolScope) => void;
+}) {
+  const funded = legacyPools().filter(
+    (p) =>
+      (legacyBalances.get(p.scope) ?? 0n) > 0n || p.scope === selected.scope,
+  );
+  if (funded.length === 0) return null;
+  const choices: { pool: PoolDescriptor; label: string }[] = [
+    { pool: activePool(), label: "Current pool" },
+    ...funded.map((p) => ({
+      pool: p,
+      label: `Previous pool · ${formatUsd(legacyBalances.get(p.scope) ?? 0n)}`,
+    })),
+  ];
+  return (
+    <div className="mb-6 grid gap-2">
+      <fieldset className="flex flex-wrap gap-2">
+        <legend className="sr-only">Pool to withdraw from</legend>
+        {choices.map(({ pool, label }) => {
+          const checked = pool.scope === selected.scope;
+          return (
+            <button
+              key={pool.scope}
+              type="button"
+              aria-pressed={checked}
+              onClick={() => onSelect(pool.scope)}
+              className={`min-h-10 rounded-lg px-3 text-sm font-semibold ring-1 transition-colors focus-visible:ring-2 focus-visible:ring-brand-linen ${
+                checked
+                  ? "bg-brand-linen text-foreground ring-brand-linen"
+                  : "bg-brand-linen/8 text-brand-linen ring-brand-linen/20 hover:bg-brand-linen/15"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </fieldset>
+      <p className="text-xs text-brand-linen/65">
+        You still have funds in a previous Mawee pool. They can only be
+        withdrawn, and are not used to pay requests.
+      </p>
+    </div>
   );
 }
 

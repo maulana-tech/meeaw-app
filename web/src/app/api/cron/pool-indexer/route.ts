@@ -1,5 +1,5 @@
 import { getServerEnv } from "../../../../env.server";
-import { syncPoolIndex } from "../../../../server/modules/deposits/deposits.service";
+import { syncAllPoolIndexes } from "../../../../server/modules/deposits/deposits.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await syncPoolIndex();
+  const result = await syncAllPoolIndexes();
   console.info("[pool-indexer]", JSON.stringify(result));
   return Response.json(result, {
     status: result.status === "degraded" ? 503 : 200,

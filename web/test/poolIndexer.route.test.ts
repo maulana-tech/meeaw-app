@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ sync: vi.fn() }));
 
 vi.mock("../src/server/modules/deposits/deposits.service", () => ({
-  syncPoolIndex: mocks.sync,
+  syncAllPoolIndexes: mocks.sync,
 }));
 
 describe("pool indexer cron route", () => {

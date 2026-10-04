@@ -16,6 +16,11 @@ export const depositOutput = z.object({
 
 export const poolSnapshotInput = z
   .object({
+    // `${chainId}:${poolAddress}`; resolved against the manifest server-side.
+    pool: z
+      .string()
+      .regex(/^\d{1,16}:0x[0-9a-f]{40}$/)
+      .optional(),
     afterLeafIndex: z.number().int().gte(-1).optional(),
     spentAfterBlock: z.number().int().nonnegative().optional(),
   })

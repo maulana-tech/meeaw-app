@@ -6,3 +6,11 @@ export class DepositIndexGapError extends Error {
     this.name = "DepositIndexGapError";
   }
 }
+
+/** The requested pool is not in this deployment's manifest. */
+export class UnknownPoolError extends Error {
+  constructor() {
+    super("Unknown pool.");
+    this.name = "UnknownPoolError";
+  }
+}

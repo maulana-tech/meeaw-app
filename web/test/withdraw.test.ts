@@ -4,6 +4,7 @@ import { beforeEach, vi } from "vitest";
 import type { Signer } from "../src/lib/chain";
 import { poolWithdraw } from "../src/lib/chain";
 import type { LocalAccount, MyNote, ScanResult } from "../src/lib/notes";
+import { activePool } from "../src/lib/pools";
 import {
   claimableNotes,
   isValidDestination,
@@ -34,7 +35,16 @@ vi.mock("../src/lib/chain", () => ({
   revertErrorName: () => null,
 }));
 
-const note = (leafIndex: number, amount: bigint, spent = false): MyNote => ({
+const SCOPE = activePool().scope;
+const OTHER_SCOPE = "10143:0x00000000000000000000000000000000000000c0" as const;
+
+const note = (
+  leafIndex: number,
+  amount: bigint,
+  spent = false,
+  scope: MyNote["scope"] = SCOPE,
+): MyNote => ({
+  scope,
   leafIndex,
   amount,
   salt: 1n,
@@ -99,6 +109,7 @@ describe("withdrawAll", () => {
     viewSk: new Uint8Array(),
   } as unknown as LocalAccount;
   const scan = {
+    scope: SCOPE,
     notes: [],
     leaves: [],
     claimable: 0n,
@@ -131,6 +142,25 @@ describe("withdrawAll", () => {
     // poolWithdraw's 3rd arg is the note amount — assert largest-first order.
     const amounts = mockPoolWithdraw.mock.calls.map((c) => c[2]);
     expect(amounts).toEqual([10_0000000n, 5_0000000n, 3_0000000n]);
+    // Every withdrawal targets the notes' own pool.
+    expect(mockPoolWithdraw.mock.calls.map((c) => c[6]?.scope)).toEqual([
+      SCOPE,
+      SCOPE,
+      SCOPE,
+    ]);
+  });
+
+  it("refuses to mix notes from another pool, even at the same leaf index", async () => {
+    await expect(
+      withdrawAll({
+        signer,
+        acct,
+        scan,
+        notes: [note(0, 5n), note(0, 7n, false, OTHER_SCOPE)],
+        destination: G,
+      }),
+    ).rejects.toThrow("one pool at a time");
+    expect(mockPoolWithdraw).not.toHaveBeenCalled();
   });
 
   it("ignores already-spent notes", async () => {

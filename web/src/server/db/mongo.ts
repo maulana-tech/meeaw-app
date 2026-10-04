@@ -2,7 +2,9 @@ import { type Binary, type Collection, type Db, MongoClient } from "mongodb";
 import { getServerEnv } from "../../env.server";
 
 export type DepositDoc = {
-  _id: number; // leaf index
+  _id: string; // `${scope}:${leafIndex}` (see deposits/poolScope.ts)
+  scope: string; // `${chainId}:${poolAddress}`
+  leafIndex: number;
   commitment: Binary;
   ephemeralPk: Binary;
   ciphertext: Binary;
@@ -24,8 +26,9 @@ export type UsernameDoc = {
 };
 
 export type IndexerStateDoc = {
-  _id: "pool" | "registry";
-  /** `${network}:${poolAddress}` the mirror was built from. */
+  /** `pool:${scope}` per pool; bare "pool" only exists before migration. */
+  _id: "pool" | "registry" | `pool:${string}`;
+  /** Pool scope (`${chainId}:${poolAddress}`) the watermark belongs to. */
   scope?: string;
   publishedBlock?: number;
   publishedLeafIndex?: number;
@@ -38,7 +41,9 @@ export type IndexerStateDoc = {
 };
 
 export type SpentNullifierDoc = {
-  _id: string; // nullifier hex, no 0x
+  _id: string; // `${scope}:${nullifierHex}` (see deposits/poolScope.ts)
+  scope: string;
+  nullifierHex: string; // no 0x
   block: number;
   txHash: string;
   ts: Date;

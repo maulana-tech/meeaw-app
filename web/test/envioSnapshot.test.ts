@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const POOL = "0x00000000000000000000000000000000000000B0";
+const POOL = "0x00000000000000000000000000000000000000b0";
 
 const mocks = vi.hoisted(() => ({
   meta: vi.fn(),
@@ -26,6 +26,25 @@ vi.mock("../src/lib/chain", () => ({
   poolDeployBlock: 0n,
   publicClient: { readContract: vi.fn() },
 }));
+vi.mock("../src/lib/pools", () => {
+  const active = {
+    scope: "10143:0x00000000000000000000000000000000000000b0",
+    chainId: 10143,
+    address: "0x00000000000000000000000000000000000000b0",
+    deployBlock: 0,
+    token: "0x00000000000000000000000000000000000000d0",
+    tokenDecimals: 6,
+    depth: 20,
+    confirmations: 1,
+    role: "active",
+    requestCapable: true,
+  };
+  return {
+    activePool: () => active,
+    listPools: () => [active],
+    findPool: (scope: string) => (scope === active.scope ? active : null),
+  };
+});
 vi.mock("../src/server/db/mongo", () => ({
   getDeposits: mocks.getDeposits,
   getIndexerState: vi.fn(),
