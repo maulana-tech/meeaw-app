@@ -1,4 +1,4 @@
-// Deploys Poseidon, the three Groth16 verifiers, MaweeRegistry and MaweePool,
+// Deploys Poseidon, the four Groth16 verifiers, MaweeRegistry and MaweePool,
 // then writes the resulting addresses into web/.env.local.
 //
 //   DEPLOYER_PRIVATE_KEY=0x… pnpm --filter contracts deploy:testnet
@@ -84,10 +84,18 @@ async function main() {
   const depositVerifier = await hre.viem.deployContract("DepositVerifier");
   const withdrawVerifier = await hre.viem.deployContract("WithdrawVerifier");
   const transferVerifier = await hre.viem.deployContract("TransferVerifier");
+  const mergeVerifier = await hre.viem.deployContract("MergeVerifier");
   const registry = await hre.viem.deployContract("MaweeRegistry");
   const pool = await hre.viem.deployContract(
     "MaweePool",
-    [admin, usdc, depositVerifier.address, withdrawVerifier.address, transferVerifier.address],
+    [
+      admin,
+      usdc,
+      depositVerifier.address,
+      withdrawVerifier.address,
+      transferVerifier.address,
+      mergeVerifier.address,
+    ],
     { libraries: { "poseidon-solidity/PoseidonT3.sol:PoseidonT3": poseidon.address } },
   );
   const deployBlock = await publicClient.getBlockNumber();

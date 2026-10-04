@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "capacity": {
+    "merge": {
+      "ptauPower": 15,
+      "optimization": "O2"
+    }
+  },
+  "artifacts": {
+    "deposit.wasm": "961a94f107e3e2fc62c18991942480e5fe06dac8345201f1296d74259c7d870a",
+    "deposit.zkey": "ed6484f7e3abd3cc09cf2e20d2e2254b3e51006c1a44f174cc64933f2e5082b0",
+    "merge.wasm": "b00a598b2c01a1d882d4b069e00f78592e60ae9739cf007c753861cc95ffd813",
+    "merge.zkey": "41a48a72bc1eab5a72661db0b5a7541eafe37d1b7ff5f6d8964a860e3b68b9b5",
+    "transfer.wasm": "8a1da5643df84cc4c935c7a523200a146e6f21c28afa2ddf99d781557784be43",
+    "transfer.zkey": "5816d3397e6328b3e8e8a1c1d3a5acaca9d3790ad10cf7aa1e07a570d46b4087",
+    "verification_key.json": "3e2b540689a2536edcd12445543fe114f927a852a9cd1c861c01ae17e49a889c",
+    "verification_key_deposit.json": "ef0e963d4533c964dd5a33477640e27c7ed64852e61c78c4add4b21875b72f91",
+    "verification_key_merge.json": "d8df42e6de47cf37e3ed86317895b7383b42371aa43037bccb6fa2aea2162c42",
+    "verification_key_transfer.json": "b6798347116f46c8c661a4007a3fdb9030da11cea4fc3b112eb3ef11ee494adc",
+    "withdraw.wasm": "65de33ecec6c11eb6d35e14e8f71055f9c45d7ff1cd055db17237b2b49dce6df",
+    "withdraw.zkey": "4708b59c67e5b9d3ad02be850a5aea3853491136d9c3bfa2e277a59cf4705786"
+  }
+}

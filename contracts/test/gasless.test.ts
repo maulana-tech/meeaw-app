@@ -193,9 +193,10 @@ describe("MaweePool gasless deposit", () => {
     const dv = await hre.viem.deployContract("DepositVerifier");
     const wv = await hre.viem.deployContract("WithdrawVerifier");
     const tv = await hre.viem.deployContract("TransferVerifier");
+    const mv = await hre.viem.deployContract("MergeVerifier");
     const pool = await hre.viem.deployContract(
       "MaweePool",
-      [admin.account.address, usdc.address, dv.address, wv.address, tv.address],
+      [admin.account.address, usdc.address, dv.address, wv.address, tv.address, mv.address],
       { libraries: { "poseidon-solidity/PoseidonT3.sol:PoseidonT3": poseidon.address } },
     );
     await usdc.write.mint([payer.account.address, 100_000_000n]);
