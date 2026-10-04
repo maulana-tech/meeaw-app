@@ -22,16 +22,15 @@ token just to get paid or cash out.
 A digital dollar — a stablecoin worth ~$1. It's what you get paid in, so the
 value doesn't swing around like other crypto.
 
-## Can my client pay from Ethereum or Solana?
+## What does my client need to pay?
 
-Yes. Mawee uses Circle's CCTP to bring USDC over from Ethereum, Base, Arbitrum,
-Avalanche, or Solana. To you, it just shows up as a normal private payment. See
-[USDC & Cross-Chain Payments](usdc-and-cctp.md).
+Any EVM wallet (MetaMask, Rabby, …) holding USDC on Monad, plus a little MON for
+the network fee. Paying from other chains is not supported yet.
 
 ## Do I need to hold USDC to receive money?
 
-No. Receiving needs nothing but your Mawee account. You only touch the chain when
-you decide to cash out.
+No. Receiving needs nothing but your Mawee account. To withdraw, your Mawee
+wallet needs a little MON to pay the network fee.
 
 ## What's the PIN for?
 
@@ -52,19 +51,17 @@ things for you.
 ## Can Mawee freeze or take my money?
 
 The app and its servers can't spend or take your funds. Your spending authority
-stays with your passkey and PIN, while funds sit in an on-chain pool rather than
-an Mawee server account.
+stays with your wallet and PIN, while funds sit in an on-chain pool rather than
+a Mawee server account.
 
-For incident response, the pool's 2-of-3 governance can temporarily pause
-deposits, transfers, and withdrawals. Sensitive changes such as new contract
-code or proof rules require a public proposal and a 48-hour delay. See
-[Multisig & Timelocked Governance](multisig-governance.md).
+For incident response, the pool admin can pause deposits, transfers, and
+withdrawals. The contract has no upgrade path and no way for the admin to move
+funds; the proof verifiers are fixed at deployment.
 
 ## How do I cash out to my bank?
 
-Mawee connects to a regulated anchor that converts crypto to fiat. You enter your
-bank details directly with them; Mawee never sees them. See
-[Cashing Out](cashing-out.md).
+Not yet on Monad. Today you withdraw USDC to any Monad wallet, and from there to
+an exchange or off-ramp of your choice.
 
 ## Can I prove a payment for taxes or accounting?
 

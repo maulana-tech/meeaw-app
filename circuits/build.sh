@@ -1,6 +1,5 @@
 set -euo pipefail
 cd "$(dirname "$0")"
-export PATH="$HOME/.cargo/bin:$PATH"
 
 mkdir -p build
 echo "==> compiling circuits"
@@ -41,20 +40,17 @@ echo "==> test vector + fixture (withdraw)"
 node ../gen_input.mjs
 npx snarkjs groth16 fullprove input.json withdraw_js/withdraw.wasm withdraw_final.zkey proof.json public.json
 npx snarkjs groth16 verify verification_key.json public.json proof.json
-node to_soroban.mjs   # writes programs/mawee-pool/src/fixture.rs + vk_soroban.json
 
 echo "==> test vector + fixture (transfer)"
 node ../gen_transfer_input.mjs
 npx snarkjs groth16 fullprove input_transfer.json transfer_js/transfer.wasm transfer_final.zkey proof_transfer.json public_transfer.json
 npx snarkjs groth16 verify verification_key_transfer.json public_transfer.json proof_transfer.json
-node ../to_soroban_transfer.mjs   # writes programs/mawee-pool/src/transfer_fixture.rs + vk_transfer_soroban.json
 
 echo "==> test vector + fixture (deposit)"
 node ../gen_deposit_input.mjs
 npx snarkjs groth16 fullprove input_deposit.json deposit_js/deposit.wasm deposit_final.zkey proof_deposit.json public_deposit.json
 npx snarkjs groth16 fullprove input_deposit_wd.json deposit_js/deposit.wasm deposit_final.zkey proof_deposit_wd.json public_deposit_wd.json
 npx snarkjs groth16 verify verification_key_deposit.json public_deposit.json proof_deposit.json
-node ../to_soroban_deposit.mjs
 
 echo "==> staging web proving assets"
 mkdir -p ../../web/public/zk
@@ -67,4 +63,6 @@ cp verification_key_transfer.json ../../web/public/zk/verification_key_transfer.
 cp deposit_js/deposit.wasm ../../web/public/zk/deposit.wasm
 cp deposit_final.zkey ../../web/public/zk/deposit.zkey
 cp verification_key_deposit.json ../../web/public/zk/verification_key_deposit.json
+echo "==> regenerating Solidity verifiers"
+(cd ../.. && pnpm --filter contracts verifiers)
 echo "circuit build complete"

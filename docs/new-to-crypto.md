@@ -10,7 +10,7 @@ Every payment is a new row. The catch: **anyone can read it.** No login, no
 permission. That's great for trust, and terrible for privacy — which is exactly
 the gap Mawee fills.
 
-Mawee runs on **Stellar**, a blockchain built to move money quickly and cheaply.
+Mawee runs on **Monad**, a fast, low-fee blockchain compatible with Ethereum wallets.
 
 ## USDC = digital dollars
 
@@ -56,10 +56,9 @@ payments don't reveal any of that.**
 
 ## Cashing out to real money
 
-When you want actual dollars in your bank, Mawee connects to a regulated service
-called an **anchor** that handles the crypto-to-bank conversion. You enter your
-bank details with them directly — Mawee never sees them. More in
-[Cashing Out](cashing-out.md).
+Mawee lets you withdraw your USDC to any Monad wallet. To turn it into money in
+your bank, send it from there to an exchange or off-ramp you trust. A built-in
+bank cash-out is not available yet.
 
 {% hint style="success" %}
 That's the whole foundation. Ready to try it? → [Quickstart](quickstart.md)

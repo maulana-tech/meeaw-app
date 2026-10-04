@@ -9,23 +9,20 @@ Mawee is **self-custodial**. That means:
 
 * The app and its servers **can't** spend or move your money.
 * We **can't** see your private balance — it's decrypted only in your browser.
-* We **don't** hold your bank details — those go straight to the anchor at
-  cash-out.
+* We **don't** handle bank details — Mawee has no bank cash-out yet.
 
-The pool contract does have limited governance and emergency controls. They are
-protected by a **2-of-3 multisig**, and sensitive changes must wait **48 hours**
-on-chain before they can take effect. The multisig can pause the pool
-immediately during an incident, which temporarily prevents deposits, transfers,
-and withdrawals. See [Multisig & Timelocked Governance](multisig-governance.md)
-for the exact powers and limits.
+The pool contract has one emergency control: an **admin can pause** deposits,
+transfers, and withdrawals during an incident. The admin cannot move funds, and
+the contract cannot be upgraded — the proof verifiers are fixed at deployment.
+Before mainnet, the admin should be a multisig.
 
 The flip side: **your keys are your responsibility.** Which is why we built a
 recovery path.
 
 ## Your passkey + PIN
 
-* **Passkey** — your device's fingerprint/face unlock signs your transactions. No
-  seed phrase to lose or get phished.
+* **Sign-in + embedded wallet** — Google, email or a passkey via Privy gives you
+  a Monad wallet that signs your transactions. No seed phrase to lose.
 * **6-digit PIN** — your backup and recovery key. It lets you get back into your
   account and unlock spending.
 
@@ -41,9 +38,7 @@ your PIN in the Mawee app itself.
 
 * The privacy link between who paid you and what you withdraw.
 * Custody — funds live in an on-chain pool, not on our servers.
-* Your identity at cash-out — a throwaway account sits between you and the anchor.
-* Governance — no single operator key can pause the pool or propose a sensitive
-  contract change.
+* Fixed rules — nobody can upgrade the pool or swap its proof verifiers.
 
 **We can't protect against:**
 

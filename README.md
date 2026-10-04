@@ -1,16 +1,16 @@
-# Mawee - private USDC payments on Stellar
+# Mawee - private USDC payments on Monad
 
 Mawee lets freelancers and small businesses accept USDC through simple payment
 links without exposing their full payment history on a public ledger.
 
-Clients pay a link. Mawee turns that payment into a private note in a Stellar
-shielded pool. The recipient can later claim the funds to a Stellar address,
-cash out through a SEP-24 anchor, or generate a disclosure bundle for accounting,
-tax, bank, or audit review.
+Clients pay a link. Mawee turns that payment into a private note in a shielded
+pool on Monad. The recipient can later withdraw to any Monad address, send it
+privately to another Mawee user, or generate a disclosure bundle for
+accounting, tax, bank, or audit review.
 
-This repository is the testnet implementation. It contains the Soroban
-contracts, zero-knowledge circuits, browser app, payment-link database, CCTP
-relay flow, Privy authentication with user-owned Stellar embedded wallets, and disclosure tooling.
+This repository is the testnet implementation. It contains the Solidity
+contracts, zero-knowledge circuits, browser app, payment-link database, and
+Privy authentication with user-owned embedded wallets.
 
 ## What Mawee Protects
 
@@ -27,31 +27,33 @@ Mawee breaks the direct link between the incoming payment and the later claim:
   revealing which deposit created it.
 - A nullifier prevents the same note from being spent twice.
 
-Amounts are still visible when funds leave the pool. Mawee's current privacy goal
-is unlinkability between deposit and withdrawal, not hidden withdrawal amounts.
+Amounts are still visible when funds leave the pool. Mawee's current privacy
+goal is unlinkability between deposit and withdrawal, not hidden withdrawal
+amounts.
 
 ## How The System Works
 
 ```text
 Recipient
+  signs in with Privy (Google, email or passkey) -> embedded wallet on Monad
   claims @username
-  publishes note key + viewing key in mawee-registry
+  publishes note key + viewing key in MaweeRegistry
 
 Payer
   opens /pay/<username>
   resolves the recipient keys
-  pays USDC through Stellar or CCTP
+  pays USDC from any EVM wallet into MaweePool
   creates an encrypted private note
 
 Shielded pool
   stores only the note commitment in a Poseidon Merkle tree
-  keeps USDC custody in the Stellar Asset Contract
+  holds the USDC
 
 Recipient
-  scans deposit events
+  scans Deposit events
   decrypts notes locally
   proves note ownership in the browser
-  withdraws, cashes out, or discloses selected payment evidence
+  withdraws, transfers privately, or discloses selected payment evidence
 ```
 
 The important idea: the pool can verify that a recipient owns a valid note, but
@@ -59,30 +61,29 @@ it does not learn which deposit event produced that note.
 
 ## Repository Map
 
-- `programs/mawee-registry` - username registry. Maps `@username` to the owner
-  address, Poseidon note public key, and x25519 viewing public key.
-- `programs/mawee-pool` - shielded USDC pool. Stores note commitments, maintains
-  the Poseidon Merkle tree, verifies Groth16 proofs, releases withdrawals, and
-  records nullifiers.
-- `programs/mawee-intake` - CCTP intake contract. Receives USDC minted on Stellar
-  from Circle CCTP and forwards it into the shielded pool as a private note.
-- `programs/mawee-account` - minimal C-address account controlled by one Privy
-  Stellar Ed25519 wallet.
-- `circuits/` - Circom circuits for withdrawing and shielded transfers, plus
-  scripts that export Soroban-compatible verification keys.
+- `contracts/` - Hardhat project.
+  - `src/MaweeRegistry.sol` - maps `@username` to the owner address, Poseidon
+    note public key, and x25519 viewing public key.
+  - `src/MaweePool.sol` - shielded ERC-20 pool. Stores note commitments,
+    maintains the Poseidon Merkle tree, verifies Groth16 proofs, releases
+    withdrawals, and records nullifiers.
+  - `src/verifiers/` - Groth16 verifiers generated from `web/public/zk/*.zkey`.
+  - `test/` - end-to-end tests that generate real proofs with the browser
+    artifacts and verify them on-chain.
+  - `scripts/deploy.ts` - deploys everything and writes `web/.env.local`.
+- `circuits/` - Circom circuits for deposits, withdrawals and shielded
+  transfers.
 - `web/` - Next.js app for onboarding, payment links, payer checkout, local note
-  scanning, proof generation, withdrawals, SEP-24 cash-out, CCTP payments, and
-  disclosure bundles.
-- `scripts/deploy-testnet.sh` - builds and deploys the contracts to Stellar
-  testnet, uploads the Mawee account WASM, sets verifier keys, deploys CCTP
-  intake, and writes `web/.env.local`.
+  scanning, proof generation, withdrawals, and disclosure bundles.
 
 ## Core Flows
 
 ### 1. Account setup
 
-A user claims a username such as `@dinar`. The app generates local note and
-viewing keys, then registers their public keys in `mawee-registry`.
+A user signs in with Privy, which provisions an embedded wallet on Monad. The
+user claims a username such as `@dinar`. The app derives note and viewing keys
+from a random master secret (backed up server-side, encrypted under the user's
+PIN), then registers their public keys in `MaweeRegistry`.
 
 The note key lets payers create notes the user can spend. The viewing key lets
 payers encrypt note metadata so only the recipient can discover their payments.
@@ -93,9 +94,10 @@ The dashboard creates shareable payment links and QR codes. Link metadata lives
 in MongoDB, but private note contents do not. A payer can pay a general username
 link or a managed link with a fixed amount and label.
 
-### 3. Direct Stellar payment
+### 3. Payment
 
-A Stellar payer pays USDC into `mawee-pool.deposit`. The app computes:
+The payer connects an EVM wallet, approves the exact amount, and calls
+`MaweePool.deposit`. The browser computes:
 
 ```text
 owner_pk   = Poseidon(owner_secret)
@@ -103,28 +105,11 @@ commitment = Poseidon(amount, owner_pk, salt)
 nullifier  = Poseidon(owner_secret, leaf_index)
 ```
 
-The contract stores the commitment as a Merkle leaf and publishes encrypted note
-metadata in the deposit event.
+A deposit proof binds the commitment to the public amount, so a payer cannot
+create a note worth more than they paid. The contract stores the commitment as a
+Merkle leaf and emits the encrypted note metadata in the `Deposit` event.
 
-### 4. Cross-chain payment with CCTP
-
-A payer can burn testnet USDC on a supported source chain. Circle attests the
-burn, then the server relay mints USDC on Stellar to `mawee-intake`.
-
-The relay verifies the CCTP message is bound to the intended recipient, then
-calls `mawee-intake.deposit_to_pool`. The intake contract forwards the minted USDC
-into `mawee-pool` and creates the same kind of private note as a direct Stellar
-payment.
-
-Current testnet sources include:
-
-- Ethereum Sepolia
-- Base Sepolia
-- Arbitrum Sepolia
-- Avalanche Fuji
-- Solana Devnet
-
-### 5. Wallet scanning
+### 4. Wallet scanning
 
 The recipient's browser reads deposit events and tries to decrypt each note with
 the local viewing key. Notes that decrypt successfully appear in the dashboard.
@@ -132,7 +117,7 @@ the local viewing key. Notes that decrypt successfully appear in the dashboard.
 The server indexer caches public event data and usernames for performance. It
 does not need the recipient's private note secret.
 
-### 6. Withdrawal
+### 5. Withdrawal
 
 To claim a note, the browser builds a Merkle proof, generates a Groth16 proof,
 and submits:
@@ -141,20 +126,17 @@ and submits:
 root, nullifier, recipient, amount, proof
 ```
 
-The pool verifies the proof with Stellar's BN254 host functions, checks the root
-is known, checks the nullifier has not been used, records the nullifier, and
-transfers USDC to the destination.
+The pool verifies the proof with the EVM's BN254 precompiles, checks the root is
+known, checks the nullifier has not been used, records the nullifier, and
+transfers USDC to the destination. The recipient address is bound into the
+proof, so a front-runner cannot redirect it.
 
-### 7. SEP-24 cash-out
+### 6. Shielded transfer
 
-For bank cash-out, Mawee creates a fresh single-use bridge account, withdraws the
-private note to that account, then opens a SEP-24 withdrawal session with the
-configured anchor. Bank details are handled by the anchor, not by Mawee.
+A note can be split into a recipient note and a change note without tokens
+leaving the pool. Value conservation is enforced inside the transfer circuit.
 
-On testnet the bridge account is funded by friendbot. A production deployment
-needs sponsorship and operational controls instead.
-
-### 8. Selective disclosure
+### 7. Selective disclosure
 
 A recipient can export evidence for a specific payment. The disclosure bundle
 contains the note amount, salt, owner key, Merkle path, root, commitment, pool,
@@ -164,12 +146,9 @@ full wallet history.
 
 ## Privacy Model
 
-Mawee keeps routine payment activity private by default, while preserving a way
-to prove selected payments later.
-
 What observers can see:
 
-- A deposit commitment was added to the pool.
+- A deposit commitment was added to the pool, and who paid it.
 - A withdrawal happened for a visible amount and destination.
 - A nullifier was used once.
 
@@ -184,169 +163,99 @@ What is intentionally not hidden yet:
 - Withdrawal amount.
 - Withdrawal destination.
 - Timing patterns if users withdraw immediately after receiving funds.
+- The wallet that submits a withdrawal pays its gas. A relayer would remove
+  that link and is a planned addition.
 
 ## Prerequisites
 
-- Rust with the `wasm32v1-none` target.
-- Stellar CLI 27 or newer.
 - Node 20 or newer.
 - pnpm 10 or newer.
-- circom 2 and snarkjs for circuit builds.
 - MongoDB for the web app's cached users, payment links, and indexer data.
-- Freighter or another supported Stellar wallet for browser testing.
+- circom 2 and snarkjs, only if you rebuild the circuits.
+- A funded Monad testnet key for deploying (MON from https://faucet.monad.xyz).
 
 ## Build And Test
 
-Install web dependencies:
-
 ```sh
 pnpm install
-```
-
-Build and test contracts:
-
-```sh
-stellar contract build
-cargo test -p mawee-registry -p mawee-pool -p mawee-intake
-```
-
-Build circuits and export Soroban verification keys:
-
-```sh
-cd circuits
-npm install
-./build.sh
-```
-
-Run web checks:
-
-```sh
+pnpm contract:test            # Hardhat: registry + pool with real proofs
 pnpm --filter web test
 pnpm --filter web lint
 pnpm --filter web build
 ```
 
-## Deploy To Stellar Testnet
-
-Build the circuits first, then deploy:
+## Deploy To Monad Testnet
 
 ```sh
-./scripts/deploy-testnet.sh alice
+DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet
 ```
 
 The deploy script:
 
-- Creates and funds the deployer identity if needed.
-- Builds account, registry, pool, and intake contracts.
-- Resolves the Circle testnet USDC Stellar Asset Contract.
-- Deploys `mawee-registry` and `mawee-pool`.
-- Initializes the pool with USDC and tree depth.
-- Sets withdraw and transfer Groth16 verifier keys.
-- Uploads the Mawee account WASM.
-- Creates a CCTP operator identity.
-- Deploys `mawee-intake`.
-- Writes the resulting contract IDs and CCTP operator secret to `web/.env.local`.
+- Deploys `MockUSDC` unless `USDC_ADDRESS` is set.
+- Deploys the Poseidon library, the three Groth16 verifiers,
+  `MaweeRegistry`, and `MaweePool` (admin = deployer unless `POOL_ADMIN` is set).
+- Writes the chain id, contract addresses, deploy block and USDC settings to
+  `web/.env.local`.
 
 ## Web App
 
-Copy the example environment file and fill in deployed contract IDs or run the
-testnet deploy script:
-
 ```sh
-cp web/.env.example web/.env.local
-pnpm --filter web dev
+cp web/.env.example web/.env.local   # or run the deploy script first
+pnpm --filter web migrate:up
+pnpm dev
 ```
 
-The app runs at:
-
-```text
-http://localhost:3000
-```
+The app runs at `http://localhost:3000`.
 
 Useful routes:
 
 - `/` - landing and onboarding.
-- `/dashboard` - private balance overview.
+- `/dashboard` - private balance overview and Add funds.
 - `/links` - manage payment links.
-- `/withdraw` - withdraw to Stellar or cash out through SEP-24.
+- `/withdraw` - withdraw to any Monad address.
 - `/history` - local payment history.
 - `/pay/<username>` - payer checkout.
 - `/pay/<username>/<slug>` - managed payment-link checkout.
 
 ## Environment
 
-The web app reads public testnet configuration from `NEXT_PUBLIC_*` variables
-and server-only secrets from plain variables.
+The web app reads public configuration from `NEXT_PUBLIC_*` variables and
+server-only secrets from plain variables. See `web/.env.example` and
+[docs/reference.md](docs/reference.md).
 
 Important server-only values:
 
 - `MONGODB_URI` - MongoDB connection string.
-- `CRON_SECRET` - long random bearer token used by Vercel Cron to authorize the
-  one-minute pool-indexer request.
-- `CHANNELS_API_KEY` - OpenZeppelin Relayer Channels key, when using Channels.
-- `CCTP_OPERATOR_SECRET` - Stellar secret key for the CCTP intake operator.
-- `CIRCLE_API_KEY` - Circle API key for Iris attestation access if required.
-- `PRIVY_APP_ID` / `PRIVY_APP_SECRET` - server-only Privy token verification.
-- `MAWEE_WALLET_DEPLOYER_SECRET` - low-float Stellar deployer for deterministic
-  per-user C-addresses. Never expose it to the browser.
+- `CRON_SECRET` - bearer token that authorizes the one-minute pool-indexer
+  request.
+- `PRIVY_APP_ID` / `PRIVY_APP_SECRET` - server-only Privy token and wallet
+  verification.
+- `MONAD_LOGS_BLOCK_RANGE` - max block span per `eth_getLogs` call.
 
-`NEXT_PUBLIC_PRIVY_APP_ID` is safe for the client bundle. Configure Google,
-GitHub, and passkey login in separate development and production Privy apps;
-register `https://auth.privy.io/api/v1/oauth/callback` with both OAuth providers.
+Do not commit `web/.env.local`. The repository ignores `.env*` files except the
+examples.
 
-Do not commit `web/.env.local`. The repository intentionally ignores `.env*`
-files except `.env.example`.
-
-Before deploying the asynchronous pool indexer, apply the Mongo migrations:
-
-```sh
-pnpm --filter web migrate:up
-```
-
-The production deployment schedules `/api/cron/pool-indexer` every minute.
-After deploying a new testnet pool contract, invoke that route once with
-`Authorization: Bearer <CRON_SECRET>` and confirm it reports `status: synced`
-before relying on the dashboard mirror. Contract-id changes automatically clear
-and rebuild the public encrypted deposit/nullifier mirror; they never clear user
-keys or other application collections.
+The production deployment schedules `/api/cron/pool-indexer` every minute. After
+deploying a new pool, invoke that route once with
+`Authorization: Bearer <CRON_SECRET>` and confirm it reports `status: synced`.
+A chain or pool address change automatically clears and rebuilds the public
+deposit/nullifier mirror; it never clears user keys or other collections.
 
 ## Testnet Payment Notes
 
-To test direct Stellar payments, the payer needs testnet USDC:
-
-1. Connect a supported external Stellar payer wallet.
-2. Add the USDC trustline.
-3. Fund testnet USDC from Circle's faucet.
-4. Pay a username or payment link.
-
-Receiving does not require the recipient to hold USDC first. They only need
-their Mawee account keys so they can decrypt and later spend their notes.
-
-## Implementation Notes
-
-- The proof system uses BN254 end to end: Circom/snarkjs in the browser and
-  Stellar BN254 host functions in Soroban.
-- Poseidon hashing is kept compatible across circuit, contract, and browser.
-- The pool keeps a rolling root history so recent Merkle proofs can still be
-  accepted after newer deposits.
-- Proof public signals for withdrawals are ordered as
-  `[root, nullifier, recipient, amount]`.
-- Proof public signals for shielded transfers are ordered as
-  `[root, nullifier, outCommitmentRecipient, outCommitmentChange]`.
-- `mawee-registry.set_pubkey` rotates both the note public key and viewing public
-  key, because re-keying only one side would make future note discovery fail.
-- CCTP burns carry a binding derived from the payee note key and payer nonce, so
-  the relay can reject attempts to redirect a burn to another username.
+On testnet the pool asset is `MockUSDC`. Recipients can mint test USDC from the
+dashboard's **Add funds** dialog; payers need USDC and a little MON in their own
+wallet. Receiving never requires the recipient to hold USDC first.
 
 ## Production Work Still Required
 
 This repo is testnet-stage. Before mainnet, Mawee still needs:
 
 - A real multi-party trusted setup ceremony for production circuits.
-- Independent security review of the contracts, circuits, relay, and web flows.
-- Mainnet CCTP, SEP-24, Privy OAuth, wallet deployment, and account-migration hardening.
-- Mainnet pool deployment under the rehearsed multisig admin process.
-- Monitoring and alerting for the bridge sponsor, relay, and indexer.
-- An account-merge sweep to recover residual XLM from cash-out bridges.
-- Clear compliance policy for supported anchors, disclosure, abuse handling, and
+- Independent security review of the contracts, circuits, and web flows.
+- A multisig pool admin and monitoring for the indexer.
+- A withdrawal relayer so the spending wallet is not linked by gas payment.
+- Mainnet USDC, Privy production apps, and a bank off-ramp integration.
+- Clear compliance policy for disclosure, abuse handling, and
   jurisdiction-specific requirements.

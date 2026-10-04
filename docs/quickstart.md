@@ -37,8 +37,9 @@ balance** — visible only to you.
 
 ## 5. Cash out whenever
 
-Move your balance to a Stellar wallet, or cash out to your **bank** through a
-SEP-24 anchor. See [Cashing Out](cashing-out.md).
+Withdraw your balance to any Monad wallet (`0x…`). Your Mawee wallet needs a
+little MON for the network fee — on testnet, use the faucet linked in
+**Add funds**.
 
 ---
 

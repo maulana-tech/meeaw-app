@@ -49,28 +49,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_STELLAR_NETWORK=${{ vars.NEXT_PUBLIC_STELLAR_NETWORK }}
-            NEXT_PUBLIC_STELLAR_RPC_URL=${{ vars.NEXT_PUBLIC_STELLAR_RPC_URL }}
-            NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE=${{ vars.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE }}
-            NEXT_PUBLIC_MAWEE_REGISTRY_ID=${{ vars.NEXT_PUBLIC_MAWEE_REGISTRY_ID }}
-            NEXT_PUBLIC_MAWEE_POOL_ID=${{ vars.NEXT_PUBLIC_MAWEE_POOL_ID }}
-            NEXT_PUBLIC_USDC_SAC_ID=${{ vars.NEXT_PUBLIC_USDC_SAC_ID }}
-            NEXT_PUBLIC_USDC_ISSUER=${{ vars.NEXT_PUBLIC_USDC_ISSUER }}
+            NEXT_PUBLIC_MONAD_CHAIN_ID=${{ vars.NEXT_PUBLIC_MONAD_CHAIN_ID }}
+            NEXT_PUBLIC_MONAD_RPC_URL=${{ vars.NEXT_PUBLIC_MONAD_RPC_URL }}
+            NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS=${{ vars.NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS }}
+            NEXT_PUBLIC_MAWEE_POOL_ADDRESS=${{ vars.NEXT_PUBLIC_MAWEE_POOL_ADDRESS }}
+            NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK=${{ vars.NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK }}
+            NEXT_PUBLIC_USDC_ADDRESS=${{ vars.NEXT_PUBLIC_USDC_ADDRESS }}
+            NEXT_PUBLIC_USDC_DECIMALS=${{ vars.NEXT_PUBLIC_USDC_DECIMALS }}
+            NEXT_PUBLIC_USDC_MINTABLE=${{ vars.NEXT_PUBLIC_USDC_MINTABLE }}
             NEXT_PUBLIC_POOL_DEPTH=${{ vars.NEXT_PUBLIC_POOL_DEPTH }}
             NEXT_PUBLIC_PRIVY_APP_ID=${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
-            NEXT_PUBLIC_CHANNELS_ENABLED=${{ vars.NEXT_PUBLIC_CHANNELS_ENABLED }}
-            NEXT_PUBLIC_SEP24_ANCHOR_URL=${{ vars.NEXT_PUBLIC_SEP24_ANCHOR_URL }}
-            NEXT_PUBLIC_SEP24_ASSET_CODE=${{ vars.NEXT_PUBLIC_SEP24_ASSET_CODE }}
-            NEXT_PUBLIC_SEP10_CLIENT_DOMAIN=${{ vars.NEXT_PUBLIC_SEP10_CLIENT_DOMAIN }}
-            NEXT_PUBLIC_MONEYGRAM_RAMP_STATUS=${{ vars.NEXT_PUBLIC_MONEYGRAM_RAMP_STATUS }}
-            NEXT_PUBLIC_STELLAR_HORIZON_URL=${{ vars.NEXT_PUBLIC_STELLAR_HORIZON_URL }}
-            NEXT_PUBLIC_FRIENDBOT_URL=${{ vars.NEXT_PUBLIC_FRIENDBOT_URL }}
-            NEXT_PUBLIC_CCTP_INTAKE_CONTRACT=${{ vars.NEXT_PUBLIC_CCTP_INTAKE_CONTRACT }}
-            NEXT_PUBLIC_CCTP_TOKEN_MESSENGER_MINTER=${{ vars.NEXT_PUBLIC_CCTP_TOKEN_MESSENGER_MINTER }}
-            NEXT_PUBLIC_CCTP_MESSAGE_TRANSMITTER=${{ vars.NEXT_PUBLIC_CCTP_MESSAGE_TRANSMITTER }}
-            NEXT_PUBLIC_CCTP_FORWARDER=${{ vars.NEXT_PUBLIC_CCTP_FORWARDER }}
-            NEXT_PUBLIC_SOLANA_RPC_URL=${{ vars.NEXT_PUBLIC_SOLANA_RPC_URL }}
-            NEXT_PUBLIC_SOLANA_USDC_MINT=${{ vars.NEXT_PUBLIC_SOLANA_USDC_MINT }}
 
   deploy:
     needs: build-and-push
@@ -93,40 +81,28 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SEP10_CLIENT_SIGNING_SECRET: ${{ secrets.SEP10_CLIENT_SIGNING_SECRET }}
           PRIVY_APP_ID: ${{ secrets.PRIVY_APP_ID }}
           PRIVY_APP_SECRET: ${{ secrets.PRIVY_APP_SECRET }}
-          MAWEE_WALLET_DEPLOYER_SECRET: ${{ secrets.MAWEE_WALLET_DEPLOYER_SECRET }}
-          MAWEE_ACCOUNT_WASM_HASH: ${{ secrets.MAWEE_ACCOUNT_WASM_HASH }}
-          BRIDGE_SPONSOR_SECRET: ${{ secrets.BRIDGE_SPONSOR_SECRET }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: MONGODB_URI,CRON_SECRET,SEP10_CLIENT_SIGNING_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET,MAWEE_WALLET_DEPLOYER_SECRET,MAWEE_ACCOUNT_WASM_HASH,BRIDGE_SPONSOR_SECRET
+          envs: MONGODB_URI,CRON_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET
           script: |
             set -euo pipefail
             cd /home/${{ secrets.SSH_USER }}/mawee
             umask 077
             test -n "${MONGODB_URI}"
             test -n "${CRON_SECRET}"
-            test -n "${SEP10_CLIENT_SIGNING_SECRET}"
             test -n "${PRIVY_APP_ID}"
             test -n "${PRIVY_APP_SECRET}"
-            test -n "${MAWEE_WALLET_DEPLOYER_SECRET}"
-            test -n "${MAWEE_ACCOUNT_WASM_HASH}"
-            test -n "${BRIDGE_SPONSOR_SECRET}"
             secret_env="$(mktemp)"
-            grep -Ev '^(MONGODB_URI|CRON_SECRET|SEP10_CLIENT_SIGNING_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET|MAWEE_WALLET_DEPLOYER_SECRET|MAWEE_ACCOUNT_WASM_HASH|BRIDGE_SPONSOR_SECRET)=' .env.production > "${secret_env}" || true
+            grep -Ev '^(MONGODB_URI|CRON_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET)=' .env.production > "${secret_env}" || true
             {
               printf '%s\n' "MONGODB_URI=${MONGODB_URI}"
               printf '%s\n' "CRON_SECRET=${CRON_SECRET}"
-              printf '%s\n' "SEP10_CLIENT_SIGNING_SECRET=${SEP10_CLIENT_SIGNING_SECRET}"
               printf '%s\n' "PRIVY_APP_ID=${PRIVY_APP_ID}"
               printf '%s\n' "PRIVY_APP_SECRET=${PRIVY_APP_SECRET}"
-              printf '%s\n' "MAWEE_WALLET_DEPLOYER_SECRET=${MAWEE_WALLET_DEPLOYER_SECRET}"
-              printf '%s\n' "MAWEE_ACCOUNT_WASM_HASH=${MAWEE_ACCOUNT_WASM_HASH}"
-              printf '%s\n' "BRIDGE_SPONSOR_SECRET=${BRIDGE_SPONSOR_SECRET}"
             } >> "${secret_env}"
             mv "${secret_env}" .env.production
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

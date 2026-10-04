@@ -6,14 +6,10 @@ web/.next
 web/coverage
 web/tsconfig.tsbuildinfo
 
-# Rust / Stellar contract + ZK circuit toolchain — not needed to run `web`.
-target
-Cargo.toml
-Cargo.lock
-rust-toolchain.toml
-programs
+# Solidity contracts + ZK circuit toolchain — not needed to run `web`.
+contracts
+!contracts/package.json
 circuits
-vendor
 scripts
 
 # Secrets and local env — never bake into an image layer.

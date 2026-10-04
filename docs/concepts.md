@@ -28,13 +28,13 @@ either one is yours.
 ## Self-custody & passkeys
 
 Mawee is **self-custodial** — you hold the keys that authorize spending, not us.
-The app and its servers can't spend your money. The pool's 2-of-3 governance can
-temporarily pause access during an emergency, while sensitive changes require a
-public proposal and a 48-hour delay. See
-[Multisig & Timelocked Governance](multisig-governance.md).
+The app and its servers can't spend your money. The pool admin can pause
+deposits and withdrawals during an emergency; it cannot move funds or change the
+proof rules, which are fixed when the pool is deployed.
 
-Instead of a seed phrase, your account is protected by a **passkey** (your
-device's fingerprint/face unlock) plus a **6-digit PIN** for backup and recovery.
+Instead of a seed phrase, you sign in with Google, email or a **passkey**, which
+gives you a Privy embedded wallet on Monad, plus a **6-digit PIN** that protects
+the keys for your private notes.
 No 24-word phrase to lose down the back of the couch.
 
 The trade-off of self-custody: recovery is on you. That's what the PIN is for —
@@ -47,8 +47,8 @@ disclosure** lets you voluntarily prove that one specific payment happened — f
 your accountant, the tax office, or your bank — without revealing your other
 payments. Private by default, provable by choice.
 
-## Anchors (the crypto-to-bank bridge)
+## Cashing out to a bank
 
-An **anchor** is a regulated service that converts crypto to regular money and
-sends it to your bank. Mawee connects to one for cash-out, and hands off the bank
-details to them directly — Mawee never touches your banking info.
+The Monad version withdraws to any Monad wallet. A bank off-ramp is not wired up
+yet; when one is added, bank details will go directly to the regulated provider,
+never through Mawee.

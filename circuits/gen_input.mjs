@@ -15,7 +15,7 @@ for (let i = 0; i < DEPTH; i++) zeros.push(F.toObject(H([zeros[i], zeros[i]])));
 const ownerSecret = 111111111111n % R;
 const salt = 222222222222n % R;
 const amount = 50000000n;
-const recipient = 12345n; // arbitrary for the fixture; live e2e uses keccak(strkey)%R
+const recipient = 12345n; // arbitrary for the fixture; live withdrawals use uint160(address)
 
 const ownerPk = F.toObject(H([ownerSecret]));
 const commitment = F.toObject(H([amount, ownerPk, salt]));

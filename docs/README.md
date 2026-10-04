@@ -2,20 +2,20 @@
 
 **Get paid in USDC. Keep your business your business.**
 
-Mawee is a private payment rail on Stellar. You share a simple link, your client
+Mawee is a private payment rail on Monad. You share a simple link, your client
 pays it, and the money lands in your private balance — without broadcasting your
 whole payment history to the entire internet.
 
 No wallet doxxing. No one scrolling through your income. Just clean, private
-payments that still let you cash out to your bank whenever you want.
+payments you can withdraw to any wallet whenever you want.
 
 ## The one-minute version
 
 * You claim a username, like `@dinar`.
 * You share `mawee/pay/dinar` (or a QR code) with clients.
-* They pay in USDC — from Stellar or another chain.
+* They pay in USDC on Monad from any EVM wallet.
 * The payment becomes a **private note** only you can see and spend.
-* You cash out to a Stellar wallet or straight to your bank.
+* You withdraw to any Monad wallet, unlinkable from the deposit.
 
 That's it. The privacy happens automatically in the background.
 

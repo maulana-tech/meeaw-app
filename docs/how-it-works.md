@@ -51,13 +51,13 @@ amount is X"* — without revealing which one. It also reveals a **nullifier**, 
 one-time tag derived from your secret that lets the pool block double-spends
 without linking back to your deposit.
 
-**The pool verifies and pays.** The contract checks the proof using Stellar's
-built-in cryptography, confirms the nullifier hasn't been used, records it, and
+**The pool verifies and pays.** The contract checks the proof using the EVM's
+BN254 precompiles, confirms the nullifier hasn't been used, records it, and
 releases the USDC. Deposit and withdrawal are never publicly connected.
 
-**You never touch gas.** A relayer sponsors the network fees and submits your
-transactions, so you don't need to hold any network token. Your passkey signs;
-the relayer pays and broadcasts. It can't move funds you didn't approve.
+**Gas is paid in MON.** Your Mawee wallet sends the withdrawal and pays a small
+MON fee. Because the proof binds the recipient and amount, anyone could submit
+it for you — a gas-sponsoring relayer is a planned addition.
 
 {% hint style="info" %}
 Want the deeper cuts — the exact hashing, curve, and contract details? See
