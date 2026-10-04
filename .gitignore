@@ -27,3 +27,4 @@ backups/
 # local-only
 circuits/build/
 docs/monad-hackathon/
+design-ref/

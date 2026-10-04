@@ -1,5 +1,6 @@
 import { Chrome } from "../components/landing/Chrome";
 import { Faq } from "../components/landing/Faq";
+import { FinalCta } from "../components/landing/FinalCta";
 import { Footer } from "../components/landing/Footer";
 import { Hero } from "../components/landing/Hero";
 import { ProblemStatement } from "../components/landing/ProblemStatement";
@@ -17,6 +18,7 @@ export default function Home() {
         <Steps />
         <Users />
         <Faq />
+        <FinalCta />
       </main>
       <Footer />
     </Chrome>

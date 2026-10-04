@@ -10,8 +10,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { useWallet } from "../WalletProvider";
+import { pillSolidViolet } from "./primitives";
+
+export const LANDING_SECTIONS = [
+  { id: "why", label: "Why Mawee" },
+  { id: "how", label: "How it works" },
+  { id: "who", label: "Who it's for" },
+  { id: "faq", label: "FAQ" },
+] as const;
 
 export function EditionsTopNav() {
   const router = useRouter();
@@ -27,29 +34,45 @@ export function EditionsTopNav() {
 
   return (
     <header
-      className="fixed inset-x-0 top-0 z-[70] flex items-center justify-between gap-2 bg-gradient-to-b from-olive-deep/50 to-olive-deep/0 px-[clamp(16px,4vw,40px)] py-3 text-ed-cream transition-[background,border-color,backdrop-filter] duration-300  data-[scrolled=true]:bg-ed-dark-2/88 data-[scrolled=true]:bg-none data-[scrolled=true]:backdrop-blur-md sm:gap-[18px] sm:py-4"
       data-ed-topnav
+      className="fixed inset-x-0 top-0 z-[70] flex items-center justify-between gap-3 px-4 py-4 text-starlight transition-[background-color,backdrop-filter] duration-300 data-[scrolled=true]:bg-void/70 data-[scrolled=true]:backdrop-blur-md sm:px-8 lg:px-14"
     >
       <a
-        className="flex flex-none items-center gap-2.5"
+        className="flex flex-none items-center gap-2.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
         href="#top"
-        aria-label="Mawee Editions — top"
+        aria-label="Mawee home"
       >
         <Image
           src="/assets/mawee-white.svg"
           alt=""
-          width={40}
-          height={40}
+          width={32}
+          height={32}
           priority
-          className="scale-125"
         />
+        <span className="text-xl font-medium tracking-tight">Mawee</span>
       </a>
 
-      <div className="flex min-w-0 flex-none items-center gap-2 sm:gap-6">
+      <nav
+        aria-label="Sections"
+        className="absolute left-1/2 hidden -translate-x-1/2 items-center rounded-full border border-starlight/10 bg-void/80 px-2 py-1.5 backdrop-blur-md lg:flex"
+      >
+        {LANDING_SECTIONS.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            data-ed-navlink={section.id}
+            className="rounded-full px-4 py-1.5 text-sm text-starlight/75 transition-colors hover:text-starlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight data-[active=true]:bg-starlight/10 data-[active=true]:text-starlight"
+          >
+            {section.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="flex min-w-0 flex-none items-center gap-2 sm:gap-4">
         {address && usernameResolved && !username && (
           <button
             type="button"
-            className="inline-flex text-xs font-medium text-ed-gold transition-colors hover:text-ed-cream sm:text-sm"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-violet transition-colors hover:text-starlight"
             onClick={openUsernameModal}
             aria-label="Claim username"
           >
@@ -60,9 +83,7 @@ export function EditionsTopNav() {
         {address ? (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className={cn(
-                "group inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold rounded-lg",
-              )}
+              className="group inline-flex min-h-11 items-center gap-2 rounded-full border border-starlight/20 px-4 text-sm font-semibold transition-colors hover:border-starlight/50"
               title={address}
             >
               <span className="max-w-24 truncate sm:max-w-40">
@@ -76,32 +97,30 @@ export function EditionsTopNav() {
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="min-w-44 border border-ed-line bg-ed-dark-2 p-1.5 text-ed-cream shadow-xl ring-0"
+              className="min-w-44 border border-starlight/10 bg-void-2 p-1.5 text-starlight shadow-xl ring-0"
             >
               <DropdownMenuItem
-                className="cursor-pointer px-2.5 py-2 font-medium text-ed-cream [&_svg]:text-ed-cream focus:bg-ed-cream/[0.12] focus:text-ed-cream focus:[&_svg]:text-ed-cream"
+                className="cursor-pointer px-2.5 py-2 font-medium text-starlight focus:bg-starlight/10 focus:text-starlight [&_svg]:text-starlight"
                 onClick={() => router.push("/dashboard")}
               >
-                <LayoutDashboard className="text-ed-cream" aria-hidden="true" />
+                <LayoutDashboard aria-hidden="true" />
                 Dashboard
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-ed-line" />
+              <DropdownMenuSeparator className="bg-starlight/10" />
               <DropdownMenuItem
-                className="cursor-pointer bg-ed-cream/[0.1] px-2.5 py-2 !text-ed-cream focus:bg-ed-cream/[0.16] focus:!text-ed-cream [&_svg]:!text-ed-cream"
+                className="cursor-pointer px-2.5 py-2 !text-starlight focus:bg-starlight/10 [&_svg]:!text-starlight"
                 onClick={disconnect}
               >
                 <LogOut aria-hidden="true" />
-                Sign Out
+                Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
           <button
             type="button"
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-lg border border-ed-cream bg-ed-cream px-4 text-sm font-semibold text-ed-dark transition-colors hover:bg-white disabled:cursor-default disabled:opacity-55 sm:min-h-[38px] sm:px-[18px] sm:text-base"
-            onClick={() => {
-              signIn();
-            }}
+            className={`${pillSolidViolet} min-h-10 px-5 text-sm disabled:cursor-default disabled:opacity-60`}
+            onClick={() => signIn()}
             disabled={connecting}
           >
             {connecting && (

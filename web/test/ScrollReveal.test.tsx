@@ -27,19 +27,21 @@ vi.mock("gsap/ScrollTrigger", () => ({
 }));
 
 describe("ProblemStatement scroll reveal", () => {
-  it("splits nested statement text into animated word spans", () => {
+  it("leads with the gradient sentence and reveals the rest word by word", () => {
     const { container } = render(<ProblemStatement />);
 
     expect(
-      screen.getByText(/public wallets were never designed/i),
+      screen.getByRole("heading", {
+        name: /public wallets were never designed for business/i,
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText("much")).toHaveClass("word");
-    expect(screen.getByText("earn,")).toHaveClass("word");
-    expect(screen.getByText("much").parentElement).toHaveClass(
-      "font-bold",
-      "text-olive-deep",
+    expect(container.querySelector(".text-nebula")).toHaveTextContent(
+      "Public wallets were never designed for business.",
     );
-    expect(container.querySelectorAll(".word").length).toBeGreaterThan(30);
+    // Nested emphasis is split into words too.
+    expect(screen.getByText("earn,")).toHaveClass("word");
+    expect(screen.getByText("earn,").parentElement).toHaveClass("font-normal");
+    expect(container.querySelectorAll(".word").length).toBeGreaterThan(20);
     expect(gsapMock.fromTo).toHaveBeenCalled();
   });
 });

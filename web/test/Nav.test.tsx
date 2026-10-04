@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mocks = vi.hoisted(() => ({
@@ -47,10 +47,30 @@ describe("EditionsTopNav", () => {
       screen.queryByRole("button", { name: /claim username/i }),
     ).not.toBeInTheDocument();
 
+    // The bar turns solid and blurred once the page scrolls (Chrome sets
+    // data-scrolled), so content never shows through the links.
     const nav = document.querySelector("[data-ed-topnav]");
-    expect(nav).toHaveClass("data-[scrolled=true]:bg-none");
-    expect(nav).toHaveClass("data-[scrolled=true]:bg-ed-dark-2/88");
-    expect(nav?.className).not.toContain("data-[scrolled=true]:from-ed-dark-2");
+    expect(nav).toHaveClass(
+      "data-[scrolled=true]:bg-void/70",
+      "data-[scrolled=true]:backdrop-blur-md",
+    );
+  });
+
+  it("links every landing section from the section pill", () => {
+    mocks.useWallet.mockReturnValue(wallet());
+    render(<EditionsTopNav />);
+    const sections = screen.getByRole("navigation", { name: "Sections" });
+    for (const [name, href] of [
+      ["Why Mawee", "#why"],
+      ["How it works", "#how"],
+      ["Who it's for", "#who"],
+      ["FAQ", "#faq"],
+    ]) {
+      expect(within(sections).getByRole("link", { name })).toHaveAttribute(
+        "href",
+        href,
+      );
+    }
   });
 
   it("opens Privy's login modal directly", async () => {

@@ -1,43 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { LandingSection } from "./LandingSection";
+import { Frame, MonoLabel } from "./primitives";
 
 const FAQ_ITEMS = [
   {
     question: "Do my clients need to use Mawee?",
     answer:
-      "No. Just share your payment link or QR code. Your client pays using a supported wallet, while Mawee handles the privacy layer behind the scenes.",
+      "No. They open your link and pay in USDC from the wallet they already use, like MetaMask. They only sign — Mawee covers the network fee.",
   },
   {
     question: "What stays private?",
     answer:
-      "Mawee prevents your payment history from becoming public business intelligence. By default, customers, payment relationships, and incoming transactions are not easily linked on-chain.",
+      "Who paid you, how much you've earned, and your payment history. Each payment becomes an encrypted note that only your keys can read. Two things stay visible on-chain: that a payment entered the pool, and the amount and destination when you withdraw.",
   },
   {
     question: "Can I still prove I received a payment?",
     answer:
-      "Yes. Mawee is built for selective disclosure. Your payments stay private by default, but you can generate proof for a specific payment whenever a bank, accountant, auditor, or tax authority requires it.",
+      "Yes. Export a receipt for any single payment. It proves that payment happened — for your accountant, bank, auditor, or tax office — without revealing any of your other payments.",
+  },
+  {
+    question: "What happens if I lose my phone or laptop?",
+    answer:
+      "Sign in on a new device. If you chose a passkey, unlock with the same passkey (synced by iCloud Keychain, Google Password Manager, or 1Password) and your balance reappears. If you chose a PIN, enter your PIN.",
   },
   {
     question: "How is Mawee different from a crypto mixer?",
     answer:
-      "Mixers are designed to make the source and destination of funds difficult to trace without giving users a practical way to prove individual transactions. Mawee is designed for private business payments with selective disclosure, so you can keep routine transactions private while still proving specific payments when needed.",
+      "Mixers hide where money came from with no practical way to prove a single transaction. Mawee is built for business: routine payments stay private, and you can prove any specific payment whenever you need to.",
   },
   {
-    question: "Why not just create a new wallet for every payment?",
+    question: "Why not just use a new wallet for every payment?",
     answer:
-      "Managing dozens or hundreds of wallets quickly becomes impractical. Even then, moving funds between wallets can still reveal payment patterns on a public blockchain. Mawee is designed to preserve privacy without requiring businesses to manage a new wallet for every invoice.",
+      "It gets unmanageable fast, and moving funds between those wallets still reveals the pattern on a public blockchain. Mawee gives you one link and one balance, with privacy built in.",
   },
   {
-    question: "Who is Mawee built for?",
+    question: "Why Monad?",
     answer:
-      "Freelancers, creators, agencies, exporters, and online businesses that accept stablecoin payments but don't want their revenue, customers, or payment history exposed on a public blockchain.",
-  },
-  {
-    question: "Why build on Monad?",
-    answer:
-      "Monad is a fully EVM-compatible chain with sub-second finality and low fees, so a private payment settles almost instantly and the zero-knowledge proof checks stay cheap enough for everyday business payments.",
+      "Monad is fully EVM-compatible with sub-second finality and low fees, so a private payment settles almost instantly and the zero-knowledge proof checks stay cheap enough for everyday payments.",
   },
 ] as const;
 
@@ -47,49 +47,36 @@ export function Faq() {
   const toggleItem = (question: string) => {
     setOpenItems((current) => {
       const next = new Set(current);
-      if (next.has(question)) {
-        next.delete(question);
-      } else {
-        next.add(question);
-      }
+      if (next.has(question)) next.delete(question);
+      else next.add(question);
       return next;
     });
   };
 
   return (
-    <LandingSection id="faq" data-ed-section aria-labelledby="faq-title">
-      <div className="grid w-full gap-12 lg:grid-cols-[0.74fr_1.26fr] lg:gap-20">
-        <div className="flex flex-col gap-10 lg:sticky lg:top-24 lg:min-h-[480px] lg:self-start lg:justify-between lg:gap-0">
+    <section
+      id="faq"
+      data-ed-section
+      aria-labelledby="faq-title"
+      className="relative bg-void py-24 sm:py-32"
+    >
+      <Frame>
+        <div className="grid gap-12 lg:grid-cols-[1fr_2fr]">
           <div>
+            <MonoLabel className="text-starlight/60">{"/// FAQ"}</MonoLabel>
             <h2
-              className="type-landing-section-title max-w-[7ch] text-balance text-ink"
               id="faq-title"
+              className="mt-4 text-[clamp(1.9rem,2.8vw,2.6rem)] font-light tracking-tight"
             >
-              Have questions?
+              Questions, answered
             </h2>
-          </div>
-
-          <div className="max-w-[280px]">
-            <p className="text-[clamp(1.35rem,2vw,1.8rem)] font-medium leading-[0.98] tracking-[-0.04em] text-ink">
-              Have more questions? Join the Discord server.
+            <p className="mt-4 max-w-[34ch] text-[15px] leading-relaxed text-starlight/60">
+              Privacy should feel practical, not mysterious. These come up
+              first.
             </p>
-            <a
-              className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2.5 rounded-lg bg-ink px-6 text-center text-base font-semibold text-paper transition-[background,transform] duration-150 ease-out hover:bg-olive-deep motion-safe:hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sage sm:mt-8 sm:w-auto sm:px-8"
-              href="#top"
-            >
-              <DiscordLogo />
-              Join Discord server
-            </a>
           </div>
-        </div>
 
-        <div>
-          <p className="mb-7 max-w-[44ch] text-[1.05rem] font-medium leading-[1.55] text-muted-text lg:hidden">
-            Privacy should feel practical, not mysterious. These are the
-            questions that usually come up first.
-          </p>
-
-          <div className="border-t border-olive-deep/14">
+          <div className="border-t border-starlight/10">
             {FAQ_ITEMS.map((item) => {
               const isOpen = openItems.has(item.question);
               const answerId = `faq-answer-${item.question
@@ -98,40 +85,38 @@ export function Faq() {
 
               return (
                 <div
-                  className="group border-b border-olive-deep/14 transition-colors duration-150 data-[open=true]:bg-paper/22 motion-safe:hover:bg-paper/18"
+                  className="group border-b border-starlight/10"
                   data-open={isOpen}
                   key={item.question}
                 >
                   <button
                     type="button"
-                    className="flex min-h-[78px] w-full cursor-pointer items-center justify-between gap-3 py-5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sage sm:min-h-[86px] sm:gap-6 sm:py-6"
+                    className="flex min-h-[72px] w-full cursor-pointer items-center justify-between gap-6 py-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                     aria-expanded={isOpen}
                     aria-controls={answerId}
                     onClick={() => toggleItem(item.question)}
                   >
-                    <span className="max-w-[760px] text-balance text-base font-medium leading-[1.45] tracking-[-0.025em] text-ink sm:text-[clamp(1rem,2vw,2rem)] sm:leading-[1.02] sm:tracking-[-0.045em]">
+                    <span className="text-lg font-normal tracking-tight text-starlight sm:text-xl">
                       {item.question}
                     </span>
                     <span
-                      className="relative grid size-11 shrink-0 place-items-center rounded-lg bg-paper text-ink shadow-[0_10px_28px_rgba(32,38,26,0.06)] transition-[background,color,transform] duration-150 ease-out group-data-[open=true]:bg-olive-deep group-data-[open=true]:text-paper motion-safe:group-hover:scale-105 sm:-mr-5 sm:size-12"
+                      className="relative grid size-10 shrink-0 place-items-center rounded-full border border-starlight/25 text-starlight transition-colors group-data-[open=true]:border-violet group-data-[open=true]:bg-violet"
                       aria-hidden="true"
                     >
-                      <span className="absolute h-0.5 w-5 bg-current" />
-                      <span className="absolute h-5 w-0.5 bg-current transition-[opacity,transform] duration-150 group-data-[open=true]:rotate-90 group-data-[open=true]:opacity-0" />
+                      <span className="absolute h-px w-4 bg-current" />
+                      <span className="absolute h-4 w-px bg-current transition-[opacity,transform] duration-200 group-data-[open=true]:rotate-90 group-data-[open=true]:opacity-0" />
                     </span>
                   </button>
                   <div
                     aria-hidden={!isOpen}
-                    className="grid grid-rows-[0fr] transition-[grid-template-rows,opacity] duration-300 ease-out data-[open=true]:grid-rows-[1fr] data-[open=true]:opacity-100 motion-reduce:transition-none"
+                    className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-300 ease-out data-[open=true]:grid-rows-[1fr] data-[open=true]:opacity-100 motion-reduce:transition-none"
                     data-open={isOpen}
                     id={answerId}
                   >
                     <div className="min-h-0 overflow-hidden">
-                      <div className="max-w-[720px] pb-7 pr-2 sm:pr-10">
-                        <p className="text-base font-medium leading-[1.62] text-ink/72 sm:text-[1.05rem]">
-                          {item.answer}
-                        </p>
-                      </div>
+                      <p className="max-w-[68ch] pb-7 pr-14 text-[15px] leading-relaxed text-starlight/65">
+                        {item.answer}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -139,21 +124,7 @@ export function Faq() {
             })}
           </div>
         </div>
-      </div>
-    </LandingSection>
-  );
-}
-
-function DiscordLogo() {
-  return (
-    <svg
-      className="size-5 shrink-0"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M19.54 5.34A18.4 18.4 0 0 0 15.04 4c-.2.35-.42.82-.58 1.19a17.1 17.1 0 0 0-4.94 0A12.6 12.6 0 0 0 8.94 4c-1.58.27-3.1.72-4.5 1.34C1.6 9.55.83 13.65 1.22 17.7A18.5 18.5 0 0 0 6.74 20.5c.45-.61.84-1.26 1.18-1.95-.65-.24-1.27-.54-1.84-.9.15-.11.3-.23.44-.35a13.2 13.2 0 0 0 10.96 0l.44.35c-.58.36-1.2.66-1.85.9.34.69.74 1.34 1.18 1.95a18.4 18.4 0 0 0 5.53-2.8c.46-4.7-.78-8.76-3.24-12.36ZM8.68 15.22c-1.08 0-1.97-.99-1.97-2.2 0-1.2.87-2.2 1.97-2.2s1.99 1 1.97 2.2c0 1.21-.87 2.2-1.97 2.2Zm6.64 0c-1.08 0-1.97-.99-1.97-2.2 0-1.2.87-2.2 1.97-2.2s1.99 1 1.97 2.2c0 1.21-.87 2.2-1.97 2.2Z" />
-    </svg>
+      </Frame>
+    </section>
   );
 }

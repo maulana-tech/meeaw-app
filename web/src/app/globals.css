@@ -79,6 +79,16 @@
   --color-ed-mid: #8f9280;
   --color-ed-line: rgba(245, 243, 234, 0.16);
   --color-ed-gold: #b78a34;
+
+  /* Landing page: deep space + Monad violet nebula. */
+  --color-void: #050507;
+  --color-void-2: #0c0b14;
+  --color-starlight: #f4f2ff;
+  --color-violet: #836ef9;
+  --color-indigo-glow: #3d2bff;
+  --color-magenta: #e24c9b;
+  --color-mist: #f4f4f6;
+  --color-graphite: #0d0c14;
 }
 
 @layer base {
@@ -115,6 +125,29 @@
 }
 
 @layer utilities {
+  /* Film grain over the landing gradients (Galxe-style nebula). */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.38;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .text-nebula {
+    background: linear-gradient(
+      100deg,
+      var(--color-violet) 0%,
+      #6f8cff 45%,
+      #5fd1c5 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
@@ -123,6 +156,10 @@
 }
 
 @theme inline {
+  --font-landing:
+    var(--font-urbanist), "Aileron", ui-sans-serif, system-ui, sans-serif;
+  --font-landing-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
   --font-heading:
     "Aileron", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
