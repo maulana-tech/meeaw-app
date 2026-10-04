@@ -5,6 +5,7 @@ import {
   poolScopeSchema,
   requestIdSchema,
   signedRequestSchema,
+  signedSubmissionSchema,
 } from "../../../features/requests/validation";
 
 // Transport schemas for the requests router. Inputs never carry plaintext
@@ -57,3 +58,12 @@ export const requestPageOutput = z.strictObject({
 });
 
 export const pendingCountOutput = z.number().int().nonnegative();
+
+export const beginPaymentInput=z.strictObject({id:requestIdSchema,revision:z.number().int().nonnegative(),attemptId:requestIdSchema});
+export const submitPaymentInput=signedSubmissionSchema;
+export const paymentOperationOutput=z.strictObject({
+  id:requestIdSchema,requestId:requestIdSchema,pool:poolScopeSchema,
+  phase:z.enum(["preparing","submitting","submitted","confirmed","failed","needsReconciliation"]),
+  completedMerges:z.number().int().nonnegative(),nextStep:z.number().int().nonnegative(),
+  txHash:hex.nullable(),updatedAt:z.string(),
+});

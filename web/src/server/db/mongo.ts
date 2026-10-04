@@ -101,6 +101,12 @@ export type RequestReservationDoc = {
     | "failed"
     | "needsReconciliation";
   updatedAt: Date;
+  completedMerges: number;
+  nextStep: number;
+  txHash: string | null;
+  relayWallet: string | null;
+  currentSubmission: import("../../features/requests/types").SignedSubmission | null;
+  currentDigest: string | null;
 };
 
 /**

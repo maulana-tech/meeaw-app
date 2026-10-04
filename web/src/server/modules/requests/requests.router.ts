@@ -15,6 +15,7 @@ import {
   requestIdInput,
   requestPageOutput,
   requestTransitionInput,
+  beginPaymentInput,submitPaymentInput,paymentOperationOutput,
 } from "./requests.schema";
 import {
   cancelRequest,
@@ -25,6 +26,7 @@ import {
   listSent,
   pendingCount,
 } from "./requests.service";
+import {beginPayment,submitConsolidation,submitPayment,paymentStatus} from "./requestOperations";
 
 // Errors map to fixed messages; nothing from the record or its envelopes is
 // echoed back or logged.
@@ -51,6 +53,10 @@ export function mapRequestError(e: unknown): never {
 }
 
 export const requestsRouter = createTRPCRouter({
+  beginPayment:protectedProcedure.input(beginPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>beginPayment(ctx.privyUserId,input).catch(mapRequestError)),
+  submitConsolidation:protectedProcedure.input(submitPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>submitConsolidation(ctx.privyUserId,input).catch(mapRequestError)),
+  submitPayment:protectedProcedure.input(submitPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>submitPayment(ctx.privyUserId,input).catch(mapRequestError)),
+  paymentStatus:protectedProcedure.input(requestIdInput).output(paymentOperationOutput.nullable()).query(({ctx,input})=>paymentStatus(ctx.privyUserId,input).catch(mapRequestError)),
   create: protectedProcedure
     .input(createRequestInput)
     .output(paymentRequestOutput)

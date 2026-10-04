@@ -90,6 +90,21 @@ const validator = {
             ],
           },
           updatedAt: { bsonType: "date" },
+          completedMerges:{bsonType:["int","long"]},
+          nextStep:{bsonType:["int","long"]},
+          txHash:{bsonType:["string","null"]},
+          relayWallet:{bsonType:["string","null"]},
+          currentDigest:{bsonType:["string","null"]},
+          currentSubmission:{
+            bsonType:["object","null"],additionalProperties:false,
+            properties:{
+              version:{enum:[1]},requestId:{bsonType:"string"},operationId:{bsonType:"string"},step:{bsonType:["int","long"]},
+              pool:{bsonType:"string"},kind:{enum:["merge","split","payment"]},root:{bsonType:"string"},nullifiers:{bsonType:"array",items:{bsonType:"string"}},
+              proof:{bsonType:"object",additionalProperties:false,properties:{a:{bsonType:"array"},b:{bsonType:"array"},c:{bsonType:"array"}}},
+              outputs:{bsonType:"array",items:{bsonType:"object",additionalProperties:false,properties:{commitment:{bsonType:"string"},ephemeralPk:{bsonType:"string"},ciphertext:{bsonType:"string"}}}},
+              signature:{bsonType:"string"},
+            },
+          },
         },
       },
       receipt: {
