@@ -1,0 +1,31 @@
+name: mawee-mongo
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: mawee-mongodb
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["mongod", "--auth", "--bind_ip_all"]
+    volumes:
+      - mawee_mongo_data:/data/db
+      - ./init/01-create-app-user.js:/docker-entrypoint-initdb.d/01-create-app-user.js:ro
+    networks:
+      app_edge:
+        aliases:
+          - mawee-mongodb
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mawee_mongo_data:
+    name: mawee_mongo_data
+
+networks:
+  app_edge:
+    name: mawee_edge
+    external: true

@@ -43,6 +43,12 @@ It keeps running in the background. Later, start it again with
 To use MongoDB Atlas instead, create a free cluster and copy its connection
 string for step 4.
 
+The command above is for local development, where the app connects to
+`localhost:27017`. For the VPS deployment, use the authenticated, persistent
+MongoDB Compose setup in [ops/mongodb/README.md](../ops/mongodb/README.md).
+That setup joins the app's Docker network and does not publish MongoDB's port
+to the internet.
+
 ## 3. Create a Privy app
 
 1. Sign in at [dashboard.privy.io](https://dashboard.privy.io) and create an
