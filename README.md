@@ -173,6 +173,10 @@ What is intentionally not hidden yet:
 
 ## Prerequisites
 
+New here? [docs/local-setup.md](docs/local-setup.md) walks through the whole
+local setup, from a fresh clone to signing in.
+
+
 - Node 20 or newer.
 - pnpm 10 or newer.
 - MongoDB for the web app's cached users, payment links, and indexer data.
