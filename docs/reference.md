@@ -20,9 +20,9 @@
 
 | Contract | ID |
 | --- | --- |
-| `olio-registry` | `CAXBFQCZIIZ73RT6KVDBTZECQCDIDIRNAQWO5X4Q5RKI4RBDL7IMHFPW` |
-| `olio-pool` | `CCV6AL2P3CYSF7FVRR4QEB5375TGX4VOXHEF3QI4QSZVJXV3O7VXWX53` |
-| `olio-intake` (CCTP) | `CA3P6VWP3ZBC65GW6USZFTNIIQNBGAYJDDRJSQEQTX7TNOETMETD7RBE` |
+| `mawee-registry` | `CAXBFQCZIIZ73RT6KVDBTZECQCDIDIRNAQWO5X4Q5RKI4RBDL7IMHFPW` |
+| `mawee-pool` | `CCV6AL2P3CYSF7FVRR4QEB5375TGX4VOXHEF3QI4QSZVJXV3O7VXWX53` |
+| `mawee-intake` (CCTP) | `CA3P6VWP3ZBC65GW6USZFTNIIQNBGAYJDDRJSQEQTX7TNOETMETD7RBE` |
 | USDC Stellar Asset Contract | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
 | USDC issuer | `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` |
 
@@ -74,7 +74,7 @@ Set in `web/.env.local` (never committed):
 ```sh
 pnpm install                                  # web deps
 stellar contract build                        # contracts
-cargo test -p olio-registry -p olio-pool -p olio-intake
+cargo test -p mawee-registry -p mawee-pool -p mawee-intake
 cd circuits && npm install && ./build.sh      # circuits + Soroban VKs
 ./scripts/deploy-testnet.sh alice             # deploy to testnet
 ```

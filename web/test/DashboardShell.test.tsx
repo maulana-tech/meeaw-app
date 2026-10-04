@@ -39,7 +39,7 @@ describe("DashboardShell navigation", () => {
       </DashboardShell>,
     );
 
-    expect(screen.getByRole("link", { name: "Olio home" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Mawee home" })).toHaveAttribute(
       "href",
       "/",
     );
@@ -78,7 +78,7 @@ describe("DashboardShell navigation", () => {
     expect(
       screen.queryByRole("link", { name: "Back to dashboard" }),
     ).toBeNull();
-    expect(screen.getByRole("link", { name: "Olio home" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Mawee home" })).toHaveAttribute(
       "href",
       "/",
     );
@@ -96,7 +96,7 @@ describe("DashboardShell navigation", () => {
     expect(
       screen.getByRole("link", { name: "Back to dashboard" }),
     ).toHaveAttribute("href", "/dashboard");
-    expect(screen.queryByRole("link", { name: "Olio home" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Mawee home" })).toBeNull();
     expect(screen.getByText("History")).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("History content")).toBeInTheDocument();
   });

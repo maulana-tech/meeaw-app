@@ -12,28 +12,28 @@ cd build
 if [ ! -f pot_final.ptau ]; then
   echo "==> powers of tau (2^15, dev ceremony)"
   npx snarkjs powersoftau new bn128 15 pot_0.ptau
-  npx snarkjs powersoftau contribute pot_0.ptau pot_1.ptau --name=olio -e="olio $(date +%s%N)"
+  npx snarkjs powersoftau contribute pot_0.ptau pot_1.ptau --name=mawee -e="mawee $(date +%s%N)"
   npx snarkjs powersoftau prepare phase2 pot_1.ptau pot_final.ptau
 fi
 
 if [ ! -f withdraw_final.zkey ]; then
   echo "==> groth16 setup (withdraw)"
   npx snarkjs groth16 setup withdraw.r1cs pot_final.ptau withdraw_0.zkey
-  npx snarkjs zkey contribute withdraw_0.zkey withdraw_final.zkey --name=olio2 -e="olio $(date +%s%N)"
+  npx snarkjs zkey contribute withdraw_0.zkey withdraw_final.zkey --name=mawee2 -e="mawee $(date +%s%N)"
 fi
 npx snarkjs zkey export verificationkey withdraw_final.zkey verification_key.json
 
 if [ ! -f transfer_final.zkey ]; then
   echo "==> groth16 setup (transfer)"
   npx snarkjs groth16 setup transfer.r1cs pot_final.ptau transfer_0.zkey
-  npx snarkjs zkey contribute transfer_0.zkey transfer_final.zkey --name=olio2 -e="olio $(date +%s%N)"
+  npx snarkjs zkey contribute transfer_0.zkey transfer_final.zkey --name=mawee2 -e="mawee $(date +%s%N)"
 fi
 npx snarkjs zkey export verificationkey transfer_final.zkey verification_key_transfer.json
 
 if [ ! -f deposit_final.zkey ]; then
   echo "==> groth16 setup (deposit)"
   npx snarkjs groth16 setup deposit.r1cs pot_final.ptau deposit_0.zkey
-  npx snarkjs zkey contribute deposit_0.zkey deposit_final.zkey --name=olio2 -e="olio deposit"
+  npx snarkjs zkey contribute deposit_0.zkey deposit_final.zkey --name=mawee2 -e="mawee deposit"
 fi
 npx snarkjs zkey export verificationkey deposit_final.zkey verification_key_deposit.json
 
@@ -41,13 +41,13 @@ echo "==> test vector + fixture (withdraw)"
 node ../gen_input.mjs
 npx snarkjs groth16 fullprove input.json withdraw_js/withdraw.wasm withdraw_final.zkey proof.json public.json
 npx snarkjs groth16 verify verification_key.json public.json proof.json
-node to_soroban.mjs   # writes programs/olio-pool/src/fixture.rs + vk_soroban.json
+node to_soroban.mjs   # writes programs/mawee-pool/src/fixture.rs + vk_soroban.json
 
 echo "==> test vector + fixture (transfer)"
 node ../gen_transfer_input.mjs
 npx snarkjs groth16 fullprove input_transfer.json transfer_js/transfer.wasm transfer_final.zkey proof_transfer.json public_transfer.json
 npx snarkjs groth16 verify verification_key_transfer.json public_transfer.json proof_transfer.json
-node ../to_soroban_transfer.mjs   # writes programs/olio-pool/src/transfer_fixture.rs + vk_transfer_soroban.json
+node ../to_soroban_transfer.mjs   # writes programs/mawee-pool/src/transfer_fixture.rs + vk_transfer_soroban.json
 
 echo "==> test vector + fixture (deposit)"
 node ../gen_deposit_input.mjs

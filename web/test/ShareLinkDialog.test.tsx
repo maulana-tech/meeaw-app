@@ -6,10 +6,10 @@ import { PersonalLinkCard } from "../src/components/dashboard/PersonalLinkCard";
 describe("personal payment link actions", () => {
   it("shows the payment URL and opens the branded QR action", async () => {
     const user = userEvent.setup();
-    const payLink = "https://olio.example/pay/olio";
-    render(<PersonalLinkCard username="olio" payLink={payLink} />);
+    const payLink = "https://mawee.example/pay/mawee";
+    render(<PersonalLinkCard username="mawee" payLink={payLink} />);
 
-    expect(screen.getByText("olio.example/pay/olio")).toBeInTheDocument();
+    expect(screen.getByText("mawee.example/pay/mawee")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Open payment link" }),
     ).toHaveAttribute("href", payLink);

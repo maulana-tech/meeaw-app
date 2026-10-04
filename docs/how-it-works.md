@@ -1,4 +1,4 @@
-# How Olio Works
+# How Mawee Works
 
 There's a simple version and a nerdy version. Read whichever one you're in the
 mood for.
@@ -9,7 +9,7 @@ Think of the blockchain as a public bulletin board. Normally, when someone pays
 you, they pin a note to the board that says *"paid Dinar $50"* — for everyone to
 see, forever.
 
-Olio changes the note. Instead, your client pins up a **sealed envelope**. The
+Mawee changes the note. Instead, your client pins up a **sealed envelope**. The
 board only shows that *an envelope was pinned* — not who it's for or what's
 inside. Only you have the key to open your envelopes.
 
@@ -19,7 +19,7 @@ envelope worth $50"* without pointing to which one. The board pays you out, mark
 that envelope as used so it can't be spent twice, and never learns which
 deposit it came from.
 
-That "prove it without revealing it" trick is the heart of Olio. It's what keeps
+That "prove it without revealing it" trick is the heart of Mawee. It's what keeps
 your payments unlinkable.
 
 ## The technical explanation

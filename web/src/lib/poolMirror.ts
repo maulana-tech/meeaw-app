@@ -2,7 +2,7 @@ import { api } from "../trpc/client";
 import { hexToBytes } from "./crypto";
 import { type DepositEvent, networkPassphrase, poolId } from "./stellar";
 
-const DB_NAME = "olio-pool-mirror";
+const DB_NAME = "mawee-pool-mirror";
 const STORE_NAME = "mirrors";
 const DB_VERSION = 1;
 

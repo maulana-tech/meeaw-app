@@ -66,7 +66,7 @@ function exportCsv(events: ActivityEvent[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "olio-receipts.csv";
+  a.download = "mawee-receipts.csv";
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -111,8 +111,8 @@ export function DashboardSidebar() {
           className="flex items-center gap-2 group-data-[collapsible=icon]:hidden"
         >
           <Image
-            src="/assets/olio-white.svg"
-            alt="Olio"
+            src="/assets/mawee-white.svg"
+            alt="Mawee"
             width={56}
             height={56}
             className="size-14"

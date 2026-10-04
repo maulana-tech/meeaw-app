@@ -215,7 +215,7 @@ describe("Dashboard route", () => {
     );
     expect(
       within(depositCard).getByText(
-        "Add money to your Olio balance. Use it for payments, or withdraw it whenever you need it.",
+        "Add money to your Mawee balance. Use it for payments, or withdraw it whenever you need it.",
       ),
     ).toBeInTheDocument();
     expect(within(depositCard).getByAltText("MoneyGram")).toBeInTheDocument();

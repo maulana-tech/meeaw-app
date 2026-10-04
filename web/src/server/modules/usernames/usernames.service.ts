@@ -1,7 +1,7 @@
 import "server-only";
 import { Binary } from "mongodb";
 import { bytesToHex } from "../../../lib/crypto";
-import type { OlioAccount } from "../../../lib/stellar";
+import type { MaweeAccount } from "../../../lib/stellar";
 import {
   resolveUsernameOnChain,
   server,
@@ -36,7 +36,7 @@ function toResolveOutput(doc: UsernameDoc): ResolveOutput {
 // Mongo only ever holds keys we just re-verified against the registry.
 async function upsertFromChain(
   username: string,
-  onChain: OlioAccount,
+  onChain: MaweeAccount,
 ): Promise<ResolveOutput> {
   const usernames = await getUsernames();
   const latestLedger = (await server.getLatestLedger()).sequence;
@@ -76,7 +76,7 @@ export async function resolveUsername(
     return toResolveOutput(cached);
   }
 
-  let onChain: OlioAccount | null;
+  let onChain: MaweeAccount | null;
   try {
     onChain = await resolveUsernameOnChain(username);
   } catch {

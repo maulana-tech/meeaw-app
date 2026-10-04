@@ -1,4 +1,4 @@
-// Note cryptography for the Olio shielded pool (iteration 2).
+// Note cryptography for the Mawee shielded pool (iteration 2).
 //
 // Poseidon over BN254 (circomlibjs) matches the circuit (circomlib) and the
 // contract (soroban-poseidon) — verified by fixed vectors + an on-chain
@@ -76,7 +76,7 @@ export function cashInSalt(
   settlementIdentity: string,
 ): bigint {
   const material = new TextEncoder().encode(
-    `olio:moneygram-cash-in:v1:${ownerSecret.toString()}:${settlementIdentity}`,
+    `mawee:moneygram-cash-in:v1:${ownerSecret.toString()}:${settlementIdentity}`,
   );
   return fromBE(sha256(material)) % R;
 }

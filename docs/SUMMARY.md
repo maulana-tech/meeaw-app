@@ -1,12 +1,12 @@
 # Table of contents
 
-* [Welcome to Olio](README.md)
+* [Welcome to Mawee](README.md)
 
-## Is Olio for You?
+## Is Mawee for You?
 
 * [Why Privacy Matters](why-privacy-matters.md)
-* [Who Olio Is For](who-its-for.md)
-* [Olio's Practical Privacy](practical-privacy.md)
+* [Who Mawee Is For](who-its-for.md)
+* [Mawee's Practical Privacy](practical-privacy.md)
 
 ## New to Crypto? Start Here
 
@@ -20,7 +20,7 @@
 
 ## Under the Hood
 
-* [How Olio Works](how-it-works.md)
+* [How Mawee Works](how-it-works.md)
 * [USDC & Cross-Chain Payments](usdc-and-cctp.md)
 * [Concepts](concepts.md)
 * [Security & Recovery](security.md)

@@ -18,7 +18,7 @@ const SOLUTION_BOXES = [
   },
   {
     label: "II",
-    text: "Olio creates a private payment receipt every time you get paid.",
+    text: "Mawee creates a private payment receipt every time you get paid.",
     className: "lg:left-[43vw] lg:top-[22%] lg:w-[300px]",
     textClassName: "text-[clamp(1.1rem,1.45vw,1.45rem)] leading-[1.08]",
     widthClassName: "max-w-[14ch]",

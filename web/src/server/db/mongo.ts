@@ -64,7 +64,7 @@ export type PaymentLinkDoc = {
 };
 
 export type UserDoc = {
-  _id: string; // Olio C-address
+  _id: string; // Mawee C-address
   privyUserId: string;
   privyWalletId: string;
   privyWalletAddress: string;
@@ -78,7 +78,7 @@ export type UserDoc = {
 
 declare global {
   // eslint-disable-next-line no-var
-  var _olioMongoClientPromise: Promise<MongoClient> | undefined;
+  var _maweeMongoClientPromise: Promise<MongoClient> | undefined;
 }
 
 let clientPromise: Promise<MongoClient> | undefined;
@@ -91,14 +91,14 @@ function getClient(): Promise<MongoClient> {
   if (serverEnv.NODE_ENV === "production" && !configuredUri) {
     throw new Error("MONGODB_URI must be configured in production.");
   }
-  const uri = configuredUri || "mongodb://localhost:27017/olio";
+  const uri = configuredUri || "mongodb://localhost:27017/mawee";
 
   if (serverEnv.NODE_ENV === "development") {
     // Reuse the connection across HMR reloads in dev.
-    if (!global._olioMongoClientPromise) {
-      global._olioMongoClientPromise = new MongoClient(uri).connect();
+    if (!global._maweeMongoClientPromise) {
+      global._maweeMongoClientPromise = new MongoClient(uri).connect();
     }
-    clientPromise = global._olioMongoClientPromise;
+    clientPromise = global._maweeMongoClientPromise;
   } else {
     clientPromise = new MongoClient(uri).connect();
   }
@@ -107,7 +107,7 @@ function getClient(): Promise<MongoClient> {
 
 export async function getDb(): Promise<Db> {
   const client = await getClient();
-  return client.db(); // resolves db name from the URI path (`olio`)
+  return client.db(); // resolves db name from the URI path (`mawee`)
 }
 
 export async function getDeposits(): Promise<Collection<DepositDoc>> {

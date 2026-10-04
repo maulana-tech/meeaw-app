@@ -324,7 +324,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             const { notePubkey, viewPubkey } = await accountPubkeys(account);
             await setUsernamePubkeys(
               privySigner({
-                olioAddress: mapping.contractId,
+                maweeAddress: mapping.contractId,
                 wallet: privyWallet,
                 signRawHash,
               }),
@@ -419,7 +419,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const wallet = privyWalletRef.current;
     if (!mapping || !wallet) throw new Error("Connect a Privy wallet first.");
     return privySigner({
-      olioAddress: mapping.contractId,
+      maweeAddress: mapping.contractId,
       wallet,
       signRawHash,
     });
@@ -451,7 +451,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (!wallet || !mapping) throw new Error("Connect a Privy wallet first.");
     return privyUsdcSigner({
       wallet,
-      olioAddress: mapping.contractId,
+      maweeAddress: mapping.contractId,
       signRawHash,
     });
   }, [signRawHash]);

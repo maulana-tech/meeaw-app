@@ -114,7 +114,7 @@ describe("DashboardBackground", () => {
     expect(
       container.querySelector(".bg-brand-obsidian.opacity-75"),
     ).toBeInTheDocument();
-    expect(window.localStorage.getItem("olio.dashboard.theme")).toBe("dark");
+    expect(window.localStorage.getItem("mawee.dashboard.theme")).toBe("dark");
 
     const { container: restored } = render(
       <DashboardBackground>

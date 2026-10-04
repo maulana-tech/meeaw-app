@@ -11,7 +11,7 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const MENU = [
   { id: "problem", numeral: "I", label: "Why privacy matters?" },
-  { id: "solution", numeral: "II", label: "How Olio protects you?" },
+  { id: "solution", numeral: "II", label: "How Mawee protects you?" },
   { id: "users", numeral: "III", label: "Who it's for?" },
   { id: "faq", numeral: "IV", label: "Frequently Asked Questions" },
 ];

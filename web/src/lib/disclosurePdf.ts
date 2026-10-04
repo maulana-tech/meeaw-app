@@ -57,7 +57,7 @@ function truncMiddle(value: string, keep = 12): string {
 
 function receiptReference(bundle: DisclosureBundle): string {
   const leaf = String(bundle.leafIndex).padStart(4, "0");
-  return `OLIO-${leaf}-${bundle.commitmentHex.slice(0, 8).toUpperCase()}`;
+  return `MAWEE-${leaf}-${bundle.commitmentHex.slice(0, 8).toUpperCase()}`;
 }
 
 function displayNetwork(network: string): string {
@@ -101,7 +101,7 @@ function drawWordmark(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
   doc.setTextColor(color);
-  doc.text("olio", x, y + 22);
+  doc.text("mawee", x, y + 22);
 }
 
 function drawPageFooter(
@@ -118,7 +118,7 @@ function drawPageFooter(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED);
-  doc.text(`Olio  •  ${reference}`, MARGIN, height - 25);
+  doc.text(`Mawee  •  ${reference}`, MARGIN, height - 25);
   doc.text(`Page ${page} of ${total}`, width - MARGIN, height - 25, {
     align: "right",
   });
@@ -173,14 +173,14 @@ export async function renderDisclosurePdf(
   const reference = receiptReference(bundle);
   const recipient = bundle.username
     ? `@${bundle.username}`
-    : "Private Olio account";
+    : "Private Mawee account";
 
   doc.setProperties({
-    title: `Olio payment receipt ${reference}`,
+    title: `Mawee payment receipt ${reference}`,
     subject: "Confirmation of a received private payment",
-    author: "Olio",
-    creator: "Olio",
-    keywords: "Olio, payment receipt, USDC, Stellar",
+    author: "Mawee",
+    creator: "Mawee",
+    keywords: "Mawee, payment receipt, USDC, Stellar",
   });
 
   // Page 1: friendly receipt
@@ -196,7 +196,7 @@ export async function renderDisclosurePdf(
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Issued by Olio", pageWidth - MARGIN, 76, { align: "right" });
+  doc.text("Issued by Mawee", pageWidth - MARGIN, 76, { align: "right" });
 
   doc.setFillColor(PANEL);
   doc.roundedRect(MARGIN, 180, contentWidth, 176, 14, 14, "F");
@@ -219,7 +219,7 @@ export async function renderDisclosurePdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(MUTED);
-  doc.text("USD Coin received privately through Olio", MARGIN + 22, 325);
+  doc.text("USD Coin received privately through Mawee", MARGIN + 22, 325);
 
   const rightX = pageWidth - MARGIN - 160;
   doc.setFont("helvetica", "normal");
@@ -282,7 +282,7 @@ export async function renderDisclosurePdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(OBSIDIAN);
-  doc.text("Verified by Olio", MARGIN + 44, 614);
+  doc.text("Verified by Mawee", MARGIN + 44, 614);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   const confirmation = doc.splitTextToSize(
@@ -319,7 +319,7 @@ export async function renderDisclosurePdf(
     ["Private payment index", `#${bundle.leafIndex}`],
     ["Commitment", truncMiddle(bundle.commitmentHex, 16)],
     ["Verified ledger root", truncMiddle(bundle.rootHex, 16)],
-    ["Olio pool contract", truncMiddle(bundle.pool, 16)],
+    ["Mawee pool contract", truncMiddle(bundle.pool, 16)],
     ["Network", displayNetwork(bundle.network)],
   ];
   for (const [label, value] of technicalFacts) {
@@ -342,8 +342,8 @@ export async function renderDisclosurePdf(
   const verificationSteps = [
     "Recreate the private payment fingerprint from the amount, recipient key, and one-time secret in the appendix.",
     "Use the included proof path to confirm that fingerprint belongs to the verified ledger root shown above.",
-    "Confirm the Olio pool published the fingerprint at the stated payment index and recognized that ledger root.",
-    "Confirm the recipient key maps to the Olio username shown on the receipt.",
+    "Confirm the Mawee pool published the fingerprint at the stated payment index and recognized that ledger root.",
+    "Confirm the recipient key maps to the Mawee username shown on the receipt.",
   ];
   verificationSteps.forEach((step, index) => {
     doc.setFillColor(SECONDARY_OBSIDIAN);
@@ -425,5 +425,5 @@ export async function downloadDisclosurePdf(
   bundle: DisclosureBundle,
 ): Promise<void> {
   const doc = await renderDisclosurePdf(bundle);
-  doc.save(`olio-receipt-${receiptReference(bundle).toLowerCase()}.pdf`);
+  doc.save(`mawee-receipt-${receiptReference(bundle).toLowerCase()}.pdf`);
 }

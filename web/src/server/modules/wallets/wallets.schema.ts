@@ -11,7 +11,7 @@ export const contractId = z
   .string()
   .refine(
     (value) => StrKey.isValidContract(value),
-    "invalid Olio contract address",
+    "invalid Mawee contract address",
   );
 const walletId = z.string().min(1).max(256);
 const exactHexBytes = (bytes: number, label: string) =>

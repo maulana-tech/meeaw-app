@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card } from "../../../../components/ui/card";
 import { ToastFeedback } from "../../../../components/ui/toast-feedback";
 import { usePaymentLinkBySlug } from "../../../../features/paymentLinks/hooks/usePaymentLink";
-import { type OlioAccount, resolveUsername } from "../../../../lib/stellar";
+import { type MaweeAccount, resolveUsername } from "../../../../lib/stellar";
 import { PayForm } from "../PayForm";
 
 export default function SlugPayPage() {
@@ -19,7 +19,7 @@ export default function SlugPayPage() {
     error: linkError,
     retry: retryLink,
   } = usePaymentLinkBySlug(username, slug);
-  const [account, setAccount] = useState<OlioAccount | null | "loading">(
+  const [account, setAccount] = useState<MaweeAccount | null | "loading">(
     "loading",
   );
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export default function SlugPayPage() {
           @{username} not found
         </h2>
         <p className="text-sm text-brand-linen/60">
-          No Olio account is registered for this username on testnet.
+          No Mawee account is registered for this username on testnet.
         </p>
       </Card>
     );

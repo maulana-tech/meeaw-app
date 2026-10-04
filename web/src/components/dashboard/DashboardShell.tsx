@@ -69,11 +69,11 @@ function DashboardNavigation() {
         {isOverview ? (
           <Link
             href="/"
-            aria-label="Olio home"
+            aria-label="Mawee home"
             className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
           >
             <Image
-              src="/assets/olio-white.svg"
+              src="/assets/mawee-white.svg"
               alt=""
               width={72}
               height={72}

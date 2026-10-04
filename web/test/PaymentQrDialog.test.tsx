@@ -8,8 +8,8 @@ describe("payment link QR dialog", () => {
     const user = userEvent.setup();
     render(
       <PersonalLinkCard
-        username="olio"
-        payLink="https://olio.example/pay/olio"
+        username="mawee"
+        payLink="https://mawee.example/pay/mawee"
       />,
     );
 

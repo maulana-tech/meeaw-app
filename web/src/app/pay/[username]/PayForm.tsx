@@ -34,7 +34,7 @@ import {
 import { proveDeposit } from "../../../lib/prover";
 import {
   explorerTxUrl,
-  type OlioAccount,
+  type MaweeAccount,
   poolDeposit,
   usdcBalance,
 } from "../../../lib/stellar";
@@ -56,7 +56,7 @@ export function PayForm({
   username,
   link,
 }: {
-  account: OlioAccount;
+  account: MaweeAccount;
   username: string;
   link?: PaymentLink | null;
 }) {

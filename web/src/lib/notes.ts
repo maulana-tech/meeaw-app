@@ -19,10 +19,10 @@ import {
 } from "./poolMirror";
 import { isSpent } from "./stellar";
 
-const OWNER_KEY = "olio.ownerSecret";
-const VIEW_KEY = "olio.viewSecret";
-const USERNAME_KEY = "olio.username";
-const IDENTITY_KEY = "olio.privyUserId";
+const OWNER_KEY = "mawee.ownerSecret";
+const VIEW_KEY = "mawee.viewSecret";
+const USERNAME_KEY = "mawee.username";
+const IDENTITY_KEY = "mawee.privyUserId";
 
 export type LocalAccount = { ownerSecret: bigint; viewSk: Uint8Array };
 
@@ -127,7 +127,7 @@ async function scanMirrorForAccount(
     // Derived pubkeys must equal what's registered for your username in the
     // registry/Mongo. If these don't match, the payer encrypted to keys this
     // browser can't decrypt → notes are invisible and the balance stays 0.
-    console.info("[olio] scan", {
+    console.info("[mawee] scan", {
       deposits: deposits.length,
       myViewPubkey_b64: btoa(String.fromCharCode(...viewPubkey(acct.viewSk))),
       myNotePubkey_b64: btoa(String.fromCharCode(...toBE32(myPk))),
@@ -140,7 +140,7 @@ async function scanMirrorForAccount(
   for (const d of deposits) {
     const dec = decryptNote(acct.viewSk, d.ephemeralPk, d.ciphertext);
     if (!dec) {
-      if (debug) console.info(`[olio] leaf ${d.leafIndex}: not mine (decrypt)`);
+      if (debug) console.info(`[mawee] leaf ${d.leafIndex}: not mine (decrypt)`);
       continue;
     }
     // Belt-and-suspenders: the recomputed commitment must match the leaf.
@@ -149,12 +149,12 @@ async function scanMirrorForAccount(
     ) {
       if (debug)
         console.warn(
-          `[olio] leaf ${d.leafIndex}: decrypted but commitment mismatch — owner key differs from the one registered at pay time`,
+          `[mawee] leaf ${d.leafIndex}: decrypted but commitment mismatch — owner key differs from the one registered at pay time`,
         );
       continue;
     }
     if (debug)
-      console.info(`[olio] leaf ${d.leafIndex}: MINE, amount=${dec.amount}`);
+      console.info(`[mawee] leaf ${d.leafIndex}: MINE, amount=${dec.amount}`);
     const nullifierBytes = toBE32(
       await nullifier(acct.ownerSecret, d.leafIndex),
     );

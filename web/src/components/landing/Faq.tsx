@@ -5,32 +5,32 @@ import { LandingSection } from "./LandingSection";
 
 const FAQ_ITEMS = [
   {
-    question: "Do my clients need to use Olio?",
+    question: "Do my clients need to use Mawee?",
     answer:
-      "No. Just share your payment link or QR code. Your client pays using a supported wallet, while Olio handles the privacy layer behind the scenes.",
+      "No. Just share your payment link or QR code. Your client pays using a supported wallet, while Mawee handles the privacy layer behind the scenes.",
   },
   {
     question: "What stays private?",
     answer:
-      "Olio prevents your payment history from becoming public business intelligence. By default, customers, payment relationships, and incoming transactions are not easily linked on-chain.",
+      "Mawee prevents your payment history from becoming public business intelligence. By default, customers, payment relationships, and incoming transactions are not easily linked on-chain.",
   },
   {
     question: "Can I still prove I received a payment?",
     answer:
-      "Yes. Olio is built for selective disclosure. Your payments stay private by default, but you can generate proof for a specific payment whenever a bank, accountant, auditor, or tax authority requires it.",
+      "Yes. Mawee is built for selective disclosure. Your payments stay private by default, but you can generate proof for a specific payment whenever a bank, accountant, auditor, or tax authority requires it.",
   },
   {
-    question: "How is Olio different from a crypto mixer?",
+    question: "How is Mawee different from a crypto mixer?",
     answer:
-      "Mixers are designed to make the source and destination of funds difficult to trace without giving users a practical way to prove individual transactions. Olio is designed for private business payments with selective disclosure, so you can keep routine transactions private while still proving specific payments when needed.",
+      "Mixers are designed to make the source and destination of funds difficult to trace without giving users a practical way to prove individual transactions. Mawee is designed for private business payments with selective disclosure, so you can keep routine transactions private while still proving specific payments when needed.",
   },
   {
     question: "Why not just create a new wallet for every payment?",
     answer:
-      "Managing dozens or hundreds of wallets quickly becomes impractical. Even then, moving funds between wallets can still reveal payment patterns on a public blockchain. Olio is designed to preserve privacy without requiring businesses to manage a new wallet for every invoice.",
+      "Managing dozens or hundreds of wallets quickly becomes impractical. Even then, moving funds between wallets can still reveal payment patterns on a public blockchain. Mawee is designed to preserve privacy without requiring businesses to manage a new wallet for every invoice.",
   },
   {
-    question: "Who is Olio built for?",
+    question: "Who is Mawee built for?",
     answer:
       "Freelancers, creators, agencies, exporters, and online businesses that accept stablecoin payments but don't want their revenue, customers, or payment history exposed on a public blockchain.",
   },

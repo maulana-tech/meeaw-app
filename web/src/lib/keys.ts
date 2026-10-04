@@ -7,9 +7,9 @@ import { bytesToHex, fromBE, hexToBytes, R } from "./crypto";
 import { BadPinError } from "./pin-errors";
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
-const MASTER_INFO = utf8("olio.master.v1");
-const OWNER_INFO = utf8("olio.owner.v1");
-const VIEW_INFO = utf8("olio.view.v1");
+const MASTER_INFO = utf8("mawee.master.v1");
+const OWNER_INFO = utf8("mawee.owner.v1");
+const VIEW_INFO = utf8("mawee.view.v1");
 const MASTER_LEN = 32;
 
 export type KdfParams = { m: number; t: number; p: number };

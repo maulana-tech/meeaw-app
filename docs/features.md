@@ -12,9 +12,9 @@ locally in your browser, not stored on a server for anyone to peek at.
 
 Share a link or QR code and get paid. Two flavors:
 
-* **Simple link** (`olio/pay/username`) — the payer chooses the amount. Great as
+* **Simple link** (`mawee/pay/username`) — the payer chooses the amount. Great as
   your general "pay me" link.
-* **Managed link** (`olio/pay/username/your-slug`) — you set a fixed amount and a
+* **Managed link** (`mawee/pay/username/your-slug`) — you set a fixed amount and a
   label, like "Consulting call — $150." Perfect for invoices and products.
 
 Every link comes with a QR code for in-person or mobile payments.
@@ -32,6 +32,6 @@ where re-keying lives if you ever need to rotate your keys.
 
 {% hint style="info" %}
 **Receiving needs nothing up front.** You don't need to hold any USDC or do any
-setup to *receive* a payment — just your Olio account. You only interact with the
+setup to *receive* a payment — just your Mawee account. You only interact with the
 chain when you decide to cash out.
 {% endhint %}

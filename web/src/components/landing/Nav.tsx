@@ -34,10 +34,10 @@ export function EditionsTopNav() {
       <a
         className="flex flex-none items-center gap-2.5"
         href="#top"
-        aria-label="Olio Editions — top"
+        aria-label="Mawee Editions — top"
       >
         <Image
-          src="/assets/olio-white.svg"
+          src="/assets/mawee-white.svg"
           alt=""
           width={40}
           height={40}

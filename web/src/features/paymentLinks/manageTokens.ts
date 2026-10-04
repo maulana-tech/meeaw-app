@@ -3,7 +3,7 @@
 // Per-link manage capability tokens, returned once at creation and kept only in
 // this browser. Presenting one proves ownership for edit/archive/delete; without
 // it those mutations return UNAUTHORIZED, so enumerated ids are useless to attackers.
-const STORAGE_KEY = "olio.paymentLinkManageTokens";
+const STORAGE_KEY = "mawee.paymentLinkManageTokens";
 
 type TokenMap = Record<string, string>;
 

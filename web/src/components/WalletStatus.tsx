@@ -52,7 +52,7 @@ export function WalletStatus() {
 
   return (
     <Card className="gap-3 p-6">
-      <h2 className="text-lg font-semibold text-ink">Olio account</h2>
+      <h2 className="text-lg font-semibold text-ink">Mawee account</h2>
       <button
         type="button"
         className="break-all font-mono text-sm text-muted-foreground cursor-pointer text-left hover:text-olive-deep"

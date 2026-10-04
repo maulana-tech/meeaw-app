@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { env } from "@/env";
 
 export const privyAppId =
-  env.NEXT_PUBLIC_PRIVY_APP_ID || "olio_missing_privy_app_id";
+  env.NEXT_PUBLIC_PRIVY_APP_ID || "mawee_missing_privy_app_id";
 
 export function PrivyAppProvider({ children }: { children: ReactNode }) {
   return (
@@ -16,7 +16,7 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
         appearance: {
           theme: "dark",
           accentColor: "#91975b",
-          landingHeader: "Sign in to Olio",
+          landingHeader: "Sign in to Mawee",
           loginMessage: "Use Email, Google,or a passkey.",
         },
         embeddedWallets: {

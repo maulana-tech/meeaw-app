@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/olio-web
+  IMAGE_NAME: ${{ github.repository_owner }}/mawee-web
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -52,8 +52,8 @@ jobs:
             NEXT_PUBLIC_STELLAR_NETWORK=${{ vars.NEXT_PUBLIC_STELLAR_NETWORK }}
             NEXT_PUBLIC_STELLAR_RPC_URL=${{ vars.NEXT_PUBLIC_STELLAR_RPC_URL }}
             NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE=${{ vars.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE }}
-            NEXT_PUBLIC_OLIO_REGISTRY_ID=${{ vars.NEXT_PUBLIC_OLIO_REGISTRY_ID }}
-            NEXT_PUBLIC_OLIO_POOL_ID=${{ vars.NEXT_PUBLIC_OLIO_POOL_ID }}
+            NEXT_PUBLIC_MAWEE_REGISTRY_ID=${{ vars.NEXT_PUBLIC_MAWEE_REGISTRY_ID }}
+            NEXT_PUBLIC_MAWEE_POOL_ID=${{ vars.NEXT_PUBLIC_MAWEE_POOL_ID }}
             NEXT_PUBLIC_USDC_SAC_ID=${{ vars.NEXT_PUBLIC_USDC_SAC_ID }}
             NEXT_PUBLIC_USDC_ISSUER=${{ vars.NEXT_PUBLIC_USDC_ISSUER }}
             NEXT_PUBLIC_POOL_DEPTH=${{ vars.NEXT_PUBLIC_POOL_DEPTH }}
@@ -85,7 +85,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: docker-compose.yml
-          target: /home/${{ secrets.SSH_USER }}/olio
+          target: /home/${{ secrets.SSH_USER }}/mawee
           overwrite: true
 
       - name: Pull and restart on the box
@@ -96,42 +96,42 @@ jobs:
           SEP10_CLIENT_SIGNING_SECRET: ${{ secrets.SEP10_CLIENT_SIGNING_SECRET }}
           PRIVY_APP_ID: ${{ secrets.PRIVY_APP_ID }}
           PRIVY_APP_SECRET: ${{ secrets.PRIVY_APP_SECRET }}
-          OLIO_WALLET_DEPLOYER_SECRET: ${{ secrets.OLIO_WALLET_DEPLOYER_SECRET }}
-          OLIO_ACCOUNT_WASM_HASH: ${{ secrets.OLIO_ACCOUNT_WASM_HASH }}
+          MAWEE_WALLET_DEPLOYER_SECRET: ${{ secrets.MAWEE_WALLET_DEPLOYER_SECRET }}
+          MAWEE_ACCOUNT_WASM_HASH: ${{ secrets.MAWEE_ACCOUNT_WASM_HASH }}
           BRIDGE_SPONSOR_SECRET: ${{ secrets.BRIDGE_SPONSOR_SECRET }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: MONGODB_URI,CRON_SECRET,SEP10_CLIENT_SIGNING_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET,OLIO_WALLET_DEPLOYER_SECRET,OLIO_ACCOUNT_WASM_HASH,BRIDGE_SPONSOR_SECRET
+          envs: MONGODB_URI,CRON_SECRET,SEP10_CLIENT_SIGNING_SECRET,PRIVY_APP_ID,PRIVY_APP_SECRET,MAWEE_WALLET_DEPLOYER_SECRET,MAWEE_ACCOUNT_WASM_HASH,BRIDGE_SPONSOR_SECRET
           script: |
             set -euo pipefail
-            cd /home/${{ secrets.SSH_USER }}/olio
+            cd /home/${{ secrets.SSH_USER }}/mawee
             umask 077
             test -n "${MONGODB_URI}"
             test -n "${CRON_SECRET}"
             test -n "${SEP10_CLIENT_SIGNING_SECRET}"
             test -n "${PRIVY_APP_ID}"
             test -n "${PRIVY_APP_SECRET}"
-            test -n "${OLIO_WALLET_DEPLOYER_SECRET}"
-            test -n "${OLIO_ACCOUNT_WASM_HASH}"
+            test -n "${MAWEE_WALLET_DEPLOYER_SECRET}"
+            test -n "${MAWEE_ACCOUNT_WASM_HASH}"
             test -n "${BRIDGE_SPONSOR_SECRET}"
             secret_env="$(mktemp)"
-            grep -Ev '^(MONGODB_URI|CRON_SECRET|SEP10_CLIENT_SIGNING_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET|OLIO_WALLET_DEPLOYER_SECRET|OLIO_ACCOUNT_WASM_HASH|BRIDGE_SPONSOR_SECRET)=' .env.production > "${secret_env}" || true
+            grep -Ev '^(MONGODB_URI|CRON_SECRET|SEP10_CLIENT_SIGNING_SECRET|PRIVY_APP_ID|PRIVY_APP_SECRET|MAWEE_WALLET_DEPLOYER_SECRET|MAWEE_ACCOUNT_WASM_HASH|BRIDGE_SPONSOR_SECRET)=' .env.production > "${secret_env}" || true
             {
               printf '%s\n' "MONGODB_URI=${MONGODB_URI}"
               printf '%s\n' "CRON_SECRET=${CRON_SECRET}"
               printf '%s\n' "SEP10_CLIENT_SIGNING_SECRET=${SEP10_CLIENT_SIGNING_SECRET}"
               printf '%s\n' "PRIVY_APP_ID=${PRIVY_APP_ID}"
               printf '%s\n' "PRIVY_APP_SECRET=${PRIVY_APP_SECRET}"
-              printf '%s\n' "OLIO_WALLET_DEPLOYER_SECRET=${OLIO_WALLET_DEPLOYER_SECRET}"
-              printf '%s\n' "OLIO_ACCOUNT_WASM_HASH=${OLIO_ACCOUNT_WASM_HASH}"
+              printf '%s\n' "MAWEE_WALLET_DEPLOYER_SECRET=${MAWEE_WALLET_DEPLOYER_SECRET}"
+              printf '%s\n' "MAWEE_ACCOUNT_WASM_HASH=${MAWEE_ACCOUNT_WASM_HASH}"
               printf '%s\n' "BRIDGE_SPONSOR_SECRET=${BRIDGE_SPONSOR_SECRET}"
             } >> "${secret_env}"
             mv "${secret_env}" .env.production
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            export OLIO_IMAGE="${{ needs.build-and-push.outputs.image }}"
-            grep -q '^OLIO_IMAGE=' .env && sed -i "s#^OLIO_IMAGE=.*#OLIO_IMAGE=${OLIO_IMAGE}#" .env || echo "OLIO_IMAGE=${OLIO_IMAGE}" >> .env
+            export MAWEE_IMAGE="${{ needs.build-and-push.outputs.image }}"
+            grep -q '^MAWEE_IMAGE=' .env && sed -i "s#^MAWEE_IMAGE=.*#MAWEE_IMAGE=${MAWEE_IMAGE}#" .env || echo "MAWEE_IMAGE=${MAWEE_IMAGE}" >> .env
             docker compose pull web pool-indexer migrate
             if ! docker compose up -d; then
               docker compose logs --no-color migrate || true

@@ -118,7 +118,7 @@ async function verifiedPrivyWallets(
 }
 
 export function accountSalt(privyUserId: string): Buffer {
-  return hash(Buffer.from(`olio:account:v2:${privyUserId}`));
+  return hash(Buffer.from(`mawee:account:v2:${privyUserId}`));
 }
 
 export function deriveAccountContractId(
@@ -178,7 +178,7 @@ export async function restoreWallet(
       .toArray();
     if (matches.length > 1) {
       throw new WalletConflictError(
-        "Multiple Olio accounts match wallets on this Privy identity.",
+        "Multiple Mawee accounts match wallets on this Privy identity.",
       );
     }
     existing = matches[0] ?? null;
@@ -190,7 +190,7 @@ export async function restoreWallet(
   );
   if (!wallet) {
     throw new WalletConflictError(
-      "The Stellar wallet controlling this Olio account is not linked to the signed-in Privy identity.",
+      "The Stellar wallet controlling this Mawee account is not linked to the signed-in Privy identity.",
     );
   }
   if (
@@ -246,7 +246,7 @@ async function assertExpectedOwner(
   if (!owner) return false;
   if (!owner.equals(expectedOwner)) {
     throw new WalletConflictError(
-      "The deterministic Olio account already exists with a different owner.",
+      "The deterministic Mawee account already exists with a different owner.",
     );
   }
   return true;
@@ -258,13 +258,13 @@ async function waitForDeployment(transactionHash: string): Promise<void> {
     if (result.status === rpc.Api.GetTransactionStatus.SUCCESS) return;
     if (result.status !== rpc.Api.GetTransactionStatus.NOT_FOUND) {
       throw new WalletDeploymentError(
-        `Olio account deployment failed: ${result.status}`,
+        `Mawee account deployment failed: ${result.status}`,
       );
     }
     await sleep(1000);
   }
   throw new WalletDeploymentError(
-    "Olio account deployment confirmation timed out.",
+    "Mawee account deployment confirmation timed out.",
   );
 }
 
@@ -295,12 +295,12 @@ async function deployAccount(
   privyWalletAddress: string,
 ): Promise<string> {
   const {
-    OLIO_WALLET_DEPLOYER_SECRET: deployerSecret,
-    OLIO_ACCOUNT_WASM_HASH: wasmHash,
+    MAWEE_WALLET_DEPLOYER_SECRET: deployerSecret,
+    MAWEE_ACCOUNT_WASM_HASH: wasmHash,
   } = getServerEnv();
   if (!deployerSecret || !wasmHash) {
     throw new WalletDeploymentError(
-      "Wallet deployment is not configured. Set OLIO_WALLET_DEPLOYER_SECRET and OLIO_ACCOUNT_WASM_HASH.",
+      "Wallet deployment is not configured. Set MAWEE_WALLET_DEPLOYER_SECRET and MAWEE_ACCOUNT_WASM_HASH.",
     );
   }
 
@@ -309,7 +309,7 @@ async function deployAccount(
     deployer = Keypair.fromSecret(deployerSecret);
   } catch {
     throw new WalletDeploymentError(
-      "OLIO_WALLET_DEPLOYER_SECRET is not a valid Stellar secret.",
+      "MAWEE_WALLET_DEPLOYER_SECRET is not a valid Stellar secret.",
     );
   }
 
@@ -332,11 +332,11 @@ async function deployAccount(
       },
     );
     if (deployment.result.options.contractId !== contractId) {
-      throw new WalletDeploymentError("Derived Olio account address mismatch.");
+      throw new WalletDeploymentError("Derived Mawee account address mismatch.");
     }
     if (!deployment.built) {
       throw new WalletDeploymentError(
-        "Olio account deployment was not assembled.",
+        "Mawee account deployment was not assembled.",
       );
     }
     const signed = prepareSorobanTransactionForRelay(
@@ -348,7 +348,7 @@ async function deployAccount(
     await waitForDeployment(relayed.hash);
     if (!(await assertExpectedOwner(contractId, owner))) {
       throw new WalletDeploymentError(
-        "Deployed Olio account owner could not be verified.",
+        "Deployed Mawee account owner could not be verified.",
       );
     }
     return contractId;
@@ -363,7 +363,7 @@ async function deployAccount(
     throw new WalletDeploymentError(
       error instanceof Error
         ? error.message
-        : "Olio account deployment failed.",
+        : "Mawee account deployment failed.",
     );
   }
 }
@@ -433,7 +433,7 @@ export async function bootstrapWallet(
   }
 
   // Privy can issue a replacement DID when identities are linked or merged.
-  // Ownership was verified above, so preserve and reopen the Olio account
+  // Ownership was verified above, so preserve and reopen the Mawee account
   // already controlled by this embedded wallet instead of rejecting sign-in.
   const linked = await linkExistingWallet(privyUserId, wallet);
   if (linked) return linked;
@@ -504,7 +504,7 @@ export async function saveEscrow(
   if (result.matchedCount === 1) return;
   if (!(await users.findOne({ privyUserId }))) {
     throw new WalletMigrationError(
-      "No Olio wallet is linked to this Privy identity.",
+      "No Mawee wallet is linked to this Privy identity.",
     );
   }
   throw new WalletEscrowAlreadyInitializedError();

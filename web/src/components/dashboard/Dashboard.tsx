@@ -109,7 +109,7 @@ export function Dashboard() {
             content={
               <div className="mt-4 max-w-52 text-sm leading-5 text-brand-linen/65">
                 <p>
-                  Add money to your Olio balance. Use it for payments, or
+                  Add money to your Mawee balance. Use it for payments, or
                   withdraw it whenever you need it.
                 </p>
                 {moneyGramCashInUnavailableReason ? (

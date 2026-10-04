@@ -1,6 +1,6 @@
 services:
   migrate:
-    image: ${OLIO_IMAGE:-ghcr.io/OWNER/olio-web:latest}
+    image: ${MAWEE_IMAGE:-ghcr.io/OWNER/mawee-web:latest}
     restart: "no"
     env_file:
       - .env.production
@@ -22,7 +22,7 @@ services:
         max-file: "3"
 
   web:
-    image: ${OLIO_IMAGE:-ghcr.io/OWNER/olio-web:latest}
+    image: ${MAWEE_IMAGE:-ghcr.io/OWNER/mawee-web:latest}
     restart: unless-stopped
     env_file:
       - .env.production
@@ -52,7 +52,7 @@ services:
         max-file: "3"
 
   pool-indexer:
-    image: ${OLIO_IMAGE:-ghcr.io/OWNER/olio-web:latest}
+    image: ${MAWEE_IMAGE:-ghcr.io/OWNER/mawee-web:latest}
     restart: unless-stopped
     env_file:
       - .env.production

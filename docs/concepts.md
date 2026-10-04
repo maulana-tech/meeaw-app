@@ -1,10 +1,10 @@
 # Concepts
 
-A few core ideas that make Olio tick, explained plainly.
+A few core ideas that make Mawee tick, explained plainly.
 
 ## Private notes (the shielded pool)
 
-Instead of paying money *to your address*, Olio payments go into a shared
+Instead of paying money *to your address*, Mawee payments go into a shared
 **shielded pool** — think of it as a big communal vault. Your payment becomes a
 **private note** inside that vault: a sealed record that says "this much money
 belongs to whoever holds the right key."
@@ -20,14 +20,14 @@ everyone's notes together, and the math keeps yours private.
 
 ## Unlinkability
 
-The single most important idea in Olio: **an observer can't connect the money
+The single most important idea in Mawee: **an observer can't connect the money
 coming in to the money going out.** They can see deposits happen and withdrawals
 happen, but not that a particular deposit funded a particular withdrawal, or that
 either one is yours.
 
 ## Self-custody & passkeys
 
-Olio is **self-custodial** — you hold the keys that authorize spending, not us.
+Mawee is **self-custodial** — you hold the keys that authorize spending, not us.
 The app and its servers can't spend your money. The pool's 2-of-3 governance can
 temporarily pause access during an emergency, while sensitive changes require a
 public proposal and a 48-hour delay. See
@@ -50,5 +50,5 @@ payments. Private by default, provable by choice.
 ## Anchors (the crypto-to-bank bridge)
 
 An **anchor** is a regulated service that converts crypto to regular money and
-sends it to your bank. Olio connects to one for cash-out, and hands off the bank
-details to them directly — Olio never touches your banking info.
+sends it to your bank. Mawee connects to one for cash-out, and hands off the bank
+details to them directly — Mawee never touches your banking info.

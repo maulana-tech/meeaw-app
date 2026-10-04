@@ -40,7 +40,7 @@ export function SettingsDashboard() {
     <>
       <DashboardPageHeader
         title="Settings"
-        description="The essentials for your Olio account, explained without the crypto jargon."
+        description="The essentials for your Mawee account, explained without the crypto jargon."
       />
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 pb-16 md:grid-cols-2 lg:grid-cols-12 lg:gap-5">
@@ -154,7 +154,7 @@ function RecoveryTile({
             </p>
             <p className="mt-4 text-sm leading-6 text-brand-linen/70">
               {protectedRecovery
-                ? "Your PIN lets you restore access on another device. Olio never sees or stores the PIN itself."
+                ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
                 : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
             </p>
           </div>
@@ -216,7 +216,7 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent appearance="linen" size="sm">
           <DialogHeader>
-            <DialogTitle>Sign out of Olio?</DialogTitle>
+            <DialogTitle>Sign out of Mawee?</DialogTitle>
             <DialogDescription>
               This removes access from this device. Your account and funds stay
               safe, and you can return with your recovery PIN.

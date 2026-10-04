@@ -12,7 +12,7 @@ import {
 } from "./crypto";
 import type { LocalAccount, MyNote, ScanResult } from "./notes";
 import { proveTransfer, type TransferInput } from "./prover";
-import { type OlioAccount, poolTransfer, type Signer } from "./stellar";
+import { type MaweeAccount, poolTransfer, type Signer } from "./stellar";
 
 export type TransferResult = {
   recipientIndex: number;
@@ -42,7 +42,7 @@ export async function sendTransfer(params: {
   signer: Signer;
   acct: LocalAccount;
   scan: ScanResult;
-  recipient: OlioAccount;
+  recipient: MaweeAccount;
   amount: bigint; // recipient amount, base units
 }): Promise<TransferResult> {
   const { signer, acct, scan, recipient, amount } = params;

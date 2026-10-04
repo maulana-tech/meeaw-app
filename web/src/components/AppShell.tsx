@@ -82,10 +82,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DashboardBackground>
           <DashboardShell contentClassName="flex min-h-svh max-w-3xl flex-col">
             <header className="mb-0 flex min-w-0 items-center justify-center">
-              <Link href="/" aria-label="Olio home">
+              <Link href="/" aria-label="Mawee home">
                 <Image
-                  src="/assets/olio-white.svg"
-                  alt="Olio"
+                  src="/assets/mawee-white.svg"
+                  alt="Mawee"
                   width={40}
                   height={40}
                   className="size-16"

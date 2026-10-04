@@ -5,11 +5,11 @@ const NAV_LINKS = [
   { label: "Privacy Policy", href: "/privacy", Icon: ShieldCheck },
   {
     label: "Docs",
-    href: "https://amelias-organization-20.gitbook.io/olio/",
+    href: "https://amelias-organization-20.gitbook.io/mawee/",
     Icon: BookText,
   },
-  { label: "X", href: "https://x.com/olioprivacy", Icon: XLogo },
-  { label: "Discord", href: "https://discord.gg/olio", Icon: DiscordLogo },
+  { label: "X", href: "https://x.com/maweexyz", Icon: XLogo },
+  { label: "Discord", href: "https://discord.gg/mawee", Icon: DiscordLogo },
 ] as const;
 
 export function Footer() {
@@ -36,7 +36,7 @@ export function Footer() {
         >
           <div className="absolute inset-x-0 bottom-0 flex translate-y-1/3 justify-center">
             <Image
-              src="/assets/olio-white.svg"
+              src="/assets/mawee-white.svg"
               alt=""
               width={640}
               height={640}
@@ -66,7 +66,7 @@ export function Footer() {
             </nav>
 
             <p className="text-xs font-medium text-ed-cream/50">
-              © {new Date().getFullYear()} Olio. All rights reserved.
+              © {new Date().getFullYear()} Mawee. All rights reserved.
             </p>
           </div>
         </div>

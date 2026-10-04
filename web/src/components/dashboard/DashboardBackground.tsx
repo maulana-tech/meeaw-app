@@ -12,7 +12,7 @@ import {
 import dashboardBackground from "../../../public/assets/dashboard.jpg";
 
 type DashboardTheme = "painting" | "dark";
-const STORAGE_KEY = "olio.dashboard.theme";
+const STORAGE_KEY = "mawee.dashboard.theme";
 
 const DashboardThemeContext = createContext<{
   theme: DashboardTheme;

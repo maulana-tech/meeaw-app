@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { Binary } from "mongodb";
-import type { OlioAccount } from "../src/lib/stellar";
+import type { MaweeAccount } from "../src/lib/stellar";
 import { UsernameNotOnChainError } from "../src/server/modules/usernames/usernames.errors";
 
 // ---- mocks -----------------------------------------------------------------
@@ -37,7 +37,7 @@ import { registerUsernameCache } from "../src/server/modules/usernames/usernames
 
 // ---- fixtures --------------------------------------------------------------
 
-function fakeAccount(overrides: Partial<OlioAccount> = {}): OlioAccount {
+function fakeAccount(overrides: Partial<MaweeAccount> = {}): MaweeAccount {
   return {
     owner: "GCTESTOWNERADDRESSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     note_pubkey: new Uint8Array(32).fill(0xab),

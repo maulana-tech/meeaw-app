@@ -98,7 +98,7 @@ function invocationTree(
 
 function assertAuthorizedEntry(
   entry: xdr.SorobanAuthorizationEntry,
-  olioAddress: string,
+  maweeAddress: string,
 ): void {
   const credentials = entry.credentials();
   if (credentials.switch().name !== "sorobanCredentialsAddress") {
@@ -109,8 +109,8 @@ function assertAuthorizedEntry(
   const authorizedAddress = Address.fromScAddress(
     credentials.address().address(),
   ).toString();
-  if (authorizedAddress !== olioAddress) {
-    throw new Error("Authorization entry is for a different Olio account.");
+  if (authorizedAddress !== maweeAddress) {
+    throw new Error("Authorization entry is for a different Mawee account.");
   }
 
   const methods = new Map<string, Set<string>>([
@@ -119,7 +119,7 @@ function assertAuthorizedEntry(
     [usdcSacId, new Set(["transfer"])],
   ]);
   if ([registryId, poolId, usdcSacId].some((value) => !value)) {
-    throw new Error("Olio contract allowlist is not fully configured.");
+    throw new Error("Mawee contract allowlist is not fully configured.");
   }
   for (const call of invocationTree(entry.rootInvocation())) {
     if (!methods.get(call.contractId)?.has(call.method)) {
@@ -197,19 +197,19 @@ export function privySep10Signer(options: {
 const AUTH_VALID_LEDGERS = 60;
 
 export function privySigner(options: {
-  olioAddress: string;
+  maweeAddress: string;
   wallet: PrivyStellarWallet;
   signRawHash: PrivyRawHashSigner;
 }): Signer {
-  const { olioAddress, wallet, signRawHash } = options;
+  const { maweeAddress, wallet, signRawHash } = options;
   return {
-    address: olioAddress,
+    address: maweeAddress,
     signAuthEntries: async (entries) => {
       const { sequence } = await server.getLatestLedger();
       const validUntil = sequence + AUTH_VALID_LEDGERS;
       const out: string[] = [];
       for (const entry of entries) {
-        assertAuthorizedEntry(entry, olioAddress);
+        assertAuthorizedEntry(entry, maweeAddress);
         const signed = await authorizeEntry(
           entry,
           async (preimage) => {
@@ -246,13 +246,13 @@ export function privySigner(options: {
   };
 }
 
-/** A tightly scoped signer for moving verified cash-in USDC from G-account to Olio account. */
+/** A tightly scoped signer for moving verified cash-in USDC from G-account to Mawee account. */
 export function privyUsdcSigner(options: {
   wallet: PrivyStellarWallet;
-  olioAddress: string;
+  maweeAddress: string;
   signRawHash: PrivyRawHashSigner;
 }): Signer {
-  const { wallet, olioAddress, signRawHash } = options;
+  const { wallet, maweeAddress, signRawHash } = options;
   return {
     address: wallet.address,
     signAuthEntries: async (entries) => {
@@ -273,7 +273,7 @@ export function privyUsdcSigner(options: {
           calls[0]?.contractId !== usdcSacId ||
           calls[0]?.method !== "transfer" ||
           calls[0]?.args[0] !== wallet.address ||
-          calls[0]?.args[1] !== olioAddress
+          calls[0]?.args[1] !== maweeAddress
         ) {
           throw new Error("Refusing to sign an unexpected cash-in transfer.");
         }

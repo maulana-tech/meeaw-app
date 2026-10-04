@@ -1,11 +1,11 @@
 # Security & Recovery
 
-Straight talk on how Olio keeps your money safe, what you're responsible for, and
+Straight talk on how Mawee keeps your money safe, what you're responsible for, and
 what's still being hardened.
 
 ## You hold the keys
 
-Olio is **self-custodial**. That means:
+Mawee is **self-custodial**. That means:
 
 * The app and its servers **can't** spend or move your money.
 * We **can't** see your private balance — it's decrypted only in your browser.
@@ -32,7 +32,7 @@ recovery path.
 {% hint style="danger" %}
 **We will never ask for your PIN, passkey, or any recovery info** — not by email,
 DM, chat, or "support." Anyone who does is trying to scam you. Only ever enter
-your PIN in the Olio app itself.
+your PIN in the Mawee app itself.
 {% endhint %}
 
 ## What we can and can't protect
@@ -53,9 +53,9 @@ your PIN in the Olio app itself.
 * A temporary pool pause authorized by two governance signers during an
   emergency.
 
-## What's visible even with Olio
+## What's visible even with Mawee
 
-Being honest here — Olio hides the *link* between payments, not everything:
+Being honest here — Mawee hides the *link* between payments, not everything:
 
 * When you cash out, the **amount and destination** are public on-chain.
 * If you withdraw right after getting paid, **timing** can hint at a connection.
@@ -66,17 +66,17 @@ payment-sized amounts immediately. Full details in
 
 ## Testnet status — please read
 
-Olio is currently on **testnet** with play money. It is **not yet independently
+Mawee is currently on **testnet** with play money. It is **not yet independently
 audited**. Before real funds and mainnet launch, we still need:
 
 * A proper security ceremony for the privacy math.
 * Independent audits of the contracts, privacy circuits, and app.
 * Operational hardening for cash-out, cross-chain, and recovery.
 
-Treat today's Olio as a preview of the experience, not a vault for real money.
+Treat today's Mawee as a preview of the experience, not a vault for real money.
 
 ## Need help?
 
-Reach out only through Olio's **official** channels (linked in the app). Scammers
+Reach out only through Mawee's **official** channels (linked in the app). Scammers
 love to impersonate support. When in doubt, slow down — no real support agent
 will ever rush you into sharing a PIN or recovery phrase.

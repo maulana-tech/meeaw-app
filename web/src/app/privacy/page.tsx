@@ -6,9 +6,9 @@ import type { ReactNode } from "react";
 import { Footer } from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Olio",
+  title: "Privacy Policy | Mawee",
   description:
-    "Learn how Olio collects, uses, protects, and shares personal data.",
+    "Learn how Mawee collects, uses, protects, and shares personal data.",
 };
 
 const SECTIONS = [
@@ -56,7 +56,7 @@ const purposeRows = [
   [
     "Carry out identity/business verification and determine passport eligibility",
     "Verification submissions, results, business relationships, and case records",
-    "[IDENTIFY THE BASIS FOR EACH CHECK; CITE ANY APPLICABLE LEGAL OBLIGATION. DO NOT ASSUME ALL KYC IS LEGALLY MANDATED FOR OLIO.]",
+    "[IDENTIFY THE BASIS FOR EACH CHECK; CITE ANY APPLICABLE LEGAL OBLIGATION. DO NOT ASSUME ALL KYC IS LEGALLY MANDATED FOR MAWEE.]",
   ],
   [
     "Publish a Business Passport at an authorized user's request",
@@ -100,38 +100,38 @@ const providerRows = [
   [
     "Sumsub",
     "Configured identity and business verification; verification submissions, technical information, and results.",
-    "Processor for checks performed on Olio’s instructions; independent controller for specified own-purpose processing described in its notice.",
+    "Processor for checks performed on Mawee’s instructions; independent controller for specified own-purpose processing described in its notice.",
     "[CONFIRM CONTRACTED ENTITY, ENABLED CHECKS, DATA REGION, AND TRANSFER SAFEGUARDS]"
   ],
   [
     "Circle CCTP / Iris",
     "Cross-chain USDC transfer and attestation, where the selected route uses CCTP; public blockchain messages, transaction references, addresses, and amounts.",
-    "External protocol and attestation services; Olio separately processes its own payment-session records.",
+    "External protocol and attestation services; Mawee separately processes its own payment-session records.",
     "Public blockchain information is distributed across network participants. [CONFIRM APPLICABLE SERVICE TERMS AND OFF-CHAIN PROCESSING LOCATIONS]"
   ],
   [
     "Application hosting",
-    "Olio-operated application services deployed to a virtual private server; service requests, account data, and operational information.",
-    "Olio controls application processing; the infrastructure provider’s role is governed by the hosting arrangement.",
+    "Mawee-operated application services deployed to a virtual private server; service requests, account data, and operational information.",
+    "Mawee controls application processing; the infrastructure provider’s role is governed by the hosting arrangement.",
     "[CONFIRM VPS PROVIDER, SERVER COUNTRY/REGION, AND TRANSFER SAFEGUARDS]"
   ],
   [
     "Database hosting",
     "MongoDB storage for account, payment, verification, and operational records.",
-    "Olio controls database processing. MongoDB identifies the database technology, not necessarily the hosting provider.",
+    "Mawee controls database processing. MongoDB identifies the database technology, not necessarily the hosting provider.",
     "[CONFIRM SELF-HOSTED OR MANAGED DATABASE, HOSTING PROVIDER, REGION, AND SAFEGUARDS]"
   ],
   [
     "Operational logs and backups",
     "Application/container logs and database recovery copies. Deployment configuration uses size-based log rotation; backup arrangements require confirmation.",
-    "Olio manages operational processing; any external storage provider’s role depends on the actual arrangement.",
+    "Mawee manages operational processing; any external storage provider’s role depends on the actual arrangement.",
     "[CONFIRM LOG ACCESS, BACKUP PROVIDER/LOCATION, RETENTION, AND SAFEGUARDS]"
   ],
   [
     "Google Gmail — company contact mailbox",
     "Support and privacy correspondence sent to ptpentahelixsistemterpercaya@gmail.com, including sender details, messages, and attachments.",
     "Email service supporting the company contact mailbox; applicable account terms determine the provider’s responsibilities.",
-    "[CONFIRM ACCOUNT TERMS AND TRANSFER ARRANGEMENTS; CONFIRM THE SEPARATE OLIO-DOMAIN EMAIL HOST]"
+    "[CONFIRM ACCOUNT TERMS AND TRANSFER ARRANGEMENTS; CONFIRM THE SEPARATE MAWEE-DOMAIN EMAIL HOST]"
   ]
 ] as const;
 
@@ -193,11 +193,11 @@ export default function PrivacyPolicyPage() {
           </div>
           <Link
             href="/"
-            aria-label="Olio home"
+            aria-label="Mawee home"
             className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
           >
             <Image
-              src="/assets/olio-white.svg"
+              src="/assets/mawee-white.svg"
               alt=""
               width={72}
               height={72}
@@ -215,7 +215,7 @@ export default function PrivacyPolicyPage() {
               Privacy Policy
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-olive-deep sm:text-lg">
-              How Olio processes personal data across accounts, payments,
+              How Mawee processes personal data across accounts, payments,
               verification, and Business Passport services.
             </p>
             <dl className="mt-10 flex flex-col gap-4 border-t border-ed-line pt-6 text-sm sm:flex-row sm:gap-12">
@@ -263,9 +263,9 @@ export default function PrivacyPolicyPage() {
               <p>
                 This Privacy Policy explains how{" "}
                 <strong>PT PENTAHELIX SISTEM TERPERCAYA</strong>, trading as{" "}
-                <strong>Olio / OlioPay</strong> (&quot;Olio,&quot;
+                <strong>Mawee</strong> (&quot;Mawee,&quot;
                 &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), processes
-                personal data when you use oliopay.xyz and our related account,
+                personal data when you use mawee.xyz and our related account,
                 payment, verification, and Business Passport services (the
                 &quot;Services&quot;).
               </p>
@@ -308,10 +308,10 @@ export default function PrivacyPolicyPage() {
                 route is available to every user.
               </p>
               <p>
-                Olio uses privacy technologies to reduce unnecessary public
+                Mawee uses privacy technologies to reduce unnecessary public
                 exposure of payment information. These technologies do not
                 guarantee anonymity or prevent all links between accounts,
-                identities, and transactions. Information visible to Olio or a
+                identities, and transactions. Information visible to Mawee or a
                 service provider can differ from information visible on a public
                 blockchain.
               </p>
@@ -352,7 +352,7 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <p>
                   Sumsub collects and processes verification submissions through
-                  the configured verification flow. Olio receives and stores
+                  the configured verification flow. Mawee receives and stores
                   verification metadata, including applicant and case
                   identifiers, status, check timestamps, rejection labels,
                   associated-person references and roles, and moderation
@@ -364,7 +364,7 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <p>
                   Documents and selfies submitted through Sumsub are handled in
-                  its verification environment. This does not mean that Olio
+                  its verification environment. This does not mean that Mawee
                   receives only a yes/no result or can never process information
                   contained in a verification case.
                 </p>
@@ -379,7 +379,7 @@ export default function PrivacyPolicyPage() {
                   configured checks.
                 </p>
                 <p>
-                  Olio does not use verification documents or biometric
+                  Mawee does not use verification documents or biometric
                   information for advertising. Where separate consent is
                   required for biometric processing, it must be obtained before
                   that processing begins. Required notices explain the relevant
@@ -399,7 +399,7 @@ export default function PrivacyPolicyPage() {
                   An automated flag or screening match does not by itself
                   establish wrongdoing. Not every screening or
                   transaction-monitoring product offered by a provider is
-                  necessarily enabled for Olio.
+                  necessarily enabled for Mawee.
                 </p>
               </Subsection>
               <Subsection title="Wallet, payment, and blockchain information">
@@ -415,13 +415,13 @@ export default function PrivacyPolicyPage() {
                   customer information, such as contact details, and may
                   generate records linking a user or username with a payment
                   amount and transaction reference. Some session information is
-                  encrypted in storage but can be decrypted by Olio&apos;s
+                  encrypted in storage but can be decrypted by Mawee&apos;s
                   service to operate the transaction.
                 </p>
               </Subsection>
               <Subsection title="Wallet recovery and device storage">
                 <p>
-                  For the supported recovery flow, Olio stores an encrypted
+                  For the supported recovery flow, Mawee stores an encrypted
                   wallet recovery master together with the salt and
                   key-derivation parameters needed for recovery. The application
                   uses your recovery credentials to perform the relevant
@@ -479,7 +479,7 @@ export default function PrivacyPolicyPage() {
                 director, beneficial owner, or another person, you must have
                 appropriate authority or another lawful basis to provide it and
                 give them the relevant privacy information. This does not remove
-                Olio&apos;s own responsibility to provide notices where
+                Mawee&apos;s own responsibility to provide notices where
                 required.
               </p>
             </PolicySection>
@@ -517,13 +517,13 @@ export default function PrivacyPolicyPage() {
               title="Verification through Sumsub"
             >
               <p>
-                Olio integrates with Sumsub for the identity and business
+                Mawee integrates with Sumsub for the identity and business
                 verification checks configured for the relevant product. The
                 verification flow identifies the information required and
                 presents the relevant notices and consents before submission.
               </p>
               <p>
-                For processing undertaken on Olio&apos;s instructions, the
+                For processing undertaken on Mawee&apos;s instructions, the
                 respective responsibilities are governed by our agreement with
                 the provider. Sumsub may also act as an independent controller
                 for particular processing described in its applicable notice.
@@ -546,7 +546,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>
                 Sumsub&apos;s SDK handles provider consent collection within its
-                supported flow. Olio remains responsible for its own applicable
+                supported flow. Mawee remains responsible for its own applicable
                 transparency and consent requirements. Where required,
                 additional notices or consent are presented separately.
                 Acceptance records must be available to demonstrate the relevant
@@ -556,7 +556,7 @@ export default function PrivacyPolicyPage() {
                 If you decline information or consent necessary for a particular
                 check, that check may not be completed and the associated
                 feature or passport may be unavailable. This does not
-                automatically mean that every Olio service is unavailable.
+                automatically mean that every Mawee service is unavailable.
               </p>
             </PolicySection>
 
@@ -566,9 +566,9 @@ export default function PrivacyPolicyPage() {
               title="Business Passport and public profiles"
             >
               <p>
-                The current Business Passport is an Olio-issued
+                The current Business Passport is an Mawee-issued
                 identity-verification status displayed through a hosted public
-                page. Sumsub performs configured checks; Olio applies its
+                page. Sumsub performs configured checks; Mawee applies its
                 credential policy to determine eligibility.
               </p>
               <p>
@@ -605,7 +605,7 @@ export default function PrivacyPolicyPage() {
               <p>
                 Eligibility is reassessed over time. A passport may become
                 unavailable when unpublished, suspended, stale, or expired.
-                Unpublishing removes public availability through Olio&apos;s
+                Unpublishing removes public availability through Mawee&apos;s
                 passport response; it does not delete internal verification
                 records or remove copies already held by others.
               </p>
@@ -624,7 +624,7 @@ export default function PrivacyPolicyPage() {
             >
               <p>
                 Public blockchain records are replicated by independent network
-                participants. Olio cannot generally erase, amend, or control
+                participants. Mawee cannot generally erase, amend, or control
                 their copies.
               </p>
               <p>
@@ -639,14 +639,14 @@ export default function PrivacyPolicyPage() {
               <p>
                 Privacy mechanisms can reduce particular links between
                 transactions but do not conceal every amount or all activity.
-                Olio and enabled payment providers may hold off-chain records
+                Mawee and enabled payment providers may hold off-chain records
                 that connect accounts or business information with transactions.
               </p>
               <p>
                 Do not add identification numbers, private keys, recovery
                 credentials, or unnecessary personal information to public
                 transaction fields. Ordinary identity verification does not
-                require you to give Olio or Sumsub your wallet seed phrase or
+                require you to give Mawee or Sumsub your wallet seed phrase or
                 private key.
               </p>
             </PolicySection>
@@ -672,7 +672,7 @@ export default function PrivacyPolicyPage() {
               <p>
                 Share disclosures only with recipients you intend to receive
                 them. A recipient can retain or redistribute a downloaded
-                export. Olio cannot revoke copies already received. The bundle
+                export. Mawee cannot revoke copies already received. The bundle
                 does not contain the wallet owner secret or recovery master.
               </p>
             </PolicySection>
@@ -734,8 +734,8 @@ export default function PrivacyPolicyPage() {
               <p>
                 Third parties acting independently may process information under
                 their own notices. Their independent role does not remove
-                Olio&apos;s responsibility for disclosures or processing under
-                Olio&apos;s control.
+                Mawee&apos;s responsibility for disclosures or processing under
+                Mawee&apos;s control.
               </p>
             </PolicySection>
 
@@ -745,7 +745,7 @@ export default function PrivacyPolicyPage() {
               title="Advertising and sale of information"
             >
               <p>
-                Olio does not sell personal data for monetary consideration or
+                Mawee does not sell personal data for monetary consideration or
                 use KYC documents, biometric information, private payment
                 records, or non-public financial history for third-party
                 behavioral advertising.
@@ -811,14 +811,14 @@ export default function PrivacyPolicyPage() {
               <p>
                 Unpublishing or suspending a passport does not itself delete
                 verification data. Deletion requests are assessed across
-                Olio&apos;s records and information processed on our behalf by
+                Mawee&apos;s records and information processed on our behalf by
                 providers. Provider-independent processing may require a
                 separate request or explanation of the provider&apos;s
                 obligations.
               </p>
               <p>
                 Public blockchain records and copies independently retained by
-                disclosure recipients are not generally deletable by Olio. We
+                disclosure recipients are not generally deletable by Mawee. We
                 explain these limits when responding to relevant requests.
               </p>
             </PolicySection>
@@ -833,7 +833,7 @@ export default function PrivacyPolicyPage() {
                 involved. The architecture includes encrypted recovery records
                 and encrypted fields for some payment-session information, but
                 this does not mean that every record is encrypted in every
-                location or inaccessible to Olio.
+                location or inaccessible to Mawee.
               </p>
               <p>
                 No online service, device, or cryptographic system guarantees
@@ -857,7 +857,7 @@ export default function PrivacyPolicyPage() {
               <p>
                 Configured verification processes use automated checks, which
                 may include document checks, facial matching, liveness, and
-                screening. Olio also applies credential eligibility rules based
+                screening. Mawee also applies credential eligibility rules based
                 on verification results and their freshness. These can prevent
                 publication, require further information, or make an existing
                 passport unavailable.
@@ -994,7 +994,7 @@ export default function PrivacyPolicyPage() {
               <p>
                 If additional jurisdiction-specific notices or rights apply, we
                 provide the necessary information for those services and users.
-                This Policy does not itself establish that Olio offers services
+                This Policy does not itself establish that Mawee offers services
                 in the EEA, United Kingdom, United States, or every other
                 jurisdiction.
               </p>
@@ -1013,7 +1013,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>For questions, requests, or complaints, contact:</p>
               <address className="not-italic">
-                <strong>Olio Privacy Team</strong>
+                <strong>Mawee Privacy Team</strong>
                 <br />
                 PT PENTAHELIX SISTEM TERPERCAYA
                 <br />
@@ -1031,7 +1031,7 @@ export default function PrivacyPolicyPage() {
 
             <div className="mt-16 border-t border-line pt-8">
               <a
-                href="mailto:olio@oliopay.xyz"
+                href="mailto:hello@mawee.xyz"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-ed-dark bg-ed-dark px-3 text-center text-sm font-semibold tracking-[0.02em] !text-ed-cream transition-opacity hover:!text-ed-cream hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ed-dark focus-visible:ring-offset-2 focus-visible:ring-offset-paper sm:px-5"
               >
                 <Mail className="size-4" aria-hidden="true" />
@@ -1116,7 +1116,7 @@ function ContactLinks() {
       <a href="mailto:ptpentahelixsistemterpercaya@gmail.com">
         ptpentahelixsistemterpercaya@gmail.com
       </a>{" "}
-      / <a href="mailto:olio@oliopay.xyz">olio@oliopay.xyz</a>
+      / <a href="mailto:hello@mawee.xyz">hello@mawee.xyz</a>
     </>
   );
 }

@@ -121,7 +121,7 @@ beforeEach(() => {
 });
 
 describe("WalletProvider Privy session", () => {
-  it("restores the Privy wallet mapping and Olio C-address", async () => {
+  it("restores the Privy wallet mapping and Mawee C-address", async () => {
     render(
       <WalletProvider>
         <Probe />

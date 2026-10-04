@@ -1,20 +1,20 @@
 # FAQs
 
-## Is Olio anonymous?
+## Is Mawee anonymous?
 
-Not exactly — it's **private**, which is a bit different. Olio hides the link
+Not exactly — it's **private**, which is a bit different. Mawee hides the link
 between who paid you and the money you take out, so people can't build a profile
 of your income and clients. But when you cash out, the amount and destination are
 visible on-chain. Think "your business stays your business," not "invisible."
 
 ## Do I need crypto experience to use it?
 
-Nope. If you can sign in with your fingerprint and share a link, you can use Olio.
+Nope. If you can sign in with your fingerprint and share a link, you can use Mawee.
 Start with [The Basics, No Jargon](new-to-crypto.md).
 
 ## Do I need to buy a "gas" token for fees?
 
-No. Olio covers the network fees for you. You don't need to hold any special
+No. Mawee covers the network fees for you. You don't need to hold any special
 token just to get paid or cash out.
 
 ## What is USDC?
@@ -24,13 +24,13 @@ value doesn't swing around like other crypto.
 
 ## Can my client pay from Ethereum or Solana?
 
-Yes. Olio uses Circle's CCTP to bring USDC over from Ethereum, Base, Arbitrum,
+Yes. Mawee uses Circle's CCTP to bring USDC over from Ethereum, Base, Arbitrum,
 Avalanche, or Solana. To you, it just shows up as a normal private payment. See
 [USDC & Cross-Chain Payments](usdc-and-cctp.md).
 
 ## Do I need to hold USDC to receive money?
 
-No. Receiving needs nothing but your Olio account. You only touch the chain when
+No. Receiving needs nothing but your Mawee account. You only touch the chain when
 you decide to cash out.
 
 ## What's the PIN for?
@@ -38,9 +38,9 @@ you decide to cash out.
 It's your backup and recovery key, and it unlocks spending. Keep it safe and
 private.
 
-## Will Olio ever ask for my PIN?
+## Will Mawee ever ask for my PIN?
 
-**Never.** Not by email, DM, or "support." Only ever type your PIN into the Olio
+**Never.** Not by email, DM, or "support." Only ever type your PIN into the Mawee
 app itself. Anyone asking for it is a scammer.
 
 ## What if I lose my device?
@@ -49,11 +49,11 @@ Your 6-digit PIN backs account recovery. This is why keeping it safe matters —
 a self-custodial system, recovery depends on you, not on us being able to reset
 things for you.
 
-## Can Olio freeze or take my money?
+## Can Mawee freeze or take my money?
 
 The app and its servers can't spend or take your funds. Your spending authority
 stays with your passkey and PIN, while funds sit in an on-chain pool rather than
-an Olio server account.
+an Mawee server account.
 
 For incident response, the pool's 2-of-3 governance can temporarily pause
 deposits, transfers, and withdrawals. Sensitive changes such as new contract
@@ -62,8 +62,8 @@ code or proof rules require a public proposal and a 48-hour delay. See
 
 ## How do I cash out to my bank?
 
-Olio connects to a regulated anchor that converts crypto to fiat. You enter your
-bank details directly with them; Olio never sees them. See
+Mawee connects to a regulated anchor that converts crypto to fiat. You enter your
+bank details directly with them; Mawee never sees them. See
 [Cashing Out](cashing-out.md).
 
 ## Can I prove a payment for taxes or accounting?
@@ -72,14 +72,14 @@ Yes — selective disclosure lets you prove one specific payment happened withou
 revealing your other payments. See
 [Practical Privacy](practical-privacy.md#traceability-on-your-terms).
 
-## Is Olio safe to use with real money right now?
+## Is Mawee safe to use with real money right now?
 
-Not yet. Olio is on testnet with play money and hasn't been independently audited.
+Not yet. Mawee is on testnet with play money and hasn't been independently audited.
 It's a preview. Don't put real funds in until launch. See
 [Security & Recovery](security.md).
 
 ## Is this legal / is it a tool for hiding money?
 
-Olio is built for everyday financial privacy — the same reason you use an envelope
+Mawee is built for everyday financial privacy — the same reason you use an envelope
 instead of a postcard. It's not a mixer, and it supports proving payments when you
 need to. Practical privacy, not illicit activity.

@@ -1,10 +1,10 @@
-# Olio's Practical Privacy
+# Mawee's Practical Privacy
 
 We believe in **practical privacy** — enough to protect your normal financial
 life, without pretending to be something it's not. So here's the straight talk on
-what Olio does and doesn't do.
+what Mawee does and doesn't do.
 
-## What Olio provides
+## What Mawee provides
 
 ✅ **Unlinkable payments.** Nobody watching the blockchain can connect the money
 coming in to the money you take out. Your deposits and withdrawals don't line up
@@ -23,7 +23,7 @@ address. Your clients don't need to understand any of this.
 happened — for your accountant, your bank, or the tax office — without exposing
 everything else.
 
-## What Olio doesn't provide
+## What Mawee doesn't provide
 
 We're not a mixer, and we're not here to help anyone hide from legitimate
 questions.
@@ -37,7 +37,7 @@ the exact same amount, someone could reasonably guess they're connected. Letting
 funds rest, or withdrawing different amounts, keeps things cleaner.
 
 ❌ **We don't take custody on our servers.** Your passkey controls spending from
-the on-chain pool, so Olio's app and servers can't spend your funds. The pool's
+the on-chain pool, so Mawee's app and servers can't spend your funds. The pool's
 2-of-3 governance can temporarily pause it during an emergency; sensitive
 changes require 48 hours' public notice. Recovery still depends on your PIN and
 passkey (see [Security & Recovery](security.md)).
@@ -51,14 +51,14 @@ Here's the balance we strike: **private by default, provable by choice.**
 
 Your day-to-day activity stays private. But when *you* need to show that a
 specific payment happened — an audit, a tax filing, a "please prove this deposit"
-from your bank — Olio lets you export a disclosure for just that one payment.
+from your bank — Mawee lets you export a disclosure for just that one payment.
 Everything else stays private.
 
 That's the difference between privacy and secrecy. You're never stuck unable to
 account for your own money.
 
 {% hint style="warning" %}
-Olio is testnet-stage and not yet independently audited. Treat it as a preview of
+Mawee is testnet-stage and not yet independently audited. Treat it as a preview of
 how this works, not a place for real funds yet. See
 [Security & Recovery](security.md).
 {% endhint %}

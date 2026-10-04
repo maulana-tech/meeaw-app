@@ -7,7 +7,7 @@ import { WalletProvider } from "../components/WalletProvider";
 import { TRPCReactProvider } from "../trpc/react";
 
 export const metadata: Metadata = {
-  title: "Olio: private USDC payments",
+  title: "Mawee: private USDC payments",
   description:
     "Confidential USDC payment links on Stellar. Private by default, provable on demand.",
 };
