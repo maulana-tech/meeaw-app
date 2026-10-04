@@ -83,7 +83,7 @@ describe("dashboard glass modals", () => {
       commitment: "0",
       rootHex: "00",
       root: "0",
-      amount: "12500000",
+      amount: "1250000",
       amountLabel: "1.25",
       ownerPk: "1",
       salt: "2",
@@ -93,7 +93,7 @@ describe("dashboard glass modals", () => {
       disclosedAt: "2026-08-09T00:00:00.000Z",
     };
     mocks.scanMyNotes.mockResolvedValue({
-      notes: [{ leafIndex: 7, amount: 12_500_000n, salt: 2n }],
+      notes: [{ leafIndex: 7, amount: 1_250_000n, salt: 2n }],
     });
     mocks.buildDisclosure.mockResolvedValue(bundle);
     mocks.verifyDisclosure.mockResolvedValue({ valid: true });

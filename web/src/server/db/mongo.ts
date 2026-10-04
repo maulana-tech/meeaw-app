@@ -2,21 +2,20 @@ import { type Binary, type Collection, type Db, MongoClient } from "mongodb";
 import { getServerEnv } from "../../env.server";
 
 export type DepositDoc = {
-  _id: number;
+  _id: number; // leaf index
   commitment: Binary;
   ephemeralPk: Binary;
   ciphertext: Binary;
-  ledger: number;
+  block: number;
   txHash: string;
   ts: Date;
 };
 
 export type UsernameDoc = {
   _id: string; // lowercased username
-  owner: string;
+  owner: string; // checksummed EVM address
   notePubkey: Binary;
   viewPubkey: Binary;
-  createdLedger: number; // ledger this cache entry was (re)written at, not registration ledger
   createdAt: Date;
   updatedAt?: Date;
   displayName?: string;
@@ -26,24 +25,21 @@ export type UsernameDoc = {
 
 export type IndexerStateDoc = {
   _id: "pool" | "registry";
-  lastLedger: number;
-  lastLeafIndex?: number;
-  updatedAt: Date;
-  poolId?: string;
-  publishedLedger?: number;
+  /** `${network}:${poolAddress}` the mirror was built from. */
+  scope?: string;
+  publishedBlock?: number;
   publishedLeafIndex?: number;
+  updatedAt: Date;
   indexedAt?: Date;
   health?: "healthy" | "degraded";
   lastError?: string;
   leaseOwner?: string;
   leaseUntil?: Date;
-  nullifiersComplete?: boolean;
 };
 
 export type SpentNullifierDoc = {
-  _id: string;
-  ledger: number;
-  eventId: string;
+  _id: string; // nullifier hex, no 0x
+  block: number;
   txHash: string;
   ts: Date;
 };
@@ -64,10 +60,9 @@ export type PaymentLinkDoc = {
 };
 
 export type UserDoc = {
-  _id: string; // Mawee C-address
+  _id: string; // checksummed address of the user's Privy embedded wallet
   privyUserId: string;
-  privyWalletId: string;
-  privyWalletAddress: string;
+  privyWalletId?: string;
   encryptedMaster?: Binary;
   masterSalt?: Binary;
   kdfParams?: { m: number; t: number; p: number };

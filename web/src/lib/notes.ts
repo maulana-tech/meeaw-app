@@ -1,4 +1,5 @@
 import { env } from "../env";
+import { isSpent } from "./chain";
 import {
   bytesToHex,
   commitment,
@@ -17,7 +18,6 @@ import {
   type PoolMirror,
   refreshPoolMirror,
 } from "./poolMirror";
-import { isSpent } from "./stellar";
 
 const OWNER_KEY = "mawee.ownerSecret";
 const VIEW_KEY = "mawee.viewSecret";
@@ -140,7 +140,8 @@ async function scanMirrorForAccount(
   for (const d of deposits) {
     const dec = decryptNote(acct.viewSk, d.ephemeralPk, d.ciphertext);
     if (!dec) {
-      if (debug) console.info(`[mawee] leaf ${d.leafIndex}: not mine (decrypt)`);
+      if (debug)
+        console.info(`[mawee] leaf ${d.leafIndex}: not mine (decrypt)`);
       continue;
     }
     // Belt-and-suspenders: the recomputed commitment must match the leaf.

@@ -1,10 +1,11 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
 import {
+  type ConnectedWallet,
   useCreateWallet,
-  useSignRawHash,
-} from "@privy-io/react-auth/extended-chains";
+  usePrivy,
+  useWallets,
+} from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -16,8 +17,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Sep10Signer } from "../lib/anchor";
 import { DASHBOARD_PATH } from "../lib/auth-routes";
+import {
+  registerUsernameCache,
+  type Signer,
+  setUsernamePubkeys,
+  usernameOf,
+} from "../lib/chain";
 import { deriveNoteSecrets, randomMaster } from "../lib/keys";
 import {
   accountPubkeys,
@@ -27,20 +33,7 @@ import {
   syncLocalAccountIdentity,
 } from "../lib/notes";
 import { BadPinError } from "../lib/pin-errors";
-import {
-  type PrivyStellarWallet,
-  privySep10Signer,
-  privySigner,
-  privyUsdcSigner,
-  resolvePrivyStellarWallet,
-  signClassicTransaction,
-} from "../lib/privy-wallet";
-import {
-  registerUsernameCache,
-  type Signer,
-  setUsernamePubkeys,
-  usernameOf,
-} from "../lib/stellar";
+import { findEmbeddedWallet, privySigner } from "../lib/privy-wallet";
 import { api } from "../trpc/client";
 import type { PinMode } from "./PinDialog";
 
@@ -66,29 +59,19 @@ type WalletState = {
   promptUnlock: () => void;
   signIn: () => void;
   disconnect: () => Promise<void>;
-  getSigner: () => Signer;
-  privyPublicKey: string;
-  getPrivySep10Signer: () => Sep10Signer;
-  signPrivyTransaction: (
-    transactionXdr: string,
-    passphrase: string,
-  ) => Promise<string>;
-  getPrivyUsdcSigner: () => Signer;
+  /** Signer for the user's embedded wallet on Monad (pays gas, signs writes). */
+  getSigner: () => Promise<Signer>;
 };
 
-type WalletMapping = {
-  contractId: string;
-  privyWalletId: string;
-  privyWalletAddress: string;
-};
+type WalletMapping = { address: string };
 
 const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { ready, authenticated, user, login, logout } = usePrivy();
+  const { wallets, ready: walletsReady } = useWallets();
   const { createWallet } = useCreateWallet();
-  const { signRawHash } = useSignRawHash();
   const userId = user?.id ?? null;
   const [address, setAddress] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -103,27 +86,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [pinMode, setPinMode] = useState<PinMode>("unlock");
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [pinError, setPinError] = useState("");
-  const privyWalletRef = useRef<PrivyStellarWallet | null>(null);
   const mappingRef = useRef<WalletMapping | null>(null);
   const pendingMasterRef = useRef<Uint8Array | null>(null);
   const revisionRef = useRef(0);
   const sessionAbortedRef = useRef(false);
-  const userRef = useRef(user);
+  const walletsRef = useRef<readonly ConnectedWallet[]>(wallets);
   const createWalletRef = useRef(createWallet);
-  const resolvedWalletRef = useRef<{
-    userId: string;
-    wallet: PrivyStellarWallet;
-  } | null>(null);
   const setupRef = useRef<{
     key: string;
-    promise: Promise<{
-      wallet: PrivyStellarWallet;
-      mapping: WalletMapping;
-      openDashboard: boolean;
-    }>;
+    promise: Promise<{ mapping: WalletMapping; openDashboard: boolean }>;
   } | null>(null);
 
-  userRef.current = user;
+  walletsRef.current = wallets;
   createWalletRef.current = createWallet;
 
   const openPinModal = useCallback((mode: PinMode) => {
@@ -147,7 +121,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const escrow = await api.wallets.getEscrow.query();
       if (sessionAbortedRef.current) return;
       mappingRef.current = mapping;
-      setAddress(mapping.contractId);
+      setAddress(mapping.address);
       if (!escrow) {
         const master = randomMaster();
         pendingMasterRef.current = master;
@@ -163,14 +137,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || (authenticated && !walletsReady)) return;
     const revision = ++revisionRef.current;
     syncLocalAccountIdentity(authenticated ? userId : null);
     if (!authenticated || !userId) {
       sessionAbortedRef.current = true;
       setupRef.current = null;
-      privyWalletRef.current = null;
-      resolvedWalletRef.current = null;
       mappingRef.current = null;
       setAddress("");
       setAccountUnlocked(false);
@@ -188,49 +160,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setupRef.current = {
         key: setupKey,
         promise: api.wallets.restore.mutate().then(async (restored) => {
-          if (restored) {
-            const wallet = {
-              id: restored.privyWalletId,
-              address: restored.privyWalletAddress,
-            };
-            resolvedWalletRef.current = { userId, wallet };
-            return {
-              wallet,
-              mapping: restored,
-              openDashboard: true,
-            };
-          }
+          if (restored) return { mapping: restored, openDashboard: true };
 
-          const currentUser = userRef.current;
-          if (!currentUser || currentUser.id !== userId) {
-            throw new Error("Privy session changed during wallet setup.");
-          }
-          const cachedWallet = resolvedWalletRef.current;
-          const wallet =
-            cachedWallet?.userId === userId
-              ? cachedWallet.wallet
-              : await resolvePrivyStellarWallet(
-                  currentUser,
-                  createWalletRef.current,
-                );
-          resolvedWalletRef.current = { userId, wallet };
-          const mapping = await api.wallets.bootstrap.mutate({
-            privyWalletId: wallet.id,
-            privyWalletAddress: wallet.address,
-          });
-          return { wallet, mapping, openDashboard: true };
+          // createOnLogin normally provisions the embedded wallet; create it
+          // here for identities that signed up before that was enabled.
+          const address =
+            findEmbeddedWallet(walletsRef.current)?.address ??
+            (await createWalletRef.current()).address;
+          const mapping = await api.wallets.bootstrap.mutate({ address });
+          return { mapping, openDashboard: true };
         }),
       };
     }
     setupRef.current.promise
-      .then(async ({ wallet, mapping, openDashboard }) => {
+      .then(async ({ mapping, openDashboard }) => {
         if (
           cancelled ||
           sessionAbortedRef.current ||
           revisionRef.current !== revision
         )
           return;
-        privyWalletRef.current = wallet;
         await activateMapping(mapping);
         if (openDashboard) routeToDashboard();
       })
@@ -254,6 +203,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [
     ready,
+    walletsReady,
     authenticated,
     userId,
     activateMapping,
@@ -304,6 +254,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       openPinModal("set");
   }, [username, usernameModalOpen, openPinModal]);
 
+  const getSigner = useCallback(async (): Promise<Signer> => {
+    const mapping = mappingRef.current;
+    if (!mapping) throw new Error("Sign in first.");
+    const wallet = walletsRef.current.find(
+      (candidate) =>
+        candidate.walletClientType === "privy" &&
+        candidate.address.toLowerCase() === mapping.address.toLowerCase(),
+    );
+    if (!wallet) {
+      throw new Error("Your Mawee wallet is still loading. Try again.");
+    }
+    return privySigner(wallet);
+  }, []);
+
   const signIn = useCallback(() => {
     if (authenticated) setBootstrapRevision((value) => value + 1);
     else login();
@@ -311,9 +275,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const submitPin = useCallback(
     async (pin: string) => {
-      const mapping = mappingRef.current;
-      const privyWallet = privyWalletRef.current;
-      if (!mapping || !privyWallet) return;
+      if (!mappingRef.current) return;
       setPinSubmitting(true);
       setPinError("");
       try {
@@ -323,11 +285,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             const account = deriveNoteSecrets(master);
             const { notePubkey, viewPubkey } = await accountPubkeys(account);
             await setUsernamePubkeys(
-              privySigner({
-                maweeAddress: mapping.contractId,
-                wallet: privyWallet,
-                signRawHash,
-              }),
+              await getSigner(),
               username,
               notePubkey,
               viewPubkey,
@@ -386,15 +344,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setPinSubmitting(false);
       }
     },
-    [pinMode, username, openPinModal, signRawHash],
+    [pinMode, username, openPinModal, getSigner],
   );
 
   const disconnect = useCallback(async () => {
     revisionRef.current += 1;
     sessionAbortedRef.current = true;
     setupRef.current = null;
-    privyWalletRef.current = null;
-    resolvedWalletRef.current = null;
     mappingRef.current = null;
     pendingMasterRef.current = null;
     clearLocalAccount();
@@ -406,55 +362,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     await logout();
     // Privy logout and an already-resolved bootstrap can settle in the same
     // microtask turn. Reassert the disconnected state after logout completes.
-    privyWalletRef.current = null;
     mappingRef.current = null;
     setAddress("");
     setUsernameModalOpen(false);
     setPinModalOpen(false);
     setAccountUnlocked(false);
   }, [logout]);
-
-  const getSigner = useCallback((): Signer => {
-    const mapping = mappingRef.current;
-    const wallet = privyWalletRef.current;
-    if (!mapping || !wallet) throw new Error("Connect a Privy wallet first.");
-    return privySigner({
-      maweeAddress: mapping.contractId,
-      wallet,
-      signRawHash,
-    });
-  }, [signRawHash]);
-
-  const getPrivySep10Signer = useCallback((): Sep10Signer => {
-    const wallet = privyWalletRef.current;
-    if (!wallet) throw new Error("Connect a Privy wallet first.");
-    return privySep10Signer({ wallet, signRawHash });
-  }, [signRawHash]);
-
-  const signPrivyTransaction = useCallback(
-    async (transactionXdr: string, passphrase: string): Promise<string> => {
-      const wallet = privyWalletRef.current;
-      if (!wallet) throw new Error("Connect a Privy wallet first.");
-      return signClassicTransaction({
-        wallet,
-        transactionXdr,
-        networkPassphrase: passphrase,
-        signRawHash,
-      });
-    },
-    [signRawHash],
-  );
-
-  const getPrivyUsdcSigner = useCallback((): Signer => {
-    const wallet = privyWalletRef.current;
-    const mapping = mappingRef.current;
-    if (!wallet || !mapping) throw new Error("Connect a Privy wallet first.");
-    return privyUsdcSigner({
-      wallet,
-      maweeAddress: mapping.contractId,
-      signRawHash,
-    });
-  }, [signRawHash]);
 
   const openUsernameModal = useCallback(() => setUsernameModalOpen(true), []);
   const closeUsernameModal = useCallback(() => setUsernameModalOpen(false), []);
@@ -490,10 +403,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signIn,
       disconnect,
       getSigner,
-      privyPublicKey: privyWalletRef.current?.address ?? "",
-      getPrivySep10Signer,
-      signPrivyTransaction,
-      getPrivyUsdcSigner,
     }),
     [
       address,
@@ -517,9 +426,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signIn,
       disconnect,
       getSigner,
-      getPrivySep10Signer,
-      signPrivyTransaction,
-      getPrivyUsdcSigner,
     ],
   );
 

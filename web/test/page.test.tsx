@@ -7,11 +7,8 @@ const mocks = vi.hoisted(() => ({
   getAccount: vi.fn(),
   scanMyNotes: vi.fn(),
   usdcBalanceLabel: vi.fn(),
-  addUsdcTrustline: vi.fn(),
+  accountStatus: vi.fn(),
   openUsernameModal: vi.fn(),
-  moneyGramCashInEnabled: false,
-  moneyGramCashInUnavailableReason:
-    "MoneyGram cash-in is awaiting KYB and certification approval.",
 }));
 
 // Passthrough stubs for the GSAP-driven landing shell (not under test here).
@@ -40,18 +37,13 @@ vi.mock("../src/components/landing/ProblemStatement", () => ({
 vi.mock("../src/components/landing/Solution", () => ({ Solution: () => null }));
 vi.mock("../src/components/landing/Steps", () => ({ Steps: () => null }));
 vi.mock("../src/components/landing/Users", () => ({ Users: () => null }));
-vi.mock("../src/components/landing/StellarAcknowledgement", () => ({
-  StellarAcknowledgement: () => null,
-}));
 vi.mock("../src/components/landing/Faq", () => ({ Faq: () => null }));
 vi.mock("../src/components/landing/Footer", () => ({ Footer: () => null }));
 vi.mock("../src/components/WalletStatus", () => ({ WalletStatus: () => null }));
 vi.mock("../src/components/DepositForm", () => ({
   DepositForm: () => <div>DEPOSIT_FORM</div>,
 }));
-vi.mock("../src/components/dashboard/MoneyGramDepositContent", () => ({
-  MoneyGramDepositContent: () => <div>MoneyGram deposit flow</div>,
-}));
+vi.mock("../src/lib/deposit", () => ({ payIntoNote: vi.fn() }));
 
 vi.mock("../src/components/WalletProvider", () => ({
   useWallet: mocks.useWallet,
@@ -60,20 +52,12 @@ vi.mock("../src/lib/notes", () => ({
   getAccount: mocks.getAccount,
   scanMyNotes: mocks.scanMyNotes,
 }));
-vi.mock("../src/lib/stellar", () => ({
-  registryId: "REGISTRY",
-  poolId: "POOL",
+vi.mock("../src/lib/chain", () => ({
   usdcBalanceLabel: mocks.usdcBalanceLabel,
-  addUsdcTrustline: mocks.addUsdcTrustline,
-}));
-vi.mock("../src/lib/moneygram-status", () => ({
-  get moneyGramCashInEnabled() {
-    return mocks.moneyGramCashInEnabled;
-  },
-  get moneyGramCashInUnavailableReason() {
-    return mocks.moneyGramCashInUnavailableReason;
-  },
-  moneyGramRampStatus: "sandbox",
+  accountStatus: mocks.accountStatus,
+  gasFaucetUrl: "https://faucet.monad.xyz",
+  mintTestUsdc: vi.fn(),
+  usdcMintable: true,
 }));
 
 import DashboardPage from "../src/app/(dashboard)/dashboard/page";
@@ -96,9 +80,7 @@ function wallet(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.moneyGramCashInEnabled = false;
-  mocks.moneyGramCashInUnavailableReason =
-    "MoneyGram cash-in is awaiting KYB and certification approval.";
+  mocks.accountStatus.mockResolvedValue({ usdc: "12.5", gas: "0.5" });
   mocks.usdcBalanceLabel.mockResolvedValue("0");
   mocks.getAccount.mockReturnValue(null);
   mocks.scanMyNotes.mockResolvedValue({ notes: [], leaves: [], claimable: 0n });
@@ -118,7 +100,11 @@ describe("Home get-started gating", () => {
 
   it("shows a claim-username CTA that opens the modal when connected without a username", async () => {
     mocks.useWallet.mockReturnValue(
-      wallet({ address: "GCSIGNER", usernameResolved: true, username: null }),
+      wallet({
+        address: "0x00000000000000000000000000000000000000E1",
+        usernameResolved: true,
+        username: null,
+      }),
     );
     render(<Home />);
 
@@ -135,7 +121,7 @@ describe("Home get-started gating", () => {
   it("keeps the dashboard off the public landing page once connected", () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCSIGNER",
+        address: "0x00000000000000000000000000000000000000E1",
         usernameResolved: true,
         username: "alice",
       }),
@@ -153,7 +139,7 @@ describe("Dashboard route", () => {
   it("renders the dashboard while username lookup is pending", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCSIGNER",
+        address: "0x00000000000000000000000000000000000000E1",
         sessionReady: true,
         usernameResolved: false,
         username: null,
@@ -176,7 +162,7 @@ describe("Dashboard route", () => {
   it("shows the private dashboard once connected with a claimed username", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCSIGNER",
+        address: "0x00000000000000000000000000000000000000E1",
         sessionReady: true,
         usernameResolved: true,
         username: "alice",
@@ -209,19 +195,13 @@ describe("Dashboard route", () => {
     const depositCard = screen.getByRole("button", {
       name: "Open deposit funds",
     });
-    expect(depositCard).toBeDisabled();
-    expect(depositCard).toHaveAccessibleDescription(
-      "MoneyGram cash-in is awaiting KYB and certification approval.",
-    );
+    expect(depositCard).toBeEnabled();
     expect(
       within(depositCard).getByText(
         "Add money to your Mawee balance. Use it for payments, or withdraw it whenever you need it.",
       ),
     ).toBeInTheDocument();
-    expect(within(depositCard).getByAltText("MoneyGram")).toBeInTheDocument();
-    expect(
-      within(depositCard).getByAltText("Durianpay, coming soon"),
-    ).toBeInTheDocument();
+    expect(within(depositCard).getByText("USDC on Monad")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add cash" }),
     ).not.toBeInTheDocument();
@@ -244,12 +224,10 @@ describe("Dashboard route", () => {
     expect(screen.queryByText(/connect your wallet/i)).not.toBeInTheDocument();
   });
 
-  it("opens the existing Add cash dialog from the Deposit fund tile", async () => {
-    mocks.moneyGramCashInEnabled = true;
-    mocks.moneyGramCashInUnavailableReason = null;
+  it("opens the Add funds dialog from the Deposit fund tile", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCSIGNER",
+        address: "0x00000000000000000000000000000000000000E1",
         sessionReady: true,
         usernameResolved: true,
         username: "alice",
@@ -268,10 +246,14 @@ describe("Dashboard route", () => {
     await userEvent.click(depositCard);
 
     expect(
-      await screen.findByRole("heading", { name: "Add cash" }),
+      await screen.findByRole("heading", { name: "Add funds" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("12.5")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Get 100 test USDC/ }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("MoneyGram deposit flow"),
+      screen.getByLabelText("Move to private balance"),
     ).toBeInTheDocument();
   });
 });

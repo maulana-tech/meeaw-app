@@ -1,18 +1,19 @@
 // Mongo-backed, asynchronous mirror of public pool events. Dashboard reads are
-// bounded by the last published watermark and never wait for Soroban RPC.
+// bounded by the last published watermark and never wait for the Monad RPC.
 
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { Binary, MongoServerError } from "mongodb";
-import { bytesToHex } from "../../../lib/crypto";
+import { getServerEnv } from "../../../env.server";
+import { maweePoolAbi } from "../../../lib/abi";
 import {
-  fetchPoolEventsSince,
-  networkPassphrase,
-  parseDepositEvent,
-  parseSpentEvent,
-  poolId,
-  simulateRead,
-} from "../../../lib/stellar";
+  fetchPoolLogs,
+  network,
+  poolAddress,
+  poolDeployBlock,
+  publicClient,
+} from "../../../lib/chain";
+import { bytesToHex } from "../../../lib/crypto";
 import {
   type DepositDoc,
   getDeposits,
@@ -24,20 +25,23 @@ import type { DepositOutput, PoolSnapshotOutput } from "./deposits.schema";
 
 const LEASE_MS = 50_000;
 const STALE_AFTER_MS = 120_000;
+// Bounds one cron run (each chunk is one eth_getLogs call).
+const MAX_CHUNKS_PER_RUN = 400;
+
+const scope = () => `${network}:${poolAddress.toLowerCase()}`;
+const startBlock = () =>
+  Number(poolDeployBlock > 0n ? poolDeployBlock - 1n : 0n);
 
 export type PoolSyncResult = {
   status: "synced" | "skipped" | "degraded";
-  fromLedger: number;
-  toLedger: number;
+  fromBlock: number;
+  toBlock: number;
+  latestBlock: number;
   depositsUpserted: number;
   nullifiersUpserted: number;
   durationMs: number;
   error?: string;
 };
-
-async function poolLeafCount(): Promise<number> {
-  return Number(await simulateRead(poolId, "leaf_count", []));
-}
 
 async function acquireLease(owner: string): Promise<boolean> {
   const now = new Date();
@@ -55,7 +59,7 @@ async function acquireLease(owner: string): Promise<boolean> {
       },
       {
         $set: { leaseOwner: owner, leaseUntil },
-        $setOnInsert: { lastLedger: 0, updatedAt: now },
+        $setOnInsert: { updatedAt: now },
       },
       { upsert: true, returnDocument: "after" },
     );
@@ -75,6 +79,7 @@ async function releaseLease(owner: string): Promise<void> {
   );
 }
 
+/** A new chain or pool address invalidates every mirrored row. */
 async function resetForConfiguredPool(owner: string): Promise<void> {
   const [deposits, nullifiers, states] = await Promise.all([
     getDeposits(),
@@ -86,19 +91,28 @@ async function resetForConfiguredPool(owner: string): Promise<void> {
     { _id: "pool", leaseOwner: owner },
     {
       $set: {
-        poolId,
-        lastLedger: 0,
-        lastLeafIndex: -1,
-        publishedLedger: 0,
+        scope: scope(),
+        publishedBlock: startBlock(),
         publishedLeafIndex: -1,
         updatedAt: new Date(),
         health: "degraded",
-        nullifiersComplete: true,
         lastError: "Pool mirror is awaiting its initial synchronization",
       },
       $unset: { indexedAt: "" },
     },
   );
+}
+
+async function blockTimestamps(blocks: bigint[]): Promise<Map<bigint, Date>> {
+  const unique = [...new Set(blocks)];
+  const out = new Map<bigint, Date>();
+  await Promise.all(
+    unique.map(async (blockNumber) => {
+      const block = await publicClient.getBlock({ blockNumber });
+      out.set(blockNumber, new Date(Number(block.timestamp) * 1000));
+    }),
+  );
+  return out;
 }
 
 export async function syncPoolIndex(): Promise<PoolSyncResult> {
@@ -107,8 +121,9 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
   if (!(await acquireLease(owner))) {
     return {
       status: "skipped",
-      fromLedger: 0,
-      toLedger: 0,
+      fromBlock: 0,
+      toBlock: 0,
+      latestBlock: 0,
       depositsUpserted: 0,
       nullifiersUpserted: 0,
       durationMs: Date.now() - startedAt,
@@ -116,59 +131,53 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
   }
 
   const states = await getIndexerState();
-  let fromLedger = 0;
+  let fromBlock = startBlock();
   try {
     let state = await states.findOne({ _id: "pool" });
-    if (state?.poolId && state.poolId !== poolId) {
+    if (state?.scope !== scope()) {
       await resetForConfiguredPool(owner);
       state = await states.findOne({ _id: "pool" });
     }
-    fromLedger = state?.publishedLedger ?? state?.lastLedger ?? 0;
+    fromBlock = state?.publishedBlock ?? startBlock();
 
-    const { events, scannedFromLedger, latestLedger } =
-      await fetchPoolEventsSince(fromLedger);
-    const retentionGap = fromLedger > 0 && scannedFromLedger !== fromLedger + 1;
-    const nullifiersComplete =
-      (state?.nullifiersComplete ?? true) && !retentionGap;
-    if (retentionGap) {
-      console.warn(
-        `[pool-indexer] retention gap: watermark ledger ${fromLedger + 1}, RPC resumed at ${scannedFromLedger}; spend events in the gap may be unindexed (nullifier mirror marked incomplete)`,
-      );
-    }
+    const { logs, scannedTo, latestBlock } = await fetchPoolLogs({
+      afterBlock: BigInt(fromBlock),
+      blockRange: getServerEnv().MONAD_LOGS_BLOCK_RANGE,
+      maxChunks: MAX_CHUNKS_PER_RUN,
+    });
+    const timestamps = await blockTimestamps(logs.map((l) => l.blockNumber));
 
     const depositOps = [];
     const nullifierOps = [];
-    for (const event of events) {
-      const deposit = parseDepositEvent(event);
-      if (deposit) {
+    for (const log of logs) {
+      const ts = timestamps.get(log.blockNumber) ?? new Date();
+      if (log.deposit) {
         depositOps.push({
           updateOne: {
-            filter: { _id: deposit.leafIndex },
+            filter: { _id: log.deposit.leafIndex },
             update: {
               $set: {
-                commitment: new Binary(Buffer.from(deposit.commitment)),
-                ephemeralPk: new Binary(Buffer.from(deposit.ephemeralPk)),
-                ciphertext: new Binary(Buffer.from(deposit.ciphertext)),
-                ledger: event.ledger,
-                txHash: event.txHash,
-                ts: new Date(event.ledgerClosedAt),
+                commitment: new Binary(Buffer.from(log.deposit.commitment)),
+                ephemeralPk: new Binary(Buffer.from(log.deposit.ephemeralPk)),
+                ciphertext: new Binary(Buffer.from(log.deposit.ciphertext)),
+                block: Number(log.blockNumber),
+                txHash: log.txHash,
+                ts,
               },
             },
             upsert: true,
           },
         });
       }
-      const spent = parseSpentEvent(event);
-      if (spent) {
+      if (log.spent) {
         nullifierOps.push({
           updateOne: {
-            filter: { _id: spent.nullifierHex },
+            filter: { _id: log.spent.nullifierHex },
             update: {
               $set: {
-                ledger: event.ledger,
-                eventId: event.id,
-                txHash: event.txHash,
-                ts: new Date(event.ledgerClosedAt),
+                block: Number(log.blockNumber),
+                txHash: log.txHash,
+                ts,
               },
             },
             upsert: true,
@@ -190,40 +199,42 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
         : Promise.resolve(),
     ]);
 
+    // Integrity check at the exact block we scanned up to: every leaf the
+    // contract had inserted by then must be mirrored.
     const [onChainCount, mirroredCount] = await Promise.all([
-      poolLeafCount(),
-      deposits.countDocuments(),
+      publicClient.readContract({
+        address: poolAddress,
+        abi: maweePoolAbi,
+        functionName: "nextIndex",
+        blockNumber: scannedTo,
+      }),
+      deposits.countDocuments({ block: { $lte: Number(scannedTo) } }),
     ]);
     if (onChainCount !== mirroredCount) {
       throw new DepositIndexGapError(onChainCount, mirroredCount);
     }
 
     const indexedAt = new Date();
-    const gapMessage =
-      "Retention gap skipped a ledger window; some spent notes may be missing from the mirror until a full resync.";
     await states.updateOne(
       { _id: "pool", leaseOwner: owner },
       {
         $set: {
-          poolId,
-          lastLedger: latestLedger,
-          lastLeafIndex: onChainCount - 1,
-          publishedLedger: latestLedger,
+          scope: scope(),
+          publishedBlock: Number(scannedTo),
           publishedLeafIndex: onChainCount - 1,
           indexedAt,
           updatedAt: indexedAt,
-          nullifiersComplete,
-          health: nullifiersComplete ? "healthy" : "degraded",
-          ...(nullifiersComplete ? {} : { lastError: gapMessage }),
+          health: "healthy",
         },
-        ...(nullifiersComplete ? { $unset: { lastError: "" } } : {}),
+        $unset: { lastError: "" },
       },
     );
 
     return {
       status: "synced",
-      fromLedger,
-      toLedger: latestLedger,
+      fromBlock,
+      toBlock: Number(scannedTo),
+      latestBlock: Number(latestBlock),
       depositsUpserted: depositOps.length,
       nullifiersUpserted: nullifierOps.length,
       durationMs: Date.now() - startedAt,
@@ -243,8 +254,9 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
     );
     return {
       status: "degraded",
-      fromLedger,
-      toLedger: fromLedger,
+      fromBlock,
+      toBlock: fromBlock,
+      latestBlock: fromBlock,
       depositsUpserted: 0,
       nullifiersUpserted: 0,
       durationMs: Date.now() - startedAt,
@@ -261,7 +273,7 @@ function toDepositOutput(d: DepositDoc): DepositOutput {
     commitmentHex: bytesToHex(d.commitment.buffer),
     ephemeralPkHex: bytesToHex(d.ephemeralPk.buffer),
     ciphertextHex: bytesToHex(d.ciphertext.buffer),
-    ledger: d.ledger,
+    block: d.block,
     txHash: d.txHash,
     ts: d.ts.toISOString(),
   };
@@ -282,7 +294,7 @@ function healMirror(): Promise<PoolSyncResult> {
 
 export async function getPoolSnapshot(
   afterLeafIndex: number,
-  spentAfterLedger: number,
+  spentAfterBlock: number,
 ): Promise<PoolSnapshotOutput> {
   const startedAt = Date.now();
   const [states, deposits, nullifiers] = await Promise.all([
@@ -292,8 +304,7 @@ export async function getPoolSnapshot(
   ]);
   let state = await states.findOne({ _id: "pool" });
 
-  const published =
-    state?.poolId === poolId && (state.publishedLeafIndex ?? -1) >= 0;
+  const published = state?.scope === scope() && state.indexedAt !== undefined;
   const cooled = Date.now() - lastHealAttempt > HEAL_COOLDOWN_MS;
   if (!published) {
     if (healInFlight || cooled) {
@@ -306,17 +317,15 @@ export async function getPoolSnapshot(
       Date.now() - state.indexedAt.getTime() > STALE_AFTER_MS;
     if (isStale && (healInFlight || cooled)) void healMirror().catch(() => {});
   }
-  const configuredPool = state?.poolId === poolId;
-  const publishedLedger = configuredPool ? (state?.publishedLedger ?? 0) : 0;
+  const configuredPool = state?.scope === scope();
+  const publishedBlock = configuredPool ? (state?.publishedBlock ?? 0) : 0;
   const publishedLeafIndex = configuredPool
     ? (state?.publishedLeafIndex ?? -1)
     : -1;
   const indexedAt = configuredPool ? state?.indexedAt : undefined;
   const stale = !indexedAt || Date.now() - indexedAt.getTime() > STALE_AFTER_MS;
   const health =
-    !configuredPool ||
-    state?.health === "degraded" ||
-    state?.nullifiersComplete === false
+    !configuredPool || state?.health === "degraded"
       ? "degraded"
       : stale
         ? "stale"
@@ -328,8 +337,8 @@ export async function getPoolSnapshot(
       .sort({ _id: 1 })
       .toArray(),
     nullifiers
-      .find({ ledger: { $gt: spentAfterLedger, $lte: publishedLedger } })
-      .sort({ ledger: 1, _id: 1 })
+      .find({ block: { $gt: spentAfterBlock, $lte: publishedBlock } })
+      .sort({ block: 1, _id: 1 })
       .toArray(),
   ]);
 
@@ -337,13 +346,13 @@ export async function getPoolSnapshot(
     deposits: depositDocs.map(toDepositOutput),
     spentNullifiers: spentDocs.map((doc) => ({
       nullifierHex: doc._id,
-      ledger: doc.ledger,
+      block: doc.block,
       ts: doc.ts.toISOString(),
     })),
     index: {
-      poolId,
-      networkPassphrase,
-      publishedLedger,
+      poolAddress,
+      network,
+      publishedBlock: Math.max(0, publishedBlock),
       publishedLeafIndex,
       indexedAt: indexedAt?.toISOString() ?? new Date(0).toISOString(),
       health,
@@ -355,7 +364,7 @@ export async function getPoolSnapshot(
       durationMs: Date.now() - startedAt,
       deposits: snapshot.deposits.length,
       nullifiers: snapshot.spentNullifiers.length,
-      publishedLedger,
+      publishedBlock,
       health,
     }),
   );

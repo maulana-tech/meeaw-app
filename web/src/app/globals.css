@@ -115,42 +115,9 @@
 }
 
 @layer utilities {
-  @keyframes stellar-marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
-  }
-
-  @keyframes stellar-sway {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(var(--stellar-sway-y, -10px));
-    }
-  }
-
-  .stellar-marquee {
-    animation: stellar-marquee 22s linear infinite;
-  }
-
-  .stellar-sway {
-    animation: stellar-sway 4.5s ease-in-out infinite;
-    animation-delay: var(--stellar-delay, 0s);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
-    }
-
-    .stellar-marquee,
-    .stellar-sway {
-      animation: none;
     }
   }
 }

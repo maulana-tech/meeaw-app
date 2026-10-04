@@ -1,21 +1,21 @@
 // Note cryptography for the Mawee shielded pool (iteration 2).
 //
 // Poseidon over BN254 (circomlibjs) matches the circuit (circomlib) and the
-// contract (soroban-poseidon) — verified by fixed vectors + an on-chain
-// root-parity test. All field elements are bigints < R, serialized big-endian
-// to 32 bytes when crossing the contract/event boundary.
+// contract (poseidon-solidity) — verified by the contracts/ Hardhat suite,
+// which proves and verifies real notes on-chain. All field elements are
+// bigints < R, serialized big-endian to 32 bytes when crossing the
+// contract/event boundary.
 
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { x25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { keccak_256 } from "@noble/hashes/sha3.js";
 import { buildPoseidon } from "circomlibjs";
 import { env } from "../env";
 
 export const R =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 export const TREE_DEPTH = env.NEXT_PUBLIC_POOL_DEPTH;
-export const USDC_DECIMALS = 7;
+export const USDC_DECIMALS = env.NEXT_PUBLIC_USDC_DECIMALS;
 
 // --- Poseidon singleton -----------------------------------------------------
 
@@ -70,17 +70,6 @@ export function randomFieldElement(): bigint {
   return fromBE(bytes) % R;
 }
 
-/** Stable, domain-separated salt for retry-safe MoneyGram shielding. */
-export function cashInSalt(
-  ownerSecret: bigint,
-  settlementIdentity: string,
-): bigint {
-  const material = new TextEncoder().encode(
-    `mawee:moneygram-cash-in:v1:${ownerSecret.toString()}:${settlementIdentity}`,
-  );
-  return fromBE(sha256(material)) % R;
-}
-
 // --- amount helpers ---------------------------------------------------------
 
 export function toBaseUnits(amount: string): bigint {
@@ -109,9 +98,13 @@ export const commitment = (amount: bigint, pk: bigint, salt: bigint) =>
 export const nullifier = (ownerSecret: bigint, leafIndex: number) =>
   poseidonHash([ownerSecret, BigInt(leafIndex)]);
 
-/// recipient field element = keccak256(strkey utf8) mod R (matches the contract).
-export function recipientField(strkey: string): bigint {
-  return fromBE(keccak_256(new TextEncoder().encode(strkey))) % R;
+/// recipient field element = the 160-bit EVM address as an integer (matches
+/// MaweePool.recipientField). Addresses always fit below R.
+export function recipientField(address: string): bigint {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+    throw new Error("Recipient must be a 0x-prefixed EVM address.");
+  }
+  return BigInt(address);
 }
 
 // --- incremental Merkle tree (Poseidon) -------------------------------------

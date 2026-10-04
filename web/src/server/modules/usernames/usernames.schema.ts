@@ -1,4 +1,4 @@
-import { StrKey } from "@stellar/stellar-sdk";
+import { isAddress } from "viem";
 import { z } from "zod";
 
 export const usernameSchema = z
@@ -14,8 +14,10 @@ export const resolveInput = z.object({ username: usernameSchema });
 export const registerInput = z.object({ username: usernameSchema });
 
 export const byOwnerInput = z.object({
-  // The Mawee account C-address controlled by the user's Privy Stellar wallet.
-  owner: z.string().refine(StrKey.isValidContract, "invalid Stellar address"),
+  // The user's Privy embedded wallet address.
+  owner: z
+    .string()
+    .refine((v) => isAddress(v, { strict: false }), "invalid EVM address"),
 });
 
 export const resolveOutput = z

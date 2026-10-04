@@ -17,29 +17,11 @@ export const serverEnvSchema = z.object({
   CRON_SECRET: optionalString,
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
-  MAWEE_WALLET_DEPLOYER_SECRET: optionalString,
-  MAWEE_ACCOUNT_WASM_HASH: optionalString,
-  CHANNELS_API_KEY: optionalString,
-  CHANNELS_BASE_URL: z.preprocess(
+  // Max block span per eth_getLogs request; public Monad RPCs cap this.
+  MONAD_LOGS_BLOCK_RANGE: z.preprocess(
     emptyToUndefined,
-    z
-      .string()
-      .trim()
-      .url()
-      .default("https://channels.openzeppelin.com/testnet"),
+    z.coerce.number().int().min(1).max(100_000).default(100),
   ),
-  SEP10_CLIENT_SIGNING_SECRET: optionalString,
-  BRIDGE_SPONSOR_SECRET: optionalString,
-  BRIDGE_FUNDING_XLM: z.preprocess(
-    emptyToUndefined,
-    z.string().trim().default("2.5"),
-  ),
-  CCTP_OPERATOR_SECRET: optionalString,
-  CIRCLE_IRIS_URL: z.preprocess(
-    emptyToUndefined,
-    z.string().trim().url().default("https://iris-api-sandbox.circle.com"),
-  ),
-  CIRCLE_API_KEY: optionalString,
 });
 
 export function getServerEnv() {
@@ -49,16 +31,7 @@ export function getServerEnv() {
     CRON_SECRET: process.env.CRON_SECRET,
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
-    MAWEE_WALLET_DEPLOYER_SECRET: process.env.MAWEE_WALLET_DEPLOYER_SECRET,
-    MAWEE_ACCOUNT_WASM_HASH: process.env.MAWEE_ACCOUNT_WASM_HASH,
-    CHANNELS_API_KEY: process.env.CHANNELS_API_KEY,
-    CHANNELS_BASE_URL: process.env.CHANNELS_BASE_URL,
-    SEP10_CLIENT_SIGNING_SECRET: process.env.SEP10_CLIENT_SIGNING_SECRET,
-    BRIDGE_SPONSOR_SECRET: process.env.BRIDGE_SPONSOR_SECRET,
-    BRIDGE_FUNDING_XLM: process.env.BRIDGE_FUNDING_XLM,
-    CCTP_OPERATOR_SECRET: process.env.CCTP_OPERATOR_SECRET,
-    CIRCLE_IRIS_URL: process.env.CIRCLE_IRIS_URL,
-    CIRCLE_API_KEY: process.env.CIRCLE_API_KEY,
+    MONAD_LOGS_BLOCK_RANGE: process.env.MONAD_LOGS_BLOCK_RANGE,
   });
 }
 

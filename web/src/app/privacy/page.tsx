@@ -95,44 +95,44 @@ const providerRows = [
     "Privy",
     "Authentication and configured wallet services; account identifiers and sign-in information.",
     "Responsibilities depend on the service and applicable agreement; independent processing is described in Privy’s privacy notice.",
-    "[CONFIRM CONTRACTED ENTITY, PROCESSING LOCATIONS, AND APPLICABLE TRANSFER SAFEGUARDS]"
+    "[CONFIRM CONTRACTED ENTITY, PROCESSING LOCATIONS, AND APPLICABLE TRANSFER SAFEGUARDS]",
   ],
   [
     "Sumsub",
     "Configured identity and business verification; verification submissions, technical information, and results.",
     "Processor for checks performed on Mawee’s instructions; independent controller for specified own-purpose processing described in its notice.",
-    "[CONFIRM CONTRACTED ENTITY, ENABLED CHECKS, DATA REGION, AND TRANSFER SAFEGUARDS]"
+    "[CONFIRM CONTRACTED ENTITY, ENABLED CHECKS, DATA REGION, AND TRANSFER SAFEGUARDS]",
   ],
   [
-    "Circle CCTP / Iris",
-    "Cross-chain USDC transfer and attestation, where the selected route uses CCTP; public blockchain messages, transaction references, addresses, and amounts.",
-    "External protocol and attestation services; Mawee separately processes its own payment-session records.",
-    "Public blockchain information is distributed across network participants. [CONFIRM APPLICABLE SERVICE TERMS AND OFF-CHAIN PROCESSING LOCATIONS]"
+    "Monad network and RPC providers",
+    "Submitting and reading Monad transactions; public blockchain transactions, addresses, amounts, and encrypted note data.",
+    "Public network and infrastructure services; Mawee separately processes its own payment-session records.",
+    "Public blockchain information is distributed across network participants. [CONFIRM RPC PROVIDER, SERVICE TERMS, AND OFF-CHAIN PROCESSING LOCATIONS]",
   ],
   [
     "Application hosting",
     "Mawee-operated application services deployed to a virtual private server; service requests, account data, and operational information.",
     "Mawee controls application processing; the infrastructure provider’s role is governed by the hosting arrangement.",
-    "[CONFIRM VPS PROVIDER, SERVER COUNTRY/REGION, AND TRANSFER SAFEGUARDS]"
+    "[CONFIRM VPS PROVIDER, SERVER COUNTRY/REGION, AND TRANSFER SAFEGUARDS]",
   ],
   [
     "Database hosting",
     "MongoDB storage for account, payment, verification, and operational records.",
     "Mawee controls database processing. MongoDB identifies the database technology, not necessarily the hosting provider.",
-    "[CONFIRM SELF-HOSTED OR MANAGED DATABASE, HOSTING PROVIDER, REGION, AND SAFEGUARDS]"
+    "[CONFIRM SELF-HOSTED OR MANAGED DATABASE, HOSTING PROVIDER, REGION, AND SAFEGUARDS]",
   ],
   [
     "Operational logs and backups",
     "Application/container logs and database recovery copies. Deployment configuration uses size-based log rotation; backup arrangements require confirmation.",
     "Mawee manages operational processing; any external storage provider’s role depends on the actual arrangement.",
-    "[CONFIRM LOG ACCESS, BACKUP PROVIDER/LOCATION, RETENTION, AND SAFEGUARDS]"
+    "[CONFIRM LOG ACCESS, BACKUP PROVIDER/LOCATION, RETENTION, AND SAFEGUARDS]",
   ],
   [
     "Google Gmail — company contact mailbox",
     "Support and privacy correspondence sent to ptpentahelixsistemterpercaya@gmail.com, including sender details, messages, and attachments.",
     "Email service supporting the company contact mailbox; applicable account terms determine the provider’s responsibilities.",
-    "[CONFIRM ACCOUNT TERMS AND TRANSFER ARRANGEMENTS; CONFIRM THE SEPARATE MAWEE-DOMAIN EMAIL HOST]"
-  ]
+    "[CONFIRM ACCOUNT TERMS AND TRANSFER ARRANGEMENTS; CONFIRM THE SEPARATE MAWEE-DOMAIN EMAIL HOST]",
+  ],
 ] as const;
 
 const retentionRows = [
@@ -263,10 +263,10 @@ export default function PrivacyPolicyPage() {
               <p>
                 This Privacy Policy explains how{" "}
                 <strong>PT PENTAHELIX SISTEM TERPERCAYA</strong>, trading as{" "}
-                <strong>Mawee</strong> (&quot;Mawee,&quot;
-                &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), processes
-                personal data when you use mawee.xyz and our related account,
-                payment, verification, and Business Passport services (the
+                <strong>Mawee</strong> (&quot;Mawee,&quot; &quot;we,&quot;
+                &quot;us,&quot; or &quot;our&quot;), processes personal data
+                when you use mawee.xyz and our related account, payment,
+                verification, and Business Passport services (the
                 &quot;Services&quot;).
               </p>
               <p>

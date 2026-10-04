@@ -31,11 +31,13 @@ async function main() {
 
   let usdc = process.env.USDC_ADDRESS as `0x${string}` | undefined;
   let usdcDecimals = process.env.USDC_DECIMALS ?? "6";
+  let usdcMintable = "false";
   if (!usdc) {
     if (chainId === 143) throw new Error("USDC_ADDRESS is required on mainnet.");
     const mock = await hre.viem.deployContract("MockUSDC");
     usdc = mock.address;
     usdcDecimals = "6";
+    usdcMintable = "true";
     console.log(`MockUSDC        ${usdc}`);
   }
 
@@ -62,6 +64,7 @@ async function main() {
     NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK: deployBlock.toString(),
     NEXT_PUBLIC_USDC_ADDRESS: usdc,
     NEXT_PUBLIC_USDC_DECIMALS: usdcDecimals,
+    NEXT_PUBLIC_USDC_MINTABLE: usdcMintable,
   });
   console.log(`wrote ${path.relative(process.cwd(), ENV_FILE)}`);
 }

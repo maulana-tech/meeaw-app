@@ -1,3 +1,4 @@
+import { type MaweeAccount, poolTransfer, type Signer } from "./chain";
 import {
   commitment,
   encryptNote,
@@ -12,7 +13,6 @@ import {
 } from "./crypto";
 import type { LocalAccount, MyNote, ScanResult } from "./notes";
 import { proveTransfer, type TransferInput } from "./prover";
-import { type MaweeAccount, poolTransfer, type Signer } from "./stellar";
 
 export type TransferResult = {
   recipientIndex: number;

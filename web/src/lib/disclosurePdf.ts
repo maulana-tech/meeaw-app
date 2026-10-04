@@ -61,9 +61,10 @@ function receiptReference(bundle: DisclosureBundle): string {
 }
 
 function displayNetwork(network: string): string {
-  return network.toLowerCase().includes("test")
-    ? "Stellar test network"
-    : "Stellar network";
+  // `network` is the CAIP-2 id written by buildDisclosure, e.g. eip155:10143.
+  if (network === "eip155:143") return "Monad";
+  if (network === "eip155:10143") return "Monad testnet";
+  return network;
 }
 
 function displayDate(value: string): string {
@@ -180,7 +181,7 @@ export async function renderDisclosurePdf(
     subject: "Confirmation of a received private payment",
     author: "Mawee",
     creator: "Mawee",
-    keywords: "Mawee, payment receipt, USDC, Stellar",
+    keywords: "Mawee, payment receipt, USDC, Monad",
   });
 
   // Page 1: friendly receipt

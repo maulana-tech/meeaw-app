@@ -7,7 +7,8 @@
     "test": "hardhat test",
     "verifiers": "node scripts/export-verifiers.cjs",
     "deploy:local": "hardhat run scripts/deploy.ts",
-    "deploy:testnet": "hardhat run scripts/deploy.ts --network monadTestnet"
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network monadTestnet",
+    "abis": "hardhat compile && node scripts/export-abis.cjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-viem": "2",

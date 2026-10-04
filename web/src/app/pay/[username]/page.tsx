@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card } from "../../../components/ui/card";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePaymentLink } from "../../../features/paymentLinks/hooks/usePaymentLink";
-import { type MaweeAccount, resolveUsername } from "../../../lib/stellar";
+import { type MaweeAccount, resolveUsername } from "../../../lib/chain";
 import { PayForm } from "./PayForm";
 
 export default function PayPage() {
@@ -117,7 +117,7 @@ export default function PayPage() {
       <PayForm account={account} username={username} link={link} />
 
       <p className="pt-8 text-center text-xs text-brand-linen/50">
-        Unlinkable receipt · encrypted to the recipient · Built on Stellar
+        Unlinkable receipt · encrypted to the recipient · Built on Monad
       </p>
     </>
   );

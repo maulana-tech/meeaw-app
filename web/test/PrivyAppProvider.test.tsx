@@ -13,7 +13,7 @@ vi.mock("@privy-io/react-auth", () => ({
 }));
 
 describe("PrivyAppProvider", () => {
-  it("exposes only Google, GitHub, and passkey login without auto-creating EVM wallets", async () => {
+  it("uses Google, email and passkey login and provisions a Monad embedded wallet", async () => {
     vi.stubEnv("NEXT_PUBLIC_PRIVY_APP_ID", "privy-public-app");
     const { PrivyAppProvider } = await import(
       "../src/components/PrivyAppProvider"
@@ -24,12 +24,18 @@ describe("PrivyAppProvider", () => {
       </PrivyAppProvider>,
     );
     expect(captured.props?.appId).toBe("privy-public-app");
-    expect(captured.props?.config).toMatchObject({
-      loginMethods: ["google", "email", "passkey"],
+    const config = captured.props?.config as {
+      defaultChain: { id: number };
+      supportedChains: { id: number }[];
+    };
+    expect(config).toMatchObject({
+      loginMethods: ["google", "passkey", "email"],
       embeddedWallets: {
-        ethereum: { createOnLogin: "off" },
+        ethereum: { createOnLogin: "users-without-wallets" },
         solana: { createOnLogin: "off" },
       },
     });
+    expect(config.defaultChain.id).toBe(10143);
+    expect(config.supportedChains.map((chain) => chain.id)).toEqual([10143]);
   });
 });

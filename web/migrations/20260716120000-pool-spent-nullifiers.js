@@ -1,7 +1,7 @@
 /**
  * Adds the public spent-nullifier mirror used by the asynchronous pool indexer.
- * Existing deposit rows are retained; the worker resets them automatically if
- * the configured pool contract id changes.
+ * The worker resets mirrored rows automatically if the configured chain or
+ * pool address changes.
  *
  * @param db {import('mongodb').Db}
  * @returns {Promise<void>}
@@ -15,11 +15,10 @@ export const up = async (db) => {
       validator: {
         $jsonSchema: {
           bsonType: "object",
-          required: ["_id", "ledger", "eventId", "txHash", "ts"],
+          required: ["_id", "block", "txHash", "ts"],
           properties: {
             _id: { bsonType: "string" },
-            ledger: { bsonType: "number" },
-            eventId: { bsonType: "string" },
+            block: { bsonType: "number" },
             txHash: { bsonType: "string" },
             ts: { bsonType: "date" },
           },
@@ -31,11 +30,11 @@ export const up = async (db) => {
   for (const collectionName of ["spent_nullifiers", "deposits"]) {
     const collection = db.collection(collectionName);
     const indexes = await collection.indexes();
-    const hasLedgerIndex = indexes.some(
-      (index) => Object.keys(index.key).length === 1 && index.key.ledger === 1,
+    const hasBlockIndex = indexes.some(
+      (index) => Object.keys(index.key).length === 1 && index.key.block === 1,
     );
-    if (!hasLedgerIndex) {
-      await collection.createIndex({ ledger: 1 }, { name: "ledger_asc" });
+    if (!hasBlockIndex) {
+      await collection.createIndex({ block: 1 }, { name: "block_asc" });
     }
   }
 };
@@ -47,7 +46,7 @@ export const up = async (db) => {
 export const down = async (db) => {
   await db
     .collection("deposits")
-    .dropIndex("ledger_asc")
+    .dropIndex("block_asc")
     .catch(() => {});
   await db.collection("spent_nullifiers").drop();
 };

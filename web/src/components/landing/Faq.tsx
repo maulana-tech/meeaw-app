@@ -35,9 +35,9 @@ const FAQ_ITEMS = [
       "Freelancers, creators, agencies, exporters, and online businesses that accept stablecoin payments but don't want their revenue, customers, or payment history exposed on a public blockchain.",
   },
   {
-    question: "Why build on Stellar?",
+    question: "Why build on Monad?",
     answer:
-      "Stellar provides fast settlement, low transaction fees, native USDC support, and strong cross-border payment infrastructure, making it practical for everyday business payments.",
+      "Monad is a fully EVM-compatible chain with sub-second finality and low fees, so a private payment settles almost instantly and the zero-knowledge proof checks stay cheap enough for everyday business payments.",
   },
 ] as const;
 

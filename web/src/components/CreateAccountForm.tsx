@@ -4,8 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { registerUsername, registerUsernameCache } from "../lib/chain";
 import { accountPubkeys, getAccount, setStoredUsername } from "../lib/notes";
-import { registerUsername, registerUsernameCache } from "../lib/stellar";
 import { usernameSchema } from "../server/modules/usernames/usernames.schema";
 import { Button } from "./ui/button";
 import {
@@ -48,7 +48,7 @@ export function CreateAccountForm({
 
   const onSubmit = handleSubmit(async ({ username }) => {
     try {
-      const signer = getSigner();
+      const signer = await getSigner();
       // Registration must use pubkeys from the unlocked recoverable account so
       // the username stays attached to the same escrow state.
       const acct = getAccount();

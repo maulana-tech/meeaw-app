@@ -1,47 +1,25 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, Loader } from "lucide-react";
-import Image from "next/image";
+import { Loader } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
-import { glassSegmentedClass } from "../../../components/ui/glass";
 import { Input } from "../../../components/ui/input";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
-import type { CctpChain } from "../../../features/cctpPayer/hooks/useCctpDeposit";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
-import { kitSigner } from "../../../features/payerWallet/kitSigner";
+import { payerSigner } from "../../../features/payerWallet/injected";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
-import { cctpIntakeContract } from "../../../lib/cctp";
 import {
-  commitment,
-  encryptNote,
-  fromBaseUnits,
-  fromBE,
-  randomFieldElement,
-  toBaseUnits,
-  toBE32,
-} from "../../../lib/crypto";
-import { proveDeposit } from "../../../lib/prover";
-import {
+  chain,
   explorerTxUrl,
   type MaweeAccount,
-  poolDeposit,
   usdcBalance,
-} from "../../../lib/stellar";
-import { cn } from "../../../lib/utils";
-import { CctpPayForm } from "./CctpPayForm";
-
-type Method = "stellar" | "cctp";
+} from "../../../lib/chain";
+import { fromBaseUnits, toBaseUnits } from "../../../lib/crypto";
+import { payIntoNote } from "../../../lib/deposit";
 
 const payInput = z.object({
   amount: z
@@ -61,14 +39,11 @@ export function PayForm({
   link?: PaymentLink | null;
 }) {
   const { address, connecting, error: walletError, connect } = usePayerWallet();
-  const [method, setMethod] = useState<Method>("stellar");
-  const [cctpChain, setCctpChain] = useState<CctpChain>("evm");
   const [status, setStatus] = useState<{
     kind: "ok" | "err";
     msg: string;
     url?: string;
   } | null>(null);
-  const cctpEnabled = Boolean(cctpIntakeContract);
 
   const lockedAmount =
     link && link.owner === username && link.amount
@@ -97,37 +72,19 @@ export function PayForm({
     }
     try {
       const units = toBaseUnits(amount);
-      const signer = kitSigner(address);
+      const signer = await payerSigner(address);
       if ((await usdcBalance(signer.address)) < units) {
         setStatus({
           kind: "err",
-          msg: "Not enough testnet USDC. Add a trustline and fund at faucet.circle.com.",
+          msg: `Not enough USDC on ${chain.name} in this wallet.`,
         });
         return;
       }
 
-      const salt = randomFieldElement();
-      const ownerPkField = fromBE(account.note_pubkey);
-      const note = toBE32(await commitment(units, ownerPkField, salt));
-      const { proof } = await proveDeposit({
-        commitment: fromBE(note).toString(),
-        amount: units.toString(),
-        ownerPk: ownerPkField.toString(),
-        salt: salt.toString(),
-      });
-      const { ephemeralPk, ciphertext } = encryptNote(
-        account.view_pubkey,
-        units,
-        salt,
-      );
-
-      const { leafIndex, txHash } = await poolDeposit(
+      const { txHash } = await payIntoNote(
         signer,
-        note,
+        { notePubkey: account.note_pubkey, viewPubkey: account.view_pubkey },
         units,
-        proof,
-        ephemeralPk,
-        ciphertext,
       );
       setStatus({
         kind: "ok",
@@ -156,193 +113,99 @@ export function PayForm({
         ) : null}
       </div>
 
-      {cctpEnabled && (
-        <div className={cn(glassSegmentedClass, "grid grid-cols-2 gap-1 p-1")}>
-          <button
-            type="button"
-            onClick={() => {
-              setStatus(null);
-              setMethod("stellar");
-            }}
-            className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-linen/70 ${
-              method === "stellar"
-                ? "bg-brand-linen/15 text-brand-linen ring-1 ring-brand-linen/20"
-                : "text-brand-linen/55 hover:bg-brand-linen/8 hover:text-brand-linen"
-            }`}
-          >
-            <Image
-              src="/assets/stellar-black.webp"
-              alt=""
-              width={20}
-              height={20}
-              className="size-5 rounded-full object-cover"
-            />
-            <span>Stellar wallet</span>
-          </button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={`group flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-linen/70 ${
-                method === "cctp"
-                  ? "bg-brand-linen/15 text-brand-linen ring-1 ring-brand-linen/20"
-                  : "text-brand-linen/55 hover:bg-brand-linen/8 hover:text-brand-linen"
-              }`}
-              aria-label="Select another chain"
+      <form className="grid gap-2" onSubmit={onSubmit}>
+        <label
+          className="text-sm font-semibold text-brand-linen"
+          htmlFor="amount"
+        >
+          USDC
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            appearance="glass"
+            id="amount"
+            className="min-h-11 flex-1"
+            inputMode="decimal"
+            placeholder="5.00"
+            readOnly={Boolean(lockedAmount)}
+            aria-readonly={Boolean(lockedAmount)}
+            {...register("amount")}
+          />
+          {address ? (
+            <Button
+              // variant="glass"
+              className="min-h-11"
+              type="submit"
+              disabled={isSubmitting}
             >
-              <span>Another chain</span>
-              <ChevronDown
-                className="size-4 transition-transform group-data-[popup-open]:rotate-180"
-                aria-hidden="true"
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              appearance="glass"
-              align="end"
-              sideOffset={8}
-              className="p-2"
+              {isSubmitting && (
+                <Loader
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              {isSubmitting ? "Paying…" : "Pay"}
+            </Button>
+          ) : (
+            <Button
+              className="min-h-11"
+              type="button"
+              onClick={connect}
+              disabled={connecting}
             >
-              <DropdownMenuItem
-                className="min-h-12 cursor-pointer gap-3 px-3 text-brand-linen focus:bg-brand-linen/14 focus:text-brand-linen"
-                onClick={() => {
-                  setStatus(null);
-                  setCctpChain("solana");
-                  setMethod("cctp");
-                }}
-              >
-                <Image
-                  src="/assets/sol.png"
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="size-7 rounded-full"
+              {connecting && (
+                <Loader
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
                 />
-                Solana
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled
-                className="min-h-12 gap-3 px-3 text-brand-linen/60 opacity-100 data-disabled:opacity-100"
-              >
-                <Image
-                  src="/assets/eth.png"
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="size-7 rounded-full"
-                />
-                <span className="grid gap-0.5">
-                  <span>EVM Chains</span>
-                  <span className="text-xs font-normal text-brand-linen/45">
-                    (under development)
-                  </span>
-                </span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              )}
+              {connecting ? "Connecting…" : "Connect wallet"}
+            </Button>
+          )}
         </div>
-      )}
-
-      {method === "cctp" ? (
-        <CctpPayForm
-          username={username}
-          notePubkey={account.note_pubkey}
-          lockedAmount={lockedAmount}
-          chain={cctpChain}
+        <span className="text-xs text-brand-linen/55">
+          {address
+            ? `Paying from ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. You need USDC plus a little MON for gas.`
+            : `Pay with any EVM wallet (MetaMask, Rabby…) on ${chain.name}.`}
+        </span>
+        <ToastFeedback
+          message={walletError}
+          variant="error"
+          toastId="payer-wallet-error"
         />
-      ) : (
-        <form className="grid gap-2" onSubmit={onSubmit}>
-          <label
-            className="text-sm font-semibold text-brand-linen"
-            htmlFor="amount"
-          >
-            USDC
-          </label>
-          <div className="flex flex-wrap items-center gap-3">
-            <Input
-              appearance="glass"
-              id="amount"
-              className="min-h-11 flex-1"
-              inputMode="decimal"
-              placeholder="5.00"
-              readOnly={Boolean(lockedAmount)}
-              aria-readonly={Boolean(lockedAmount)}
-              {...register("amount")}
-            />
-            {address ? (
-              <Button
-                // variant="glass"
-                className="min-h-11"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting && (
-                  <Loader
-                    className="size-4 motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                )}
-                {isSubmitting ? "Paying…" : "Pay"}
-              </Button>
-            ) : (
-              <Button
-                className="min-h-11"
-                type="button"
-                onClick={connect}
-                disabled={connecting}
-              >
-                {connecting && (
-                  <Loader
-                    className="size-4 motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                )}
-                {connecting ? "Connecting…" : "Connect wallet"}
-              </Button>
-            )}
-          </div>
-          <span className="text-xs text-brand-linen/55">
-            {address
-              ? `Paying from ${address.slice(0, 4)}…${address.slice(-4)} — gasless, you only need USDC.`
-              : "Pay with your own Stellar wallet (Freighter, xBull, LOBSTR…)."}
-          </span>
-          <ToastFeedback
-            message={walletError}
-            variant="error"
-            toastId="payer-wallet-error"
-          />
-          <ToastFeedback
-            message={errors.amount?.message}
-            variant="error"
-            toastId="payment-amount-error"
-          />
-          <ToastFeedback
-            message={status?.msg}
-            content={
-              status?.kind === "ok" && status.url
-                ? (() => {
-                    const [before, after] = status.msg.split("here");
-                    return (
-                      <span>
-                        {before}
-                        <a
-                          href={status.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="View transaction proof in Stellar Explorer"
-                          className="underline underline-offset-2"
-                        >
-                          here
-                        </a>
-                        {after}
-                      </span>
-                    );
-                  })()
-                : undefined
-            }
-            variant={status?.kind === "ok" ? "success" : "error"}
-            toastId="payment-status"
-          />
-        </form>
-      )}
+        <ToastFeedback
+          message={errors.amount?.message}
+          variant="error"
+          toastId="payment-amount-error"
+        />
+        <ToastFeedback
+          message={status?.msg}
+          content={
+            status?.kind === "ok" && status.url
+              ? (() => {
+                  const [before, after] = status.msg.split("here");
+                  return (
+                    <span>
+                      {before}
+                      <a
+                        href={status.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="View transaction in the Monad explorer"
+                        className="underline underline-offset-2"
+                      >
+                        here
+                      </a>
+                      {after}
+                    </span>
+                  );
+                })()
+              : undefined
+          }
+          variant={status?.kind === "ok" ? "success" : "error"}
+          toastId="payment-status"
+        />
+      </form>
     </Card>
   );
 }

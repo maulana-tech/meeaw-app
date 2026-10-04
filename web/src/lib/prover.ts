@@ -1,5 +1,3 @@
-import { toBE32 } from "./crypto";
-
 export type WithdrawInput = {
   root: string;
   nullifier: string;
@@ -35,38 +33,31 @@ export type DepositInput = {
   salt: string;
 };
 
-export type RawProof = { a: Uint8Array; b: Uint8Array; c: Uint8Array };
-
-const g1 = (p: string[]) => concat(toBE32(BigInt(p[0])), toBE32(BigInt(p[1])));
-const g2 = (p: string[][]) =>
-  concat(
-    toBE32(BigInt(p[0][1])),
-    toBE32(BigInt(p[0][0])),
-    toBE32(BigInt(p[1][1])),
-    toBE32(BigInt(p[1][0])),
-  );
-
-function concat(...chunks: Uint8Array[]): Uint8Array {
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const out = new Uint8Array(total);
-  let o = 0;
-  for (const c of chunks) {
-    out.set(c, o);
-    o += c.length;
-  }
-  return out;
-}
+/// Groth16 proof in the layout the snarkjs-generated Solidity verifier expects:
+/// G2 coordinates are (x1, x0), (y1, y0) — the reverse of snarkjs' JSON order.
+export type EvmProof = {
+  a: readonly [bigint, bigint];
+  b: readonly [readonly [bigint, bigint], readonly [bigint, bigint]];
+  c: readonly [bigint, bigint];
+};
 
 type SnarkProof = { pi_a: string[]; pi_b: string[][]; pi_c: string[] };
 
-function encodeProof(proof: SnarkProof): RawProof {
-  return { a: g1(proof.pi_a), b: g2(proof.pi_b), c: g1(proof.pi_c) };
+export function encodeProof(proof: SnarkProof): EvmProof {
+  return {
+    a: [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],
+    b: [
+      [BigInt(proof.pi_b[0][1]), BigInt(proof.pi_b[0][0])],
+      [BigInt(proof.pi_b[1][1]), BigInt(proof.pi_b[1][0])],
+    ],
+    c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])],
+  };
 }
 
 export async function proveDeposit(
   input: DepositInput,
   artifactRoot = "/zk",
-): Promise<{ proof: RawProof; publicSignals: string[]; ms: number }> {
+): Promise<{ proof: EvmProof; publicSignals: string[]; ms: number }> {
   const snarkjs = await import("snarkjs");
   const started = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -83,7 +74,7 @@ export async function proveDeposit(
 
 export async function proveWithdraw(
   input: WithdrawInput,
-): Promise<{ proof: RawProof; publicSignals: string[]; ms: number }> {
+): Promise<{ proof: EvmProof; publicSignals: string[]; ms: number }> {
   const snarkjs = await import("snarkjs");
   const started = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -100,7 +91,7 @@ export async function proveWithdraw(
 
 export async function proveTransfer(
   input: TransferInput,
-): Promise<{ proof: RawProof; publicSignals: string[]; ms: number }> {
+): Promise<{ proof: EvmProof; publicSignals: string[]; ms: number }> {
   const snarkjs = await import("snarkjs");
   const started = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(

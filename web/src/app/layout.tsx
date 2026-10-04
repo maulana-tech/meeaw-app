@@ -9,7 +9,7 @@ import { TRPCReactProvider } from "../trpc/react";
 export const metadata: Metadata = {
   title: "Mawee: private USDC payments",
   description:
-    "Confidential USDC payment links on Stellar. Private by default, provable on demand.",
+    "Confidential USDC payment links on Monad. Private by default, provable on demand.",
 };
 
 export default function RootLayout({

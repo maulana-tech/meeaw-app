@@ -16,7 +16,7 @@ vi.mock("../src/lib/notes", () => ({
   getAccount: mocks.getAccount,
   accountPubkeys: mocks.accountPubkeys,
 }));
-vi.mock("../src/lib/stellar", () => ({
+vi.mock("../src/lib/chain", () => ({
   poolDeposit: mocks.poolDeposit,
   usdcBalance: mocks.usdcBalance,
 }));
@@ -47,9 +47,8 @@ import { DepositForm } from "../src/components/DepositForm";
 import { Toaster } from "../src/components/ui/sonner";
 
 const SIGNER = {
-  address: "CSIGNER",
-  signAuthEntries: async () => [],
-  relaySoroban: async () => ({ hash: "deadbeef" }),
+  address: "0x00000000000000000000000000000000000000E1",
+  walletClient: {},
 };
 
 function renderForm() {
@@ -116,9 +115,7 @@ describe("DepositForm", () => {
     await userEvent.type(screen.getByLabelText(/usdc/i), "5");
     await userEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
-    expect(
-      await screen.findByText(/not enough testnet usdc/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/not enough usdc/i)).toBeInTheDocument();
     expect(mocks.poolDeposit).not.toHaveBeenCalled();
   });
 

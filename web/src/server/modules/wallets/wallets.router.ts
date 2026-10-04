@@ -2,7 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import {
   WalletConflictError,
-  WalletDeploymentError,
   WalletEscrowAlreadyInitializedError,
   WalletEscrowClobberError,
   WalletEscrowMissingError,
@@ -37,12 +36,6 @@ function mapError(error: unknown): never {
     throw new TRPCError({ code: "CONFLICT", message: error.message });
   }
   if (error instanceof WalletEscrowMissingError) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: error.message,
-    });
-  }
-  if (error instanceof WalletDeploymentError) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: error.message,

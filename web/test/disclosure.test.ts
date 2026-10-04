@@ -9,7 +9,7 @@ import type { LocalAccount, ScanResult } from "../src/lib/notes";
 
 const ownerSecret =
   123456789012345678901234567890123456789012345678901234567890n;
-const amount = 12_5000000n; // 12.5 USDC
+const amount = 12_500_000n; // 12.5 USDC (6 decimals)
 const salt = 987654321n;
 
 async function fixture(): Promise<{ acct: LocalAccount; scan: ScanResult }> {

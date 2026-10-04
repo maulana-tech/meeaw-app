@@ -1,21 +1,19 @@
 // @vitest-environment node
 import { Binary } from "mongodb";
-import type { MaweeAccount } from "../src/lib/stellar";
+import type { MaweeAccount } from "../src/lib/chain";
 import { UsernameNotOnChainError } from "../src/server/modules/usernames/usernames.errors";
 
 // ---- mocks -----------------------------------------------------------------
 
 const mocks = vi.hoisted(() => ({
   resolveUsernameOnChain: vi.fn(),
-  getLatestLedger: vi.fn(),
   updateOne: vi.fn(),
   findOne: vi.fn(),
 }));
 
-vi.mock("../src/lib/stellar", () => ({
+vi.mock("../src/lib/chain", () => ({
   resolveUsernameOnChain: mocks.resolveUsernameOnChain,
   usernameOfOnChain: vi.fn(),
-  server: { getLatestLedger: mocks.getLatestLedger },
 }));
 
 vi.mock("../src/server/db/mongo", () => ({
@@ -39,7 +37,7 @@ import { registerUsernameCache } from "../src/server/modules/usernames/usernames
 
 function fakeAccount(overrides: Partial<MaweeAccount> = {}): MaweeAccount {
   return {
-    owner: "GCTESTOWNERADDRESSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    owner: "0x00000000000000000000000000000000000000A1",
     note_pubkey: new Uint8Array(32).fill(0xab),
     view_pubkey: new Uint8Array(32).fill(0xcd),
     created: 1_700_000_000n,
@@ -49,7 +47,6 @@ function fakeAccount(overrides: Partial<MaweeAccount> = {}): MaweeAccount {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getLatestLedger.mockResolvedValue({ sequence: 4242 });
   mocks.updateOne.mockResolvedValue({ acknowledged: true });
 });
 
@@ -86,7 +83,6 @@ describe("registerUsernameCache", () => {
     expect(set.viewPubkey).toBeInstanceOf(Binary);
     expect(new Uint8Array(set.notePubkey.buffer)).toEqual(acct.note_pubkey);
     expect(new Uint8Array(set.viewPubkey.buffer)).toEqual(acct.view_pubkey);
-    expect(set.createdLedger).toBe(4242);
     expect(set.createdAt).toBeInstanceOf(Date);
     expect(set.createdAt.getTime()).toBe(Number(acct.created) * 1000);
     expect(set.updatedAt).toBeInstanceOf(Date);

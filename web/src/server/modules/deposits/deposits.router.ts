@@ -23,7 +23,7 @@ export const depositsRouter = createTRPCRouter({
     .query(({ input }) =>
       getPoolSnapshot(
         input?.afterLeafIndex ?? -1,
-        input?.spentAfterLedger ?? 0,
+        input?.spentAfterBlock ?? 0,
       ).catch(mapError),
     ),
   list: publicProcedure

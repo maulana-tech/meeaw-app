@@ -2,11 +2,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const mapping = {
-  contractId: "CCONTRACT",
-  privyWalletId: "wallet-1",
-  privyWalletAddress: "GPRIVY",
-};
+const WALLET = "0x5A0b54D5dc17e0AadC383d2db43B0a0D3E029c4c";
+const mapping = { address: WALLET };
 
 const mocks = vi.hoisted(() => ({
   authenticated: true,
@@ -15,8 +12,8 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   logout: vi.fn(async () => {}),
   createWallet: vi.fn(),
-  signRawHash: vi.fn(),
-  resolveWallet: vi.fn(),
+  wallets: [] as { walletClientType: string; address: string }[],
+  findWallet: vi.fn(),
   current: vi.fn(),
   restore: vi.fn(),
   bootstrap: vi.fn(),
@@ -37,16 +34,16 @@ vi.mock("@privy-io/react-auth", () => ({
     login: mocks.login,
     logout: mocks.logout,
   }),
-}));
-
-vi.mock("@privy-io/react-auth/extended-chains", () => ({
+  useWallets: () => ({
+    ready: true,
+    wallets: mocks.unstableHookValues ? [...mocks.wallets] : mocks.wallets,
+  }),
   useCreateWallet: () => ({
     createWallet: mocks.unstableHookValues
       ? (...args: Parameters<typeof mocks.createWallet>) =>
           mocks.createWallet(...args)
       : mocks.createWallet,
   }),
-  useSignRawHash: () => ({ signRawHash: mocks.signRawHash }),
 }));
 
 vi.mock("next/navigation", () => {
@@ -55,8 +52,8 @@ vi.mock("next/navigation", () => {
 });
 
 vi.mock("../src/lib/privy-wallet", () => ({
-  resolvePrivyStellarWallet: mocks.resolveWallet,
-  privySigner: vi.fn(() => ({ address: "CCONTRACT" })),
+  findEmbeddedWallet: mocks.findWallet,
+  privySigner: vi.fn(async () => ({ address: WALLET })),
 }));
 
 vi.mock("../src/trpc/client", () => ({
@@ -79,7 +76,7 @@ vi.mock("../src/lib/notes", () => ({
   syncLocalAccountIdentity: mocks.syncLocalAccountIdentity,
 }));
 
-vi.mock("../src/lib/stellar", () => ({
+vi.mock("../src/lib/chain", () => ({
   usernameOf: mocks.usernameOf,
   registerUsernameCache: vi.fn(),
   setUsernamePubkeys: vi.fn(),
@@ -108,7 +105,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.authenticated = true;
   mocks.unstableHookValues = false;
-  mocks.resolveWallet.mockResolvedValue({ id: "wallet-1", address: "GPRIVY" });
+  mocks.wallets = [{ walletClientType: "privy", address: WALLET }];
+  mocks.findWallet.mockImplementation(
+    (wallets: { walletClientType: string }[]) =>
+      wallets.find((w) => w.walletClientType === "privy") ?? null,
+  );
+  mocks.createWallet.mockResolvedValue({ address: WALLET });
   mocks.current.mockResolvedValue(mapping);
   mocks.restore.mockResolvedValue(mapping);
   mocks.bootstrap.mockResolvedValue(mapping);
@@ -121,21 +123,21 @@ beforeEach(() => {
 });
 
 describe("WalletProvider Privy session", () => {
-  it("restores the Privy wallet mapping and Mawee C-address", async () => {
+  it("restores the account mapped to the Privy identity", async () => {
     render(
       <WalletProvider>
         <Probe />
       </WalletProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId("address")).toHaveTextContent("CCONTRACT"),
+      expect(screen.getByTestId("address")).toHaveTextContent(WALLET),
     );
     await waitFor(() =>
       expect(screen.getByTestId("ready")).toHaveTextContent("yes"),
     );
     expect(mocks.restore).toHaveBeenCalledTimes(1);
     expect(mocks.current).not.toHaveBeenCalled();
-    expect(mocks.resolveWallet).not.toHaveBeenCalled();
+    expect(mocks.findWallet).not.toHaveBeenCalled();
     expect(mocks.createWallet).not.toHaveBeenCalled();
     expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
   });
@@ -148,12 +150,11 @@ describe("WalletProvider Privy session", () => {
       </WalletProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId("address")).toHaveTextContent("CCONTRACT"),
+      expect(screen.getByTestId("address")).toHaveTextContent(WALLET),
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(mocks.restore).toHaveBeenCalledTimes(1);
     expect(mocks.current).not.toHaveBeenCalled();
-    expect(mocks.resolveWallet).not.toHaveBeenCalled();
     expect(mocks.createWallet).not.toHaveBeenCalled();
   });
 
@@ -165,20 +166,32 @@ describe("WalletProvider Privy session", () => {
       </WalletProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByTestId("address")).toHaveTextContent("CCONTRACT"),
+      expect(screen.getByTestId("address")).toHaveTextContent(WALLET),
     );
-    expect(mocks.bootstrap).toHaveBeenCalledWith({
-      privyWalletId: "wallet-1",
-      privyWalletAddress: "GPRIVY",
-    });
-    expect(mocks.resolveWallet).toHaveBeenCalledTimes(1);
+    expect(mocks.bootstrap).toHaveBeenCalledWith({ address: WALLET });
+    expect(mocks.createWallet).not.toHaveBeenCalled();
     expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("creates the embedded wallet when Privy has not provisioned one", async () => {
+    mocks.restore.mockResolvedValue(null);
+    mocks.wallets = [];
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("address")).toHaveTextContent(WALLET),
+    );
+    expect(mocks.createWallet).toHaveBeenCalledTimes(1);
+    expect(mocks.bootstrap).toHaveBeenCalledWith({ address: WALLET });
   });
 
   it("retries automatic bootstrap after a recoverable failure", async () => {
     mocks.restore.mockResolvedValue(null);
     mocks.bootstrap
-      .mockRejectedValueOnce(new Error("deployment unavailable"))
+      .mockRejectedValueOnce(new Error("bootstrap unavailable"))
       .mockResolvedValueOnce(mapping);
     render(
       <WalletProvider>
@@ -186,12 +199,11 @@ describe("WalletProvider Privy session", () => {
       </WalletProvider>,
     );
     expect(await screen.findByTestId("error")).toHaveTextContent(
-      "deployment unavailable",
+      "bootstrap unavailable",
     );
     await userEvent.click(screen.getByRole("button", { name: /retry/i }));
-    expect(await screen.findByTestId("address")).toHaveTextContent("CCONTRACT");
+    expect(await screen.findByTestId("address")).toHaveTextContent(WALLET);
     expect(mocks.bootstrap).toHaveBeenCalledTimes(2);
-    expect(mocks.resolveWallet).toHaveBeenCalledTimes(1);
     expect(mocks.createWallet).not.toHaveBeenCalled();
   });
 
@@ -201,7 +213,7 @@ describe("WalletProvider Privy session", () => {
         <Probe />
       </WalletProvider>,
     );
-    expect(await screen.findByTestId("address")).toHaveTextContent("CCONTRACT");
+    expect(await screen.findByTestId("address")).toHaveTextContent(WALLET);
     await userEvent.click(screen.getByRole("button", { name: /disconnect/i }));
     expect(mocks.logout).toHaveBeenCalledTimes(1);
     expect(mocks.clearLocalAccount).toHaveBeenCalled();

@@ -1,12 +1,9 @@
 import "server-only";
 import { Binary } from "mongodb";
+import { getAddress } from "viem";
+import type { MaweeAccount } from "../../../lib/chain";
+import { resolveUsernameOnChain, usernameOfOnChain } from "../../../lib/chain";
 import { bytesToHex } from "../../../lib/crypto";
-import type { MaweeAccount } from "../../../lib/stellar";
-import {
-  resolveUsernameOnChain,
-  server,
-  usernameOfOnChain,
-} from "../../../lib/stellar";
 import { getUsernames, type UsernameDoc } from "../../db/mongo";
 import {
   RegistryLookupFailedError,
@@ -39,19 +36,13 @@ async function upsertFromChain(
   onChain: MaweeAccount,
 ): Promise<ResolveOutput> {
   const usernames = await getUsernames();
-  const latestLedger = (await server.getLatestLedger()).sequence;
   await usernames.updateOne(
     { _id: username },
     {
       $set: {
-        owner: onChain.owner,
+        owner: getAddress(onChain.owner),
         notePubkey: new Binary(Buffer.from(onChain.note_pubkey)),
         viewPubkey: new Binary(Buffer.from(onChain.view_pubkey)),
-        // Ledger this cache entry was (re)written at — not the ledger the
-        // username actually registered at. The registry's `created` field
-        // is a Unix timestamp with no event stream to recover the real
-        // registration ledger sequence from.
-        createdLedger: latestLedger,
         createdAt: new Date(Number(onChain.created) * 1000),
         updatedAt: new Date(),
       },
@@ -101,7 +92,7 @@ export async function registerUsernameCache(
 
 export async function usernameByOwner(owner: string): Promise<string | null> {
   const usernames = await getUsernames();
-  const cached = await usernames.findOne({ owner });
+  const cached = await usernames.findOne({ owner: getAddress(owner) });
   if (cached) return cached._id;
   return usernameOfOnChain(owner);
 }

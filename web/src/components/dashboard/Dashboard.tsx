@@ -1,15 +1,14 @@
 "use client";
 
 import {
+  ArrowDown,
   ArrowUpRight,
   Check,
-  ArrowDown,
   Copy,
   ExternalLink,
   Plus,
   QrCode,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   type ForwardedRef,
@@ -21,12 +20,8 @@ import {
   useState,
 } from "react";
 import { HISTORY_PATH, WITHDRAW_PATH } from "../../lib/auth-routes";
-import {
-  moneyGramCashInEnabled,
-  moneyGramCashInUnavailableReason,
-} from "../../lib/moneygram-status";
 import { useWallet } from "../WalletProvider";
-import { AddCashDialog } from "./AddCashDialog";
+import { AddFundsDialog } from "./AddFundsDialog";
 import { BalanceCard } from "./BalanceCard";
 import { DashboardTile } from "./DashboardTile";
 import { weeklyActivity } from "./dashboardAnalytics";
@@ -80,15 +75,10 @@ export function Dashboard() {
         <button
           type="button"
           onClick={() => setAddCashOpen(true)}
-          disabled={!moneyGramCashInEnabled || loading}
+          disabled={locked || loading}
           className={`${tileFocus} order-2 w-full text-left disabled:cursor-not-allowed disabled:opacity-55 lg:col-span-3 lg:col-start-4 lg:row-start-1`}
           aria-label="Open deposit funds"
-          aria-describedby={
-            moneyGramCashInUnavailableReason
-              ? "deposit-funds-unavailable"
-              : undefined
-          }
-          title={moneyGramCashInUnavailableReason ?? "Add cash with MoneyGram"}
+          title={locked ? "Unlock with your PIN to add funds" : "Add funds"}
         >
           <DashboardTile
             appearance="glass"
@@ -112,22 +102,9 @@ export function Dashboard() {
                   Add money to your Mawee balance. Use it for payments, or
                   withdraw it whenever you need it.
                 </p>
-                {moneyGramCashInUnavailableReason ? (
-                  <p
-                    id="deposit-funds-unavailable"
-                    className="mt-3 font-medium text-brand-linen/80"
-                  >
-                    {moneyGramCashInUnavailableReason}
-                  </p>
-                ) : null}
               </div>
             }
-            footer={
-              <div className="flex items-center -space-x-2">
-                <MoneyGramLogo />
-                <DurianpayLogo />
-              </div>
-            }
+            footer={<ChainBadge tone="glass" />}
           />
         </button>
 
@@ -205,24 +182,11 @@ export function Dashboard() {
             }
             content={
               <p className="mt-4 max-w-52 text-sm leading-5 text-muted-foreground">
-                Move a private payment to a Stellar wallet or an available cash
-                anchor.
+                Move a private payment to any Monad wallet without revealing
+                which deposit funded it.
               </p>
             }
-            footer={
-              <div className="flex items-center -space-x-2">
-                <span className="flex size-12 items-center justify-center overflow-hidden rounded-full bg-brand-obsidian ring-2 ring-brand-linen">
-                  <Image
-                    src="/assets/stellar-black.webp"
-                    alt="Stellar"
-                    width={36}
-                    height={36}
-                    className="size-9 object-contain"
-                  />
-                </span>
-                <MoneyGramLogo />
-              </div>
-            }
+            footer={<ChainBadge tone="linen" />}
           />
         </Link>
 
@@ -259,7 +223,7 @@ export function Dashboard() {
         username={username ?? ""}
         origin={origin}
       />
-      <AddCashDialog
+      <AddFundsDialog
         open={addCashOpen}
         onOpenChange={setAddCashOpen}
         onComplete={refresh}
@@ -441,33 +405,16 @@ function InsightTotal({ value, label }: { value: number; label: string }) {
   );
 }
 
-function MoneyGramLogo() {
-  return (
-    <span className="flex size-12 items-center justify-center overflow-hidden rounded-full ring-2 ring-brand-linen bg-brand-linen p-2">
-      <Image
-        src="/assets/moneygram.svg"
-        alt="MoneyGram"
-        width={48}
-        height={48}
-        className="size-12 object-contain"
-      />
-    </span>
-  );
-}
-
-function DurianpayLogo() {
+function ChainBadge({ tone }: { tone: "glass" | "linen" }) {
   return (
     <span
-      className="flex size-12 items-center justify-center overflow-hidden rounded-full bg-brand-linen p-2 ring-2 ring-brand-linen"
-      title="Durianpay support is coming soon"
+      className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${
+        tone === "glass"
+          ? "bg-brand-linen/10 text-brand-linen ring-brand-linen/25"
+          : "bg-foreground/5 text-foreground ring-foreground/15"
+      }`}
     >
-      <Image
-        src="/assets/durianpay.png"
-        alt="Durianpay, coming soon"
-        width={32}
-        height={32}
-        className="size-8 object-contain"
-      />
+      USDC on Monad
     </span>
   );
 }

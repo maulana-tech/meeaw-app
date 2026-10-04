@@ -19,7 +19,7 @@ vi.mock("../src/lib/notes", () => ({
   accountPubkeys: mocks.accountPubkeys,
   setStoredUsername: mocks.setStoredUsername,
 }));
-vi.mock("../src/lib/stellar", () => ({
+vi.mock("../src/lib/chain", () => ({
   registerUsername: mocks.registerUsername,
   registerUsernameCache: mocks.registerUsernameCache,
 }));
@@ -28,9 +28,8 @@ import { CreateAccountForm } from "../src/components/CreateAccountForm";
 import { Toaster } from "../src/components/ui/sonner";
 
 const SIGNER = {
-  address: "CSIGNER",
-  signAuthEntries: async () => [],
-  relaySoroban: async () => ({ hash: "deadbeef" }),
+  address: "0x00000000000000000000000000000000000000E1",
+  walletClient: {},
 };
 const NOTE_PK = new Uint8Array(32).fill(1);
 const VIEW_PK = new Uint8Array(32).fill(2);

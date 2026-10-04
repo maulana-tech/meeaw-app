@@ -8,14 +8,14 @@ vi.mock("../src/trpc/client", () => ({
   api: { deposits: { snapshot: { query: mocks.snapshot } } },
 }));
 
-vi.mock("../src/lib/stellar", () => ({
-  networkPassphrase: "Test SDF Network ; September 2015",
-  poolId: "CPOOL",
+vi.mock("../src/lib/chain", () => ({
+  network: "eip155:10143",
+  poolAddress: "0x00000000000000000000000000000000000000B0",
 }));
 
 function response(
   leafIndex: number,
-  publishedLedger: number,
+  publishedBlock: number,
   nullifierHex: string,
 ) {
   return {
@@ -25,7 +25,7 @@ function response(
         commitmentHex: "01".repeat(32),
         ephemeralPkHex: "02".repeat(32),
         ciphertextHex: "03".repeat(40),
-        ledger: publishedLedger,
+        block: publishedBlock,
         txHash: `tx-${leafIndex}`,
         ts: new Date().toISOString(),
       },
@@ -33,14 +33,14 @@ function response(
     spentNullifiers: [
       {
         nullifierHex,
-        ledger: publishedLedger,
+        block: publishedBlock,
         ts: new Date(2026, 7, leafIndex + 1).toISOString(),
       },
     ],
     index: {
-      poolId: "CPOOL",
-      networkPassphrase: "Test SDF Network ; September 2015",
-      publishedLedger,
+      poolAddress: "0x00000000000000000000000000000000000000B0",
+      network: "eip155:10143",
+      publishedBlock,
       publishedLeafIndex: leafIndex,
       indexedAt: new Date().toISOString(),
       health: "healthy" as const,
@@ -67,11 +67,11 @@ describe("poolMirror", () => {
 
     expect(mocks.snapshot).toHaveBeenNthCalledWith(1, {
       afterLeafIndex: -1,
-      spentAfterLedger: 0,
+      spentAfterBlock: 0,
     });
     expect(mocks.snapshot).toHaveBeenNthCalledWith(2, {
       afterLeafIndex: 0,
-      spentAfterLedger: 10,
+      spentAfterBlock: 10,
     });
     expect(first.deposits).toHaveLength(1);
     expect(second.deposits.map((row) => row.leafIndex)).toEqual([0, 1]);

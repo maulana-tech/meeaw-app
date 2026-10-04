@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
-import { StrKey } from "@stellar/stellar-sdk";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
+
+const DEST = "0x5A0b54D5dc17e0AadC383d2db43B0a0D3E029c4c";
 
 const mocks = vi.hoisted(() => ({
   scanMyNotes: vi.fn(),
@@ -11,32 +12,24 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../src/components/WalletProvider", () => ({
   useWallet: () => ({
-    address: "C".padEnd(56, "A"),
+    address: "0x00000000000000000000000000000000000000E1",
     accountUnlocked: true,
     promptUnlock: vi.fn(),
-    getSigner: vi.fn(),
+    getSigner: vi.fn(async () => ({})),
   }),
 }));
 
 vi.mock("../src/components/dashboard/useMyNotes", () => ({
   useMyNotes: () => ({
     notes: [
-      { leafIndex: 3, amount: 5_000_000n, salt: 1n, spent: false },
-      { leafIndex: 7, amount: 8_000_000n, salt: 2n, spent: false },
+      { leafIndex: 3, amount: 500_000n, salt: 1n, spent: false },
+      { leafIndex: 7, amount: 800_000n, salt: 2n, spent: false },
     ],
-    claimable: 13_000_000n,
+    claimable: 1_300_000n,
     loading: false,
     error: null,
     refresh: vi.fn(),
   }),
-}));
-
-vi.mock("../src/components/dashboard/StrandedFundsRecovery", () => ({
-  StrandedFundsRecovery: () => (
-    <button type="button" aria-label="Recover funds">
-      Recover funds
-    </button>
-  ),
 }));
 
 vi.mock("../src/lib/notes", async (importOriginal) => {
@@ -56,60 +49,26 @@ vi.mock("../src/lib/withdraw", async (importOriginal) => {
   };
 });
 
-vi.mock("../src/lib/anchor", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/lib/anchor")>();
-  return { ...actual, offRampEnabled: true };
-});
-
-vi.mock("../src/lib/transak", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/lib/transak")>();
-  return { ...actual, transakEnabled: true };
-});
-
 import { WithdrawDashboard } from "../src/components/dashboard/WithdrawDashboard";
 
-it("keeps MoneyGram disabled while whitelisting and Transak hidden", () => {
+it("opens straight to the Monad destination form for one or all payments", () => {
   render(<WithdrawDashboard />);
-
-  expect(
-    screen.getByRole("button", {
-      name: "Withdraw all 2 payments, 1.3 USDC total",
-    }),
-  ).toBeInTheDocument();
-  expect(screen.getAllByRole("button")[0]).toHaveAccessibleName(
-    "Recover funds",
-  );
 
   fireEvent.click(
     screen.getByRole("button", {
       name: "Withdraw private payment 1, 0.8 USDC",
     }),
   );
-
   const singleDialog = screen.getByRole("dialog");
   expect(within(singleDialog).getByText("$0.8")).toBeInTheDocument();
   expect(
     within(singleDialog).getByText("from one private payment"),
   ).toBeInTheDocument();
-
   expect(
-    screen.getByRole("button", { name: /^MoneyGram cash pickup/ }),
-  ).toBeDisabled();
-  expect(
-    screen.getByText(
-      "Sandbox access pending. We’re completing MoneyGram integration and will enable cash pickup after approval.",
-    ),
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: /Transak/i }),
-  ).not.toBeInTheDocument();
-  expect(screen.queryByText(/Transak bank cash-out/i)).not.toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: /^Stellar wallet/ }));
-  expect(
-    screen.getByRole("button", { name: "Back to withdrawal methods" }),
-  ).toBeInTheDocument();
-  expect(screen.queryByText("Withdrawal method")).not.toBeInTheDocument();
+    within(singleDialog).getByLabelText("Destination wallet"),
+  ).toHaveAttribute("placeholder", "0x…");
+  expect(screen.queryByText(/MoneyGram/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Stellar/i)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(
@@ -117,26 +76,42 @@ it("keeps MoneyGram disabled while whitelisting and Transak hidden", () => {
       name: "Withdraw all 2 payments, 1.3 USDC total",
     }),
   );
-
-  expect(
-    screen.getByRole("button", { name: /^MoneyGram cash pickup/ }),
-  ).toBeDisabled();
-  expect(
-    screen.getByText("Cash anchors process one private payment at a time."),
-  ).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: /^Stellar wallet/ }));
   const bulkDialog = screen.getByRole("dialog");
-  expect(within(bulkDialog).queryByText("Sending")).not.toBeInTheDocument();
   expect(within(bulkDialog).getByText("$1.3")).toBeInTheDocument();
   expect(
     within(bulkDialog).getByText("across 2 private payments"),
   ).toBeInTheDocument();
 });
 
+it("rejects a non-Monad destination", async () => {
+  render(<WithdrawDashboard />);
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Withdraw private payment 1, 0.8 USDC",
+    }),
+  );
+  fireEvent.change(screen.getByLabelText("Destination wallet"), {
+    target: {
+      value: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Review withdrawal" }));
+  // The validation message is surfaced as a toast; the form stays in place.
+  expect(
+    await screen.findByRole("button", { name: "Review withdrawal" }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Destination wallet")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Confirm & cash out" }),
+  ).not.toBeInTheDocument();
+});
+
 it("allows the proof-generation dialog to be closed", async () => {
   mocks.scanMyNotes.mockResolvedValue({
-    notes: [{ leafIndex: 7, amount: 8_000_000n, salt: 2n, spent: false }],
+    notes: [{ leafIndex: 7, amount: 800_000n, salt: 2n, spent: false }],
   });
   mocks.withdrawNote.mockReturnValue(new Promise(() => {}));
 
@@ -146,11 +121,8 @@ it("allows the proof-generation dialog to be closed", async () => {
       name: "Withdraw private payment 1, 0.8 USDC",
     }),
   );
-  fireEvent.click(screen.getByRole("button", { name: /^Stellar wallet/ }));
   fireEvent.change(screen.getByLabelText("Destination wallet"), {
-    target: {
-      value: StrKey.encodeEd25519PublicKey(new Uint8Array(32).fill(7)),
-    },
+    target: { value: DEST },
   });
   fireEvent.click(screen.getByRole("button", { name: "Review withdrawal" }));
   fireEvent.click(
@@ -158,10 +130,10 @@ it("allows the proof-generation dialog to be closed", async () => {
   );
 
   expect(
-    await screen.findByText("Generating proof and releasing funds…"),
+    await screen.findByText(/zero-knowledge proof is built in your browser/),
   ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(
-    screen.queryByText("Generating proof and releasing funds…"),
+    screen.queryByText(/zero-knowledge proof is built in your browser/),
   ).not.toBeInTheDocument();
 });

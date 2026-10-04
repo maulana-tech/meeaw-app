@@ -1,6 +1,6 @@
 import { api } from "../trpc/client";
+import { type DepositEvent, network, poolAddress } from "./chain";
 import { hexToBytes } from "./crypto";
-import { type DepositEvent, networkPassphrase, poolId } from "./stellar";
 
 const DB_NAME = "mawee-pool-mirror";
 const STORE_NAME = "mirrors";
@@ -11,7 +11,7 @@ export type PoolMirror = {
   deposits: DepositEvent[];
   spentNullifiers: string[];
   spentAtByNullifier?: Record<string, string>;
-  publishedLedger: number;
+  publishedBlock: number;
   publishedLeafIndex: number;
   indexedAt: string;
   health: "healthy" | "stale" | "degraded";
@@ -22,7 +22,7 @@ const memory = new Map<string, PoolMirror>();
 const inFlight = new Map<string, Promise<PoolMirror>>();
 
 function scopeKey(): string {
-  return `${networkPassphrase}:${poolId}`;
+  return `${network}:${poolAddress.toLowerCase()}`;
 }
 
 function emptyMirror(): PoolMirror {
@@ -31,7 +31,7 @@ function emptyMirror(): PoolMirror {
     deposits: [],
     spentNullifiers: [],
     spentAtByNullifier: {},
-    publishedLedger: 0,
+    publishedBlock: 0,
     publishedLeafIndex: -1,
     indexedAt: new Date(0).toISOString(),
     health: "degraded",
@@ -110,9 +110,9 @@ async function fetchAndMerge(): Promise<PoolMirror> {
   const current = await loadPoolMirror();
   const snapshot = await api.deposits.snapshot.query({
     afterLeafIndex: current.publishedLeafIndex,
-    spentAfterLedger: current.publishedLedger,
+    spentAfterBlock: current.publishedBlock,
   });
-  const responseScope = `${snapshot.index.networkPassphrase}:${snapshot.index.poolId}`;
+  const responseScope = `${snapshot.index.network}:${snapshot.index.poolAddress.toLowerCase()}`;
   const base = responseScope === current.scope ? current : emptyMirror();
   const deposits = new Map(base.deposits.map((row) => [row.leafIndex, row]));
   for (const row of snapshot.deposits) {
@@ -136,7 +136,7 @@ async function fetchAndMerge(): Promise<PoolMirror> {
     deposits: [...deposits.values()].sort((a, b) => a.leafIndex - b.leafIndex),
     spentNullifiers: [...spent],
     spentAtByNullifier,
-    publishedLedger: snapshot.index.publishedLedger,
+    publishedBlock: snapshot.index.publishedBlock,
     publishedLeafIndex: snapshot.index.publishedLeafIndex,
     indexedAt: snapshot.index.indexedAt,
     health: snapshot.index.health,

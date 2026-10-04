@@ -1,29 +1,29 @@
-// @vitest-environment node
+import type { ConnectedWallet } from "@privy-io/react-auth";
+import { describe, expect, it } from "vitest";
+import { findEmbeddedWallet } from "../src/lib/privy-wallet";
 
-import type { User } from "@privy-io/react-auth";
-import { Keypair } from "@stellar/stellar-sdk";
-import { resolvePrivyStellarWallet } from "../src/lib/privy-wallet";
+const wallet = (walletClientType: string, address: string) =>
+  ({ walletClientType, address }) as unknown as ConnectedWallet;
 
-describe("resolvePrivyStellarWallet", () => {
-  it("reuses a linked Stellar wallet with distinct publicKey metadata", async () => {
-    const address = Keypair.random().publicKey();
-    const createWallet = vi.fn();
-    const user = {
-      linkedAccounts: [
-        {
-          type: "wallet",
-          id: "wallet-1",
-          address,
-          publicKey: `02${"ab".repeat(32)}`,
-          chainType: "stellar",
-          delegated: false,
-        },
-      ],
-    } as unknown as User;
+describe("findEmbeddedWallet", () => {
+  it("picks the Privy embedded wallet over injected wallets", () => {
+    const embedded = wallet(
+      "privy",
+      "0x00000000000000000000000000000000000000E1",
+    );
+    expect(
+      findEmbeddedWallet([
+        wallet("metamask", "0x00000000000000000000000000000000000000A1"),
+        embedded,
+      ]),
+    ).toBe(embedded);
+  });
 
-    await expect(
-      resolvePrivyStellarWallet(user, createWallet),
-    ).resolves.toEqual({ id: "wallet-1", address });
-    expect(createWallet).not.toHaveBeenCalled();
+  it("returns null when the user has no embedded wallet yet", () => {
+    expect(
+      findEmbeddedWallet([
+        wallet("metamask", "0x00000000000000000000000000000000000000A1"),
+      ]),
+    ).toBeNull();
   });
 });

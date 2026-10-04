@@ -1,19 +1,10 @@
-import { StrKey } from "@stellar/stellar-sdk";
+import { getAddress, isAddress } from "viem";
 import { z } from "zod";
 
-export const stellarPublicKey = z
+export const evmAddress = z
   .string()
-  .refine(
-    (value) => StrKey.isValidEd25519PublicKey(value),
-    "invalid Stellar public key",
-  );
-export const contractId = z
-  .string()
-  .refine(
-    (value) => StrKey.isValidContract(value),
-    "invalid Mawee contract address",
-  );
-const walletId = z.string().min(1).max(256);
+  .refine((value) => isAddress(value, { strict: false }), "invalid EVM address")
+  .transform((value) => getAddress(value));
 const exactHexBytes = (bytes: number, label: string) =>
   z
     .string()
@@ -34,14 +25,12 @@ const revision = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 const expectedRevision = revision.max(Number.MAX_SAFE_INTEGER - 1);
 
 export const privyWalletInput = z.object({
-  privyWalletId: walletId,
-  privyWalletAddress: stellarPublicKey,
+  /** The user's Privy embedded Ethereum wallet; it is the Mawee account. */
+  address: evmAddress,
 });
 
 export const walletOutput = z.object({
-  contractId,
-  privyWalletId: walletId,
-  privyWalletAddress: stellarPublicKey,
+  address: evmAddress,
 });
 export const optionalWalletOutput = walletOutput.nullable();
 

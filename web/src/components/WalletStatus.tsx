@@ -2,7 +2,7 @@
 
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { type AccountStatus, accountStatus } from "../lib/stellar";
+import { type AccountStatus, accountStatus } from "../lib/chain";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { ToastFeedback } from "./ui/toast-feedback";
@@ -61,13 +61,21 @@ export function WalletStatus() {
       >
         {copied ? "Copied ✓" : address}
       </button>
-      <div className="my-2 grid grid-cols-1 gap-3">
+      <div className="my-2 grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1 rounded-lg border border-line bg-sage/40 px-3 py-2">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
             USDC
           </span>
           <span className="font-mono text-lg font-semibold text-ink">
             {status ? fmt(status.usdc) : "…"}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1 rounded-lg border border-line bg-sage/40 px-3 py-2">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            MON (gas)
+          </span>
+          <span className="font-mono text-lg font-semibold text-ink">
+            {status ? status.gas : "…"}
           </span>
         </div>
       </div>

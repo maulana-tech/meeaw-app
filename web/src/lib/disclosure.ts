@@ -1,3 +1,4 @@
+import { network, poolAddress } from "./chain";
 import {
   bytesToHex,
   commitment as commitmentHash,
@@ -5,11 +6,10 @@ import {
   merkleProof,
   ownerPk as ownerPkHash,
   poseidonHash,
-  toBE32,
   TREE_DEPTH,
+  toBE32,
 } from "./crypto";
 import type { LocalAccount, MyNote, ScanResult } from "./notes";
-import { networkPassphrase, poolId } from "./stellar";
 
 export const DISCLOSURE_VERSION = 1 as const;
 
@@ -22,7 +22,7 @@ export type DisclosureBundle = {
   commitment: string;
   rootHex: string;
   root: string;
-  amount: string; // base units (7-dp USDC)
+  amount: string; // token base units (USDC_DECIMALS)
   amountLabel: string; // human "12.5"
   ownerPk: string;
   salt: string;
@@ -46,8 +46,8 @@ export async function buildDisclosure(params: {
 
   return {
     version: DISCLOSURE_VERSION,
-    pool: poolId,
-    network: networkPassphrase,
+    pool: poolAddress,
+    network,
     leafIndex: note.leafIndex,
     commitmentHex: bytesToHex(toBE32(comm)),
     commitment: comm.toString(),

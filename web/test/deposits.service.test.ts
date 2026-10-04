@@ -1,9 +1,11 @@
 import { Binary } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const POOL = "0x00000000000000000000000000000000000000B0";
+
 const mocks = vi.hoisted(() => ({
-  fetchPoolEventsSince: vi.fn(),
-  simulateRead: vi.fn(),
+  fetchPoolLogs: vi.fn(),
+  readContract: vi.fn(),
   stateFindOne: vi.fn(),
   depositFind: vi.fn(),
   nullifierFind: vi.fn(),
@@ -15,13 +17,12 @@ function cursor<T>(rows: T[]) {
   };
 }
 
-vi.mock("../src/lib/stellar", () => ({
-  fetchPoolEventsSince: mocks.fetchPoolEventsSince,
-  networkPassphrase: "Test SDF Network ; September 2015",
-  parseDepositEvent: vi.fn(),
-  parseSpentEvent: vi.fn(),
-  poolId: "CPOOL",
-  simulateRead: mocks.simulateRead,
+vi.mock("../src/lib/chain", () => ({
+  fetchPoolLogs: mocks.fetchPoolLogs,
+  network: "eip155:10143",
+  poolAddress: "0x00000000000000000000000000000000000000B0",
+  poolDeployBlock: 0n,
+  publicClient: { readContract: mocks.readContract },
 }));
 
 vi.mock("../src/server/db/mongo", () => ({
@@ -39,8 +40,8 @@ describe("getPoolSnapshot", () => {
     const indexedAt = new Date();
     mocks.stateFindOne.mockResolvedValue({
       _id: "pool",
-      poolId: "CPOOL",
-      publishedLedger: 25,
+      scope: `eip155:10143:${POOL.toLowerCase()}`,
+      publishedBlock: 25,
       publishedLeafIndex: 4,
       indexedAt,
       health: "healthy",
@@ -52,8 +53,8 @@ describe("getPoolSnapshot", () => {
           commitment: new Binary(Buffer.alloc(32, 1)),
           ephemeralPk: new Binary(Buffer.alloc(32, 2)),
           ciphertext: new Binary(Buffer.alloc(40, 3)),
-          ledger: 24,
-          txHash: "tx-deposit",
+          block: 24,
+          txHash: "0xdeposit",
           ts: indexedAt,
         },
       ]),
@@ -62,9 +63,8 @@ describe("getPoolSnapshot", () => {
       cursor([
         {
           _id: "aa".repeat(32),
-          ledger: 25,
-          eventId: "25-1",
-          txHash: "tx-spend",
+          block: 25,
+          txHash: "0xspend",
           ts: indexedAt,
         },
       ]),
@@ -79,18 +79,23 @@ describe("getPoolSnapshot", () => {
       _id: { $gt: 3, $lte: 4 },
     });
     expect(mocks.nullifierFind).toHaveBeenCalledWith({
-      ledger: { $gt: 20, $lte: 25 },
+      block: { $gt: 20, $lte: 25 },
     });
     expect(snapshot.deposits).toHaveLength(1);
     expect(snapshot.spentNullifiers).toEqual([
       {
         nullifierHex: "aa".repeat(32),
-        ledger: 25,
+        block: 25,
         ts: indexedAt.toISOString(),
       },
     ]);
-    expect(snapshot.index.health).toBe("healthy");
-    expect(mocks.fetchPoolEventsSince).not.toHaveBeenCalled();
-    expect(mocks.simulateRead).not.toHaveBeenCalled();
+    expect(snapshot.index).toMatchObject({
+      poolAddress: POOL,
+      network: "eip155:10143",
+      publishedBlock: 25,
+      health: "healthy",
+    });
+    expect(mocks.fetchPoolLogs).not.toHaveBeenCalled();
+    expect(mocks.readContract).not.toHaveBeenCalled();
   });
 });

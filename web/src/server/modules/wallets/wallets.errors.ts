@@ -7,13 +7,6 @@ export class WalletConflictError extends Error {
   }
 }
 
-export class WalletDeploymentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "WalletDeploymentError";
-  }
-}
-
 export class WalletMigrationError extends Error {
   constructor(message: string) {
     super(message);

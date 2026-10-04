@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { isProtectedRoute } from "../lib/auth-routes";
-import { moneyGramBannerCopy } from "../lib/moneygram-status";
+import { chain } from "../lib/chain";
 import { DashboardBackground } from "./dashboard/DashboardBackground";
 import { DashboardShell } from "./dashboard/DashboardShell";
 import { PinDialog } from "./PinDialog";
@@ -28,14 +28,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isPay = pathname.startsWith("/pay");
   const protectedRoute = isProtectedRoute(pathname);
 
-  const moneyGramBanner =
-    protectedRoute && moneyGramBannerCopy ? (
+  const networkBanner =
+    protectedRoute && chain.testnet ? (
       <StickyBanner
         className="z-[80] min-h-10 border-b border-brand-linen/30 bg-brand-obsidian-secondary px-12 py-2 text-center text-sm font-medium text-brand-linen"
         hideOnScroll={false}
       >
-        <p role="status" aria-label="MoneyGram integration status">
-          {moneyGramBannerCopy}{" "}
+        <p role="status" aria-label="Network status">
+          Mawee is running on {chain.name}. Balances are test funds with no real
+          value.
         </p>
       </StickyBanner>
     ) : null;
@@ -58,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (pathname !== "/") {
       return (
         <div className="theme-product contents" data-product-theme="">
-          {moneyGramBanner}
+          {networkBanner}
           <div className="block w-full m-0 p-0">{children}</div>
           {usernameModal}
           {pinModal}
@@ -68,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     return (
       <>
-        {moneyGramBanner}
+        {networkBanner}
         <div className="block w-full m-0 p-0">{children}</div>
         {usernameModal}
         {pinModal}

@@ -9,7 +9,7 @@ export const depositOutput = z.object({
   commitmentHex: z.string(),
   ephemeralPkHex: z.string(),
   ciphertextHex: z.string(),
-  ledger: z.number(),
+  block: z.number(),
   txHash: z.string(),
   ts: z.string(),
 });
@@ -17,7 +17,7 @@ export const depositOutput = z.object({
 export const poolSnapshotInput = z
   .object({
     afterLeafIndex: z.number().int().gte(-1).optional(),
-    spentAfterLedger: z.number().int().nonnegative().optional(),
+    spentAfterBlock: z.number().int().nonnegative().optional(),
   })
   .optional();
 
@@ -26,14 +26,14 @@ export const poolSnapshotOutput = z.object({
   spentNullifiers: z
     .object({
       nullifierHex: z.string().regex(/^[0-9a-f]{64}$/),
-      ledger: z.number().int().nonnegative(),
+      block: z.number().int().nonnegative(),
       ts: z.string(),
     })
     .array(),
   index: z.object({
-    poolId: z.string(),
-    networkPassphrase: z.string(),
-    publishedLedger: z.number().int().nonnegative(),
+    poolAddress: z.string(),
+    network: z.string(),
+    publishedBlock: z.number().int().nonnegative(),
     publishedLeafIndex: z.number().int().gte(-1),
     indexedAt: z.string(),
     health: z.enum(["healthy", "stale", "degraded"]),

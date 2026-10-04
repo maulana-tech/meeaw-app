@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const POOL = "0x00000000000000000000000000000000000000B0";
+const SCOPE = `eip155:10143:${POOL.toLowerCase()}`;
+
 const mocks = vi.hoisted(() => ({
-  fetchPoolEventsSince: vi.fn(),
-  simulateRead: vi.fn(),
-  parseDepositEvent: vi.fn(),
-  parseSpentEvent: vi.fn(),
+  fetchPoolLogs: vi.fn(),
+  readContract: vi.fn(),
+  getBlock: vi.fn(),
   stateFindOneAndUpdate: vi.fn(),
   stateFindOne: vi.fn(),
   stateUpdateOne: vi.fn(),
@@ -15,13 +17,15 @@ const mocks = vi.hoisted(() => ({
   nullifierDeleteMany: vi.fn(),
 }));
 
-vi.mock("../src/lib/stellar", () => ({
-  fetchPoolEventsSince: mocks.fetchPoolEventsSince,
-  networkPassphrase: "Test SDF Network ; September 2015",
-  parseDepositEvent: mocks.parseDepositEvent,
-  parseSpentEvent: mocks.parseSpentEvent,
-  poolId: "CPOOL",
-  simulateRead: mocks.simulateRead,
+vi.mock("../src/lib/chain", () => ({
+  fetchPoolLogs: mocks.fetchPoolLogs,
+  network: "eip155:10143",
+  poolAddress: "0x00000000000000000000000000000000000000B0",
+  poolDeployBlock: 0n,
+  publicClient: {
+    readContract: mocks.readContract,
+    getBlock: mocks.getBlock,
+  },
 }));
 
 vi.mock("../src/server/db/mongo", () => ({
@@ -41,6 +45,19 @@ vi.mock("../src/server/db/mongo", () => ({
   })),
 }));
 
+const depositLog = (leafIndex: number, block: bigint) => ({
+  kind: "deposit",
+  blockNumber: block,
+  txHash: `0x${leafIndex}`,
+  logIndex: 0,
+  deposit: {
+    leafIndex,
+    commitment: new Uint8Array(32),
+    ephemeralPk: new Uint8Array(32),
+    ciphertext: new Uint8Array(4),
+  },
+});
+
 describe("syncPoolIndex", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,18 +66,19 @@ describe("syncPoolIndex", () => {
     }));
     mocks.stateFindOne.mockResolvedValue({
       _id: "pool",
-      poolId: "CPOOL",
-      publishedLedger: 10,
+      scope: SCOPE,
+      publishedBlock: 10,
       publishedLeafIndex: -1,
     });
     mocks.stateUpdateOne.mockResolvedValue({ acknowledged: true });
-    mocks.fetchPoolEventsSince.mockResolvedValue({
-      events: [],
-      scannedFromLedger: 11,
-      latestLedger: 12,
+    mocks.fetchPoolLogs.mockResolvedValue({
+      logs: [],
+      scannedTo: 12n,
+      latestBlock: 12n,
     });
-    mocks.simulateRead.mockResolvedValue(0);
+    mocks.readContract.mockResolvedValue(0);
     mocks.depositCount.mockResolvedValue(0);
+    mocks.getBlock.mockResolvedValue({ timestamp: 1_700_000_000n });
   });
 
   it("publishes a new watermark only after completeness succeeds", async () => {
@@ -70,12 +88,19 @@ describe("syncPoolIndex", () => {
     const result = await syncPoolIndex();
 
     expect(result.status).toBe("synced");
-    expect(result.toLedger).toBe(12);
+    expect(result.toBlock).toBe(12);
+    expect(mocks.fetchPoolLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ afterBlock: 10n }),
+    );
+    // The completeness check reads the leaf count at the scanned block.
+    expect(mocks.readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "nextIndex", blockNumber: 12n }),
+    );
     expect(mocks.stateUpdateOne).toHaveBeenCalledWith(
       expect.objectContaining({ _id: "pool" }),
       expect.objectContaining({
         $set: expect.objectContaining({
-          publishedLedger: 12,
+          publishedBlock: 12,
           publishedLeafIndex: -1,
           health: "healthy",
         }),
@@ -83,19 +108,43 @@ describe("syncPoolIndex", () => {
     );
   });
 
+  it("mirrors deposits with block timestamps", async () => {
+    mocks.fetchPoolLogs.mockResolvedValue({
+      logs: [depositLog(0, 11n), depositLog(1, 12n)],
+      scannedTo: 12n,
+      latestBlock: 12n,
+    });
+    mocks.readContract.mockResolvedValue(2);
+    mocks.depositCount.mockResolvedValue(2);
+    const { syncPoolIndex } = await import(
+      "../src/server/modules/deposits/deposits.service"
+    );
+    const result = await syncPoolIndex();
+
+    expect(result.status).toBe("synced");
+    expect(result.depositsUpserted).toBe(2);
+    const ops = mocks.depositBulkWrite.mock.calls[0][0];
+    expect(ops[1].updateOne.filter).toEqual({ _id: 1 });
+    expect(ops[1].updateOne.update.$set).toMatchObject({
+      block: 12,
+      txHash: "0x1",
+      ts: new Date(1_700_000_000_000),
+    });
+  });
+
   it("keeps the published watermark unchanged on a completeness gap", async () => {
-    mocks.simulateRead.mockResolvedValue(1);
+    mocks.readContract.mockResolvedValue(1);
     const { syncPoolIndex } = await import(
       "../src/server/modules/deposits/deposits.service"
     );
     const result = await syncPoolIndex();
 
     expect(result.status).toBe("degraded");
-    expect(result.toLedger).toBe(10);
+    expect(result.toBlock).toBe(10);
     expect(mocks.stateUpdateOne).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        $set: expect.objectContaining({ publishedLedger: 12 }),
+        $set: expect.objectContaining({ publishedBlock: 12 }),
       }),
     );
     expect(mocks.stateUpdateOne).toHaveBeenCalledWith(
@@ -106,63 +155,34 @@ describe("syncPoolIndex", () => {
     );
   });
 
-  it("marks nullifiers incomplete and degrades health on a retention gap", async () => {
-    mocks.fetchPoolEventsSince.mockResolvedValue({
-      events: [],
-      scannedFromLedger: 50,
-      latestLedger: 60,
-    });
+  it("resets the mirror when the configured pool changes", async () => {
+    mocks.stateFindOne
+      .mockResolvedValueOnce({
+        _id: "pool",
+        scope: "eip155:10143:0xold",
+        publishedBlock: 99,
+      })
+      .mockResolvedValue({ _id: "pool", scope: SCOPE, publishedBlock: 0 });
     const { syncPoolIndex } = await import(
       "../src/server/modules/deposits/deposits.service"
     );
-    const result = await syncPoolIndex();
+    await syncPoolIndex();
 
-    expect(result.status).toBe("synced");
-    expect(mocks.stateUpdateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: "pool" }),
-      expect.objectContaining({
-        $set: expect.objectContaining({
-          publishedLedger: 60,
-          nullifiersComplete: false,
-          health: "degraded",
-        }),
-      }),
-    );
-  });
-
-  it("keeps nullifiers incomplete sticky across a later clean sync", async () => {
-    mocks.stateFindOne.mockResolvedValue({
-      _id: "pool",
-      poolId: "CPOOL",
-      publishedLedger: 10,
-      publishedLeafIndex: -1,
-      nullifiersComplete: false,
-    });
-    const { syncPoolIndex } = await import(
-      "../src/server/modules/deposits/deposits.service"
-    );
-    const result = await syncPoolIndex();
-
-    expect(result.status).toBe("synced");
-    expect(mocks.stateUpdateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: "pool" }),
-      expect.objectContaining({
-        $set: expect.objectContaining({
-          nullifiersComplete: false,
-          health: "degraded",
-        }),
-      }),
+    expect(mocks.depositDeleteMany).toHaveBeenCalledWith({});
+    expect(mocks.nullifierDeleteMany).toHaveBeenCalledWith({});
+    expect(mocks.fetchPoolLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ afterBlock: 0n }),
     );
   });
 
   it("skips work when another worker owns the lease", async () => {
-    mocks.stateFindOneAndUpdate.mockResolvedValue(null);
+    mocks.stateFindOneAndUpdate.mockResolvedValue({ leaseOwner: "other" });
     const { syncPoolIndex } = await import(
       "../src/server/modules/deposits/deposits.service"
     );
     const result = await syncPoolIndex();
 
     expect(result.status).toBe("skipped");
-    expect(mocks.fetchPoolEventsSince).not.toHaveBeenCalled();
+    expect(mocks.fetchPoolLogs).not.toHaveBeenCalled();
   });
 });

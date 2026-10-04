@@ -1,8 +1,8 @@
 // @vitest-environment node
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { isSpent } from "../src/lib/chain";
 import { scanMyNotes } from "../src/lib/notes";
-import { isSpent } from "../src/lib/stellar";
 
 vi.mock("../src/lib/crypto", () => ({
   decryptNote: vi.fn(() => ({ amount: 5_000_000n, salt: 9n })),
@@ -29,7 +29,7 @@ vi.mock("../src/lib/poolMirror", () => ({
   loadPoolMirror: vi.fn(async () => mirror.value),
   refreshPoolMirror: vi.fn(async () => mirror.value),
 }));
-vi.mock("../src/lib/stellar", () => ({ isSpent: vi.fn(async () => false) }));
+vi.mock("../src/lib/chain", () => ({ isSpent: vi.fn(async () => false) }));
 
 const deposit = (leafIndex: number) => ({
   leafIndex,

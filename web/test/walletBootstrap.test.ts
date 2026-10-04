@@ -13,6 +13,7 @@ vi.mock("../src/server/modules/wallets/wallets.service", () => ({
   saveEscrow: vi.fn(),
 }));
 
+import { getAddress } from "viem";
 import { walletsRouter } from "../src/server/modules/wallets/wallets.router";
 
 const claim = {
@@ -31,42 +32,26 @@ const caller = walletsRouter.createCaller({
   authError: null,
 });
 
+const WALLET = getAddress("0x5a0b54d5dc17e0aadc383d2db43b0a0d3e029c4c");
+
 describe("wallet bootstrap router", () => {
   it("restores an old account from the authenticated Privy identity", async () => {
-    const key = Keypair.random().publicKey();
-    const contract = StrKey.encodeContract(Buffer.alloc(32, 3));
-    mocks.restore.mockResolvedValue({
-      contractId: contract,
-      privyWalletId: "wallet-current",
-      privyWalletAddress: key,
-    });
+    mocks.restore.mockResolvedValue({ address: WALLET });
 
-    await expect(caller.restore()).resolves.toEqual({
-      contractId: contract,
-      privyWalletId: "wallet-current",
-      privyWalletAddress: key,
-    });
+    await expect(caller.restore()).resolves.toEqual({ address: WALLET });
     expect(mocks.restore).toHaveBeenCalledWith(claim.user_id);
   });
 
-  it("derives identity from protected context and returns the idempotent mapping", async () => {
-    const key = Keypair.random().publicKey();
-    const contract = StrKey.encodeContract(Buffer.alloc(32, 4));
-    mocks.bootstrap.mockResolvedValue({
-      contractId: contract,
-      privyWalletId: "wallet-1",
-      privyWalletAddress: key,
-    });
-    const result = await caller.bootstrap({
-      privyWalletId: "wallet-1",
-      privyWalletAddress: key,
-    });
+  it("derives identity from protected context and checksums the wallet", async () => {
+    mocks.bootstrap.mockResolvedValue({ address: WALLET });
+    const result = await caller.bootstrap({ address: WALLET.toLowerCase() });
     expect(mocks.bootstrap).toHaveBeenCalledWith(claim.user_id, {
-      privyWalletId: "wallet-1",
-      privyWalletAddress: key,
+      address: WALLET,
     });
-    expect(result.contractId).toBe(contract);
+    expect(result.address).toBe(WALLET);
+  });
+
+  it("rejects a non-EVM wallet address", async () => {
+    await expect(caller.bootstrap({ address: "GABCDEF" })).rejects.toThrow();
   });
 });
-
-import { Keypair, StrKey } from "@stellar/stellar-sdk";

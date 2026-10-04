@@ -5,17 +5,10 @@ import { Loader } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import {
-  commitment,
-  encryptNote,
-  fromBE,
-  randomFieldElement,
-  toBaseUnits,
-  toBE32,
-} from "../lib/crypto";
+import { usdcBalance } from "../lib/chain";
+import { toBaseUnits } from "../lib/crypto";
+import { payIntoNote } from "../lib/deposit";
 import { accountPubkeys, getAccount } from "../lib/notes";
-import { proveDeposit } from "../lib/prover";
-import { poolDeposit, usdcBalance } from "../lib/stellar";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -58,35 +51,16 @@ export function DepositForm() {
         return;
       }
       const units = toBaseUnits(amount);
-      const signer = getSigner();
+      const signer = await getSigner();
       if ((await usdcBalance(signer.address)) < units) {
         setStatus({
           kind: "err",
-          msg: "Not enough testnet USDC. Add a trustline and fund at faucet.circle.com.",
+          msg: "Not enough USDC in your Mawee wallet.",
         });
         return;
       }
 
-      const { notePubkey, viewPubkey } = await accountPubkeys(acct);
-      const salt = randomFieldElement();
-      const ownerPkField = fromBE(notePubkey);
-      const note = toBE32(await commitment(units, ownerPkField, salt));
-      const { proof } = await proveDeposit({
-        commitment: fromBE(note).toString(),
-        amount: units.toString(),
-        ownerPk: ownerPkField.toString(),
-        salt: salt.toString(),
-      });
-      const { ephemeralPk, ciphertext } = encryptNote(viewPubkey, units, salt);
-
-      const leafIndex = await poolDeposit(
-        signer,
-        note,
-        units,
-        proof,
-        ephemeralPk,
-        ciphertext,
-      );
+      await payIntoNote(signer, await accountPubkeys(acct), units);
       setStatus({
         kind: "ok",
         msg: `Shielded ${amount} USDC into your account.`,

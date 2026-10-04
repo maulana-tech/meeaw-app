@@ -6,13 +6,13 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
-    "contract:build": "stellar contract build",
-    "contract:test": "cargo test --workspace",
-    "deploy:testnet": "./scripts/deploy-testnet.sh",
-    "reset:testnet": "./scripts/reset-testnet.sh"
+    "contract:build": "pnpm --filter contracts build",
+    "contract:test": "pnpm --filter contracts test",
+    "deploy:testnet": "pnpm --filter contracts deploy:testnet"
   },
   "workspaces": [
-    "web"
+    "web",
+    "contracts"
   ],
   "dependencies": {
     "@fontsource/aileron": "^5.2.5"
@@ -20,6 +20,13 @@
   "pnpm": {
     "overrides": {
       "viem": "2.52.0"
+    },
+    "packageExtensions": {
+      "@hookform/resolvers": {
+        "peerDependencies": {
+          "zod": "*"
+        }
+      }
     }
   }
 }
