@@ -12,6 +12,36 @@ This repository is the testnet implementation. It contains the Solidity
 contracts, zero-knowledge circuits, browser app, payment-link database, and
 Privy authentication with user-owned embedded wallets.
 
+## Monad Metropolis Hackathon
+
+Mawee submits to the **Consumer Products & Payments** track ($30k, 3 winners of
+$10k). The track asks for a consumer financial experience where the blockchain
+stays invisible; Mawee's core flow — share a link, get paid, money lands in a
+private balance — is exactly that, and payment mechanics settle on-chain
+(deposit → shielded note → withdrawal) rather than being simulated.
+
+Judging criteria and how Mawee answers them:
+
+| Criterion | Weight | Mawee's answer |
+| --- | --- | --- |
+| Technical Execution | 20% | Real on-chain settlement: `MaweePool` holds USDC, verifies Groth16 proofs from the same zkey the browser uses, nullifiers prevent double-spends. |
+| Design & Craft | 20% | Username onboarding, no seed phrase, no gas (relayer sponsors), QR/payment links a non-crypto client can pay from any EVM wallet. |
+| Originality & Track Insight | 15% | Not a rebranded wallet: unlinkable deposit→withdrawal for freelancers who don't want their income public. |
+| Founder & Market Readiness | 25% | Named segment — freelancers and small businesses invoicing in USDC who value payment privacy. |
+| Traction & Path Forward | 20% | Testnet live; see [docs/hackathon.md](docs/hackathon.md) for the current status of each deliverable. |
+
+Bounties claimed (track-agnostic, they stack):
+
+| Bounty | Prize | Why it qualifies |
+| --- | --- | --- |
+| **Mera: One Passkey, Many Keys** (chosen) | $2,500 | The passkey's PRF output is HKDF-namespaced into *non-account* keys: the Poseidon note secret (`mawee.owner.v1`) and x25519 viewing key (`mawee.view.v1`). Nothing sensitive is persisted — secrets live in page memory only, so a fresh profile + the same passkey reconstructs the same keys. See [docs/reference.md](docs/reference.md#passkey-derived-keys-mera-prf). |
+| **Best Use of Envio** | $1,000 | `indexer/` is an Envio HyperIndex powering note discovery, the anonymity set, and dashboard aggregates. |
+| Privy | — | Used for sign-in and embedded wallets, but kept as authentication only; not claimed. |
+| Alchemy | — | Optional relayer RPC only; not claimed. |
+
+Full criteria, deliverables checklist, and demo plan live in
+[docs/hackathon.md](docs/hackathon.md).
+
 ## What Mawee Protects
 
 Public blockchains make payment relationships easy to inspect. If a business

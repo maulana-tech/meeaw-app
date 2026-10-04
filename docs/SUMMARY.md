@@ -27,5 +27,6 @@
 
 * [FAQs](faqs.md)
 * [Glossary](glossary.md)
+* [Monad Metropolis Hackathon](hackathon.md)
 * [Developer Reference](reference.md)
 * [Local Setup](local-setup.md)

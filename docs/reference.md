@@ -68,7 +68,9 @@ New accounts choose how their privacy keys are protected:
   x25519 viewing key (`mawee.view.v1`) from it. The server stores only the
   credential id, transports and the viewing **public** key; on a new device
   the same synced passkey re-derives the keys, which must reproduce that
-  viewing key. No secret is stored anywhere.
+  viewing key. No secret is stored anywhere — the derived note and viewing
+  secrets live in the page's memory only, so a reload re-locks the account
+  and the same passkey (or PIN) re-derives the identical keys.
 * **PIN** — a random master encrypted with argon2id + AES-GCM and escrowed.
 
 The two are mutually exclusive per account. Passkeys are bound to the site's

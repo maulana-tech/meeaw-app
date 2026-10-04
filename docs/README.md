@@ -38,5 +38,9 @@ Mawee is currently running on **testnet** — a practice version of the network 
 play money, so we can test everything before real funds are involved. Some things
 will change before launch, and we'll always tell you what's real and what isn't.
 
+Building or judging Mawee? See
+[Monad Metropolis Hackathon](hackathon.md) for the track we're submitting to,
+the bounties we claim, and the deliverables checklist.
+
 We'll also never ask for your PIN, seed phrase, or passwords. Anyone who does is
 not us. Pinky promise.
