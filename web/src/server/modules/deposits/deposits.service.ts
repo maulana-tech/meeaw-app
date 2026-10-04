@@ -11,6 +11,7 @@ import {
   fetchPoolLogs,
   network,
   publicClient,
+  registryAddress,
 } from "../../../lib/chain";
 import { bytesToHex } from "../../../lib/crypto";
 import {
@@ -31,6 +32,7 @@ import {
   envioNotesAfter,
   envioNullifiersBetween,
   envioPoolStats,
+  envioRegistryAccounts,
 } from "../../lib/envio";
 import { DepositIndexGapError, UnknownPoolError } from "./deposits.errors";
 import type {
@@ -47,11 +49,13 @@ const MAX_CHUNKS_PER_RUN = 400;
 
 const startBlock = (pool: PoolDescriptor) => Math.max(0, pool.deployBlock - 1);
 
-/** Envio indexes the active pool; legacy pools use the RPC poller (Task 5 widens Envio). */
-const servedByEnvio = (pool: PoolDescriptor) =>
-  envioConfigured() && pool.role === "active";
+/**
+ * With Envio configured it serves every manifest pool (its config must list
+ * all of them, legacy included); otherwise the RPC poller mirrors each pool.
+ */
+const servedByEnvio = (_pool: PoolDescriptor) => envioConfigured();
 
-function resolveSnapshotPool(scope: string | undefined): PoolDescriptor {
+function resolvePoolScope(scope: string | undefined): PoolDescriptor {
   if (scope === undefined) return activePool();
   const pool = findPool(scope);
   if (!pool) throw new UnknownPoolError();
@@ -357,6 +361,7 @@ function toDate(value: string | number | null): Date | null {
  * watermark; rows beyond it are excluded so client watermarks never skip data.
  */
 async function getEnvioSnapshot(
+  pool: PoolDescriptor,
   afterLeafIndex: number,
   spentAfterBlock: number,
 ): Promise<PoolSnapshotOutput> {
@@ -364,12 +369,13 @@ async function getEnvioSnapshot(
   const publishedBlock = meta?.progressBlock ?? 0;
   const [notes, spent] = meta
     ? await Promise.all([
-        envioNotesAfter(afterLeafIndex, publishedBlock),
-        envioNullifiersBetween(spentAfterBlock, publishedBlock),
+        envioNotesAfter(pool.scope, afterLeafIndex, publishedBlock),
+        envioNullifiersBetween(pool.scope, spentAfterBlock, publishedBlock),
       ])
     : [[], []];
 
-  // Merkle proofs need every leaf, so only publish a contiguous prefix.
+  // Merkle proofs need every leaf, so only publish a contiguous prefix. The
+  // notes are this pool's only, so another pool's leaf can never fill a gap.
   const deposits: DepositOutput[] = [];
   let expected = afterLeafIndex + 1;
   for (const note of notes) {
@@ -397,12 +403,12 @@ async function getEnvioSnapshot(
   return {
     deposits,
     spentNullifiers: spent.map((row) => ({
-      nullifierHex: strip0x(row.id),
+      nullifierHex: strip0x(row.nullifier),
       block: row.blockNumber,
       ts: new Date(row.timestamp * 1000).toISOString(),
     })),
     index: {
-      poolAddress: activePool().address,
+      poolAddress: pool.address,
       network,
       // A gap means a later leaf is missing; hold the spend watermark back so
       // nothing is skipped once the gap fills.
@@ -414,10 +420,16 @@ async function getEnvioSnapshot(
   };
 }
 
-/** Active-pool privacy stats (anonymity set etc.). */
-export async function getPoolStats(): Promise<PoolStatsOutput> {
+/** Privacy stats (anonymity set etc.) for one pool, the active pool by default. */
+export async function getPoolStats(
+  poolScope?: string,
+): Promise<PoolStatsOutput> {
+  const pool = resolvePoolScope(poolScope);
   if (envioConfigured()) {
-    const stats = await envioPoolStats();
+    const [stats, accounts] = await Promise.all([
+      envioPoolStats(pool.scope),
+      envioRegistryAccounts(`${chain.id}:${registryAddress.toLowerCase()}`),
+    ]);
     return {
       source: "envio",
       notes: stats?.notes ?? 0,
@@ -425,7 +437,8 @@ export async function getPoolStats(): Promise<PoolStatsOutput> {
       anonymitySet: stats?.anonymitySet ?? 0,
       withdrawals: stats?.withdrawals ?? null,
       shieldedTransfers: stats?.shieldedTransfers ?? null,
-      accounts: stats?.accounts ?? null,
+      merges: stats?.merges ?? null,
+      accounts,
       paused: stats?.paused ?? false,
     };
   }
@@ -433,7 +446,7 @@ export async function getPoolStats(): Promise<PoolStatsOutput> {
     getDeposits(),
     getSpentNullifiers(),
   ]);
-  const { scope } = activePool();
+  const { scope } = pool;
   const [notes, spent] = await Promise.all([
     deposits.countDocuments({ scope }),
     nullifiers.countDocuments({ scope }),
@@ -445,6 +458,7 @@ export async function getPoolStats(): Promise<PoolStatsOutput> {
     anonymitySet: Math.max(0, notes - spent),
     withdrawals: null,
     shieldedTransfers: null,
+    merges: null,
     accounts: null,
     paused: false,
   };
@@ -459,9 +473,9 @@ export async function getPoolSnapshot(
   spentAfterBlock: number,
   poolScope?: string,
 ): Promise<PoolSnapshotOutput> {
-  const pool = resolveSnapshotPool(poolScope);
+  const pool = resolvePoolScope(poolScope);
   if (servedByEnvio(pool)) {
-    return getEnvioSnapshot(afterLeafIndex, spentAfterBlock);
+    return getEnvioSnapshot(pool, afterLeafIndex, spentAfterBlock);
   }
   const startedAt = Date.now();
   const [states, deposits, nullifiers] = await Promise.all([

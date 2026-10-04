@@ -45,6 +45,15 @@ export const poolSnapshotOutput = z.object({
   }),
 });
 
+export const poolStatsInput = z
+  .object({
+    pool: z
+      .string()
+      .regex(/^\d{1,16}:0x[0-9a-f]{40}$/)
+      .optional(),
+  })
+  .optional();
+
 export const poolStatsOutput = z.object({
   source: z.enum(["envio", "rpc"]),
   notes: z.number().int().nonnegative(),
@@ -52,6 +61,8 @@ export const poolStatsOutput = z.object({
   anonymitySet: z.number().int().nonnegative(),
   withdrawals: z.number().int().nonnegative().nullable(),
   shieldedTransfers: z.number().int().nonnegative().nullable(),
+  // Private two-into-one consolidations; never counted as transfers.
+  merges: z.number().int().nonnegative().nullable(),
   accounts: z.number().int().nonnegative().nullable(),
   paused: z.boolean(),
 });

@@ -6,6 +6,7 @@ import {
   listDepositsInput,
   poolSnapshotInput,
   poolSnapshotOutput,
+  poolStatsInput,
   poolStatsOutput,
 } from "./deposits.schema";
 import {
@@ -36,8 +37,9 @@ export const depositsRouter = createTRPCRouter({
       ).catch(mapError),
     ),
   stats: publicProcedure
+    .input(poolStatsInput)
     .output(poolStatsOutput)
-    .query(() => getPoolStats().catch(mapError)),
+    .query(({ input }) => getPoolStats(input?.pool).catch(mapError)),
   list: publicProcedure
     .input(listDepositsInput)
     .output(depositOutput.array())

@@ -60,7 +60,7 @@ export type EnvioNote = {
 };
 
 export type EnvioNullifier = {
-  id: string;
+  nullifier: string;
   blockNumber: number;
   timestamp: number;
 };
@@ -71,8 +71,8 @@ export type EnvioPoolStats = {
   anonymitySet: number;
   withdrawals: number;
   shieldedTransfers: number;
+  merges: number;
   totalWithdrawn: string;
-  accounts: number;
   paused: boolean;
   updatedAt: number;
 };
@@ -92,7 +92,11 @@ export async function envioMeta(chainId: number): Promise<EnvioMeta | null> {
   return data._meta[0] ?? null;
 }
 
+// Every pool query is filtered by `pool` (`${chainId}:${address}`): several
+// pools share one indexer, and leaf indices repeat across them.
+
 export async function envioNotesAfter(
+  pool: string,
   afterLeafIndex: number,
   maxBlock: number,
 ): Promise<EnvioNote[]> {
@@ -100,14 +104,18 @@ export async function envioNotesAfter(
   let cursor = afterLeafIndex;
   for (;;) {
     const data = await envioQuery<{ Note: EnvioNote[] }>(
-      `query Notes($after: Int!, $maxBlock: Int!, $limit: Int!) {
+      `query Notes($pool: String!, $after: Int!, $maxBlock: Int!, $limit: Int!) {
         Note(
-          where: { leafIndex: { _gt: $after }, blockNumber: { _lte: $maxBlock } }
+          where: {
+            pool: { _eq: $pool }
+            leafIndex: { _gt: $after }
+            blockNumber: { _lte: $maxBlock }
+          }
           order_by: { leafIndex: asc }
           limit: $limit
         ) { leafIndex commitment ephemeralPk ciphertext blockNumber timestamp txHash }
       }`,
-      { after: cursor, maxBlock, limit: PAGE },
+      { pool, after: cursor, maxBlock, limit: PAGE },
     );
     out.push(...data.Note);
     if (data.Note.length < PAGE) return out;
@@ -116,6 +124,7 @@ export async function envioNotesAfter(
 }
 
 export async function envioNullifiersBetween(
+  pool: string,
   afterBlock: number,
   maxBlock: number,
 ): Promise<EnvioNullifier[]> {
@@ -123,15 +132,18 @@ export async function envioNullifiersBetween(
   let offset = 0;
   for (;;) {
     const data = await envioQuery<{ Nullifier: EnvioNullifier[] }>(
-      `query Spent($after: Int!, $maxBlock: Int!, $limit: Int!, $offset: Int!) {
+      `query Spent($pool: String!, $after: Int!, $maxBlock: Int!, $limit: Int!, $offset: Int!) {
         Nullifier(
-          where: { blockNumber: { _gt: $after, _lte: $maxBlock } }
+          where: {
+            pool: { _eq: $pool }
+            blockNumber: { _gt: $after, _lte: $maxBlock }
+          }
           order_by: [{ blockNumber: asc }, { id: asc }]
           limit: $limit
           offset: $offset
-        ) { id blockNumber timestamp }
+        ) { nullifier blockNumber timestamp }
       }`,
-      { after: afterBlock, maxBlock, limit: PAGE, offset },
+      { pool, after: afterBlock, maxBlock, limit: PAGE, offset },
     );
     out.push(...data.Nullifier);
     if (data.Nullifier.length < PAGE) return out;
@@ -139,14 +151,30 @@ export async function envioNullifiersBetween(
   }
 }
 
-export async function envioPoolStats(): Promise<EnvioPoolStats | null> {
+export async function envioPoolStats(
+  pool: string,
+): Promise<EnvioPoolStats | null> {
   const data = await envioQuery<{ PoolStats: EnvioPoolStats[] }>(
-    `query Stats {
-      PoolStats(where: { id: { _eq: "global" } }) {
-        notes spent anonymitySet withdrawals shieldedTransfers totalWithdrawn
-        accounts paused updatedAt
+    `query Stats($pool: ID!) {
+      PoolStats(where: { id: { _eq: $pool } }) {
+        notes spent anonymitySet withdrawals shieldedTransfers merges
+        totalWithdrawn paused updatedAt
       }
     }`,
+    { pool },
   );
   return data.PoolStats[0] ?? null;
+}
+
+/** Registry accounts, scoped `${chainId}:${registry address}`. */
+export async function envioRegistryAccounts(
+  registry: string,
+): Promise<number | null> {
+  const data = await envioQuery<{ RegistryStats: { accounts: number }[] }>(
+    `query Registry($registry: ID!) {
+      RegistryStats(where: { id: { _eq: $registry } }) { accounts }
+    }`,
+    { registry },
+  );
+  return data.RegistryStats[0]?.accounts ?? null;
 }
