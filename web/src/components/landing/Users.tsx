@@ -9,36 +9,47 @@ import {
 } from "lucide-react";
 import { Frame, MonoLabel } from "./primitives";
 
-const AUDIENCES: { icon: LucideIcon; title: string; body: string }[] = [
+const AUDIENCES: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  keepsPrivate: string;
+}[] = [
   {
     icon: PenTool,
     title: "Freelancers",
     body: "Invoice international clients without exposing your rates.",
+    keepsPrivate: "Your rates",
   },
   {
     icon: UsersIcon,
     title: "Creators",
     body: "Accept tips and sales without publishing your revenue.",
+    keepsPrivate: "Your revenue",
   },
   {
     icon: Building2,
     title: "Agencies",
     body: "Bill clients without revealing who else you work with.",
+    keepsPrivate: "Your client list",
   },
   {
     icon: Store,
     title: "Online stores",
     body: "Take stablecoin payments and keep your books to yourself.",
+    keepsPrivate: "Your sales volume",
   },
   {
     icon: Globe2,
     title: "Remote teams",
     body: "Get paid across borders in minutes, not days.",
+    keepsPrivate: "Your salary",
   },
   {
     icon: Briefcase,
     title: "Consultants",
     body: "Send fixed-price payment links for each engagement.",
+    keepsPrivate: "Your engagements",
   },
 ];
 
@@ -65,26 +76,55 @@ export function Users() {
           </div>
           <p className="max-w-[48ch] self-end text-lg leading-relaxed text-graphite/75">
             If your invoices land on a public blockchain, so does your business.
-            Mawee gives you the speed of{" "}
-            <span className="text-nebula font-medium">stablecoin payments</span>{" "}
-            without turning your income into public data.
+            Mawee gives you the speed of stablecoin payments without turning
+            your income into public data.
           </p>
         </div>
-        <ul className="mt-16 grid list-none gap-x-10 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
-          {AUDIENCES.map(({ icon: Icon, title, body }) => (
-            <li key={title} data-ed-article>
-              <span
-                aria-hidden="true"
-                className="flex size-10 items-center justify-center rounded-full border border-violet/60 text-violet"
-              >
-                <Icon className="size-[18px]" strokeWidth={1.6} />
-              </span>
-              <h3 className="mt-6 text-xl font-normal tracking-tight">
+
+        {/* 1px gaps over a tinted background draw the hairline grid. */}
+        <ul className="mt-16 grid list-none gap-px overflow-hidden rounded-2xl border border-graphite/10 bg-graphite/10 sm:grid-cols-2 lg:grid-cols-3">
+          {AUDIENCES.map(({ icon: Icon, title, body, keepsPrivate }, index) => (
+            <li
+              key={title}
+              data-ed-article
+              className="group flex flex-col bg-mist p-7 transition-colors duration-200 hover:bg-white sm:p-8"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  aria-hidden="true"
+                  className="flex size-11 items-center justify-center rounded-xl border border-graphite/15 bg-white text-graphite transition-colors duration-200 group-hover:border-violet group-hover:bg-violet group-hover:text-white"
+                >
+                  <Icon className="size-5" strokeWidth={1.6} />
+                </span>
+                <MonoLabel
+                  aria-hidden="true"
+                  className="text-graphite/40 tabular-nums"
+                >
+                  {String(index + 1).padStart(2, "0")}
+                </MonoLabel>
+              </div>
+
+              <h3 className="mt-10 text-2xl font-normal tracking-tight">
                 {title}
               </h3>
-              <p className="mt-2 max-w-[34ch] text-[15px] leading-relaxed text-graphite/65">
+              <p className="mt-3 max-w-[34ch] flex-1 text-[15px] leading-relaxed text-graphite/65">
                 {body}
               </p>
+
+              <dl className="mt-8 flex items-center justify-between gap-4 border-t border-dashed border-graphite/15 pt-5">
+                <dt>
+                  <MonoLabel className="text-[11px] text-graphite/50">
+                    Stays private
+                  </MonoLabel>
+                </dt>
+                <dd className="flex items-center gap-2 text-sm font-medium">
+                  <span
+                    aria-hidden="true"
+                    className="size-1.5 rounded-full bg-violet"
+                  />
+                  {keepsPrivate}
+                </dd>
+              </dl>
             </li>
           ))}
         </ul>
