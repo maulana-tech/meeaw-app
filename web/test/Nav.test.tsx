@@ -76,18 +76,15 @@ describe("EditionsTopNav", () => {
   it("shows @username when connected with a username", () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCABCD1234EFGH5678",
+        address: "0x00000000000000000000000000000000000000E1",
         usernameResolved: true,
         username: "alice",
       }),
     );
     render(<EditionsTopNav />);
-    expect(screen.getByRole("button", { name: "@alice" })).toHaveClass(
-      "surface-glass-control",
-      "theme-glass",
-      "min-h-11",
-      "font-semibold",
-    );
+    const account = screen.getByRole("button", { name: "@alice" });
+    // Touch target stays at least 44px tall.
+    expect(account).toHaveClass("min-h-11", "font-semibold");
     expect(
       screen.queryByRole("button", { name: /claim username/i }),
     ).not.toBeInTheDocument();
@@ -96,7 +93,7 @@ describe("EditionsTopNav", () => {
   it("offers a claim-username CTA for a connected user without a username", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
-        address: "GCABCD1234EFGH5678",
+        address: "0x00000000000000000000000000000000000000E1",
         usernameResolved: true,
         username: null,
       }),

@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { glassButtonClass } from "@/components/ui/glass";
 import { cn } from "@/lib/utils";
 import { useWallet } from "../WalletProvider";
 
@@ -111,7 +110,7 @@ export function EditionsTopNav() {
                 aria-hidden="true"
               />
             )}
-            {connecting ? "Signing in" : "Sign in"}
+            {connecting ? "Signing in…" : "Sign in"}
           </button>
         )}
       </div>

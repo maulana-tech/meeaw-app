@@ -156,6 +156,7 @@ export function ReceiptTokenStack({
 
   return (
     <span
+      role="img"
       className={cn("inline-flex items-center", className)}
       aria-label={
         placeholder ? "No private receipts yet" : `${total} private receipts`
@@ -163,6 +164,9 @@ export function ReceiptTokenStack({
     >
       {visibleSeeds.map((seed, index) => (
         <ReceiptToken
+          // Seeds can repeat; the position is part of the identity of this
+          // fixed, never-reordered list of at most three tokens.
+          // biome-ignore lint/suspicious/noArrayIndexKey: see above
           key={`${seed}-${index}`}
           seed={seed}
           placeholder={placeholder}

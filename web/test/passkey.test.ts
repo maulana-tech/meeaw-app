@@ -3,7 +3,7 @@ import type { WebAuthnClient } from "@category-labs/mera";
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { describe, expect, it } from "vitest";
-import { bytesToHex } from "../src/lib/crypto";
+import { bytesToHex, hexToBytes } from "../src/lib/crypto";
 import { deriveNoteSecrets } from "../src/lib/keys";
 import {
   createPasskeyMaster,
@@ -53,9 +53,7 @@ function fakeKeychain(options: { prf?: boolean } = {}) {
         throw new Error("NotAllowedError");
       }
       return {
-        credentialId: new Uint8Array(
-          wanted.match(/../g)!.map((h) => Number.parseInt(h, 16)),
-        ),
+        credentialId: hexToBytes(wanted),
         prfOutput:
           options.prf === false
             ? undefined

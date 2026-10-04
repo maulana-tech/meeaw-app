@@ -132,6 +132,17 @@ export function BalanceCard({
       footer={
         <div className="flex items-center gap-2">
           <CurrencySelector />
+          {onReceive ? (
+            <button
+              type="button"
+              className={controlClass}
+              onClick={onReceive}
+              aria-label="Receive payment"
+              title="Receive payment"
+            >
+              <QrCode className="size-5" aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             type="button"
             className={controlClass}

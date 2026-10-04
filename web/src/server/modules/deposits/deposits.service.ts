@@ -374,12 +374,7 @@ async function getEnvioSnapshot(
       publishedBlock: gap ? Math.max(0, spentAfterBlock) : publishedBlock,
       publishedLeafIndex: expected - 1,
       indexedAt: (indexedAt ?? new Date(0)).toISOString(),
-      health:
-        !meta || !meta.isReady || gap
-          ? "degraded"
-          : stale
-            ? "stale"
-            : "healthy",
+      health: !meta?.isReady || gap ? "degraded" : stale ? "stale" : "healthy",
     },
   };
 }

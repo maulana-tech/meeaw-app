@@ -6,14 +6,16 @@ import { usePaymentLink } from "../src/features/paymentLinks/hooks/usePaymentLin
 import { renderWithTRPC } from "./renderWithTRPC";
 
 function HookConsumer() {
-  const link = usePaymentLink(null);
+  const { link, loading } = usePaymentLink(null);
   const { isCreating } = useCreatePaymentLink();
-  return <div>{`${link === null ? "no-link" : "link"}:${isCreating}`}</div>;
+  return (
+    <div>{`${link === null ? "no-link" : "link"}:${loading}:${isCreating}`}</div>
+  );
 }
 
 describe("renderWithTRPC", () => {
   it("provides the tRPC + React Query context to hook-using components", () => {
     renderWithTRPC(<HookConsumer />);
-    expect(screen.getByText("no-link:false")).toBeInTheDocument();
+    expect(screen.getByText("no-link:false:false")).toBeInTheDocument();
   });
 });
