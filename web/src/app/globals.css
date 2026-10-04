@@ -124,6 +124,26 @@
   }
 }
 
+@keyframes mawee-step-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes mawee-mock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @layer utilities {
   /* Film grain over the landing gradients (Galxe-style nebula). */
   .grain::after {
