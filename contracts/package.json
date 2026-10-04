@@ -1,0 +1,24 @@
+{
+  "name": "contracts",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "verifiers": "node scripts/export-verifiers.cjs"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-viem": "2",
+    "@types/chai": "4",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.2",
+    "chai": "4",
+    "circomlibjs": "^0.1.7",
+    "hardhat": "2",
+    "poseidon-solidity": "^0.0.5",
+    "snarkjs": "^0.7.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "viem": "2.52.0"
+  }
+}
