@@ -57,6 +57,27 @@ Rate limits (per IP for public calls, per Privy user for account calls) bound
 abuse. Typed-data definitions live in `web/src/lib/typedData.ts` and are reused
 by the contract tests.
 
+## Passkey-derived keys (Mera PRF)
+
+New accounts choose how their privacy keys are protected:
+
+* **Passkey (recommended)** — `@category-labs/mera` runs one WebAuthn PRF
+  ceremony with the salt `sha256("mawee.prf.privacy-master.v1")`.
+  `master = HKDF-SHA512(prfOutput, info="mawee.master.passkey.v1")`, and
+  `keys.ts` derives the Poseidon note secret (`mawee.owner.v1`) and the
+  x25519 viewing key (`mawee.view.v1`) from it. The server stores only the
+  credential id, transports and the viewing **public** key; on a new device
+  the same synced passkey re-derives the keys, which must reproduce that
+  viewing key. No secret is stored anywhere.
+* **PIN** — a random master encrypted with argon2id + AES-GCM and escrowed.
+
+The two are mutually exclusive per account. Passkeys are bound to the site's
+host (`rpId = location.hostname`), so `localhost` and production derive
+different keys. PRF needs iCloud Keychain, Google Password Manager,
+Windows Hello (recent), 1Password or a YubiKey 5.2+; Chrome's local-profile
+authenticator, Bitwarden and Dashlane don't support it — the PIN path covers
+those.
+
 ## Indexing (Envio HyperIndex)
 
 `indexer/` is an Envio HyperIndex project (config, schema, handlers, tests).

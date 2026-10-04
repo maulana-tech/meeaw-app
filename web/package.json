@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@category-labs/mera": "0.2.0",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "^5.4.0",
     "@noble/ciphers": "^2.2.0",

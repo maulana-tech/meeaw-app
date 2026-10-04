@@ -30,11 +30,14 @@ import { DashboardPageHeader } from "./DashboardPageHeader";
 import { DashboardTile } from "./DashboardTile";
 
 export function SettingsDashboard() {
-  const { username, disconnect } = useWallet();
+  const { username, disconnect, recoveryMethod } = useWallet();
   const [changePinOpen, setChangePinOpen] = useState(false);
   const { changeRecoveryPin, validateCurrentPin, isChanging } =
     useChangeRecoveryPin();
   const escrowQuery = trpc.wallets.getEscrow.useQuery();
+  const passkeyQuery = trpc.wallets.getPasskey.useQuery();
+  const passkeyProtected =
+    recoveryMethod === "passkey" || Boolean(passkeyQuery.data);
 
   return (
     <>
@@ -46,8 +49,9 @@ export function SettingsDashboard() {
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 pb-16 md:grid-cols-2 lg:grid-cols-12 lg:gap-5">
         <IdentityTile username={username} />
         <RecoveryTile
-          protectedRecovery={Boolean(escrowQuery.data)}
-          loading={escrowQuery.isLoading}
+          method={passkeyProtected ? "passkey" : "pin"}
+          protectedRecovery={passkeyProtected || Boolean(escrowQuery.data)}
+          loading={escrowQuery.isLoading || passkeyQuery.isLoading}
           onChangePin={() => setChangePinOpen(true)}
         />
         <SessionTile onSignOut={disconnect} />
@@ -103,10 +107,12 @@ function IdentityTile({ username }: { username: string | null }) {
 }
 
 function RecoveryTile({
+  method,
   protectedRecovery,
   loading,
   onChangePin,
 }: {
+  method: "passkey" | "pin";
   protectedRecovery: boolean;
   loading: boolean;
   onChangePin: () => void;
@@ -121,7 +127,7 @@ function RecoveryTile({
             <TileHeading
               inverse
               icon={<KeyRound className="size-5" aria-hidden="true" />}
-              title="Recovery PIN"
+              title={method === "passkey" ? "Recovery passkey" : "Recovery PIN"}
             />
             {loading ? (
               <Badge appearance="glass" className="gap-1.5">
@@ -148,20 +154,24 @@ function RecoveryTile({
             <p className="font-heading text-3xl font-semibold tracking-tight">
               {loading
                 ? "Checking your recovery setup…"
-                : protectedRecovery
-                  ? "Protected by your recovery PIN"
-                  : "Set up your recovery PIN"}
+                : method === "passkey"
+                  ? "Protected by your passkey"
+                  : protectedRecovery
+                    ? "Protected by your recovery PIN"
+                    : "Set up your recovery PIN"}
             </p>
             <p className="mt-4 text-sm leading-6 text-brand-linen/70">
-              {protectedRecovery
-                ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
-                : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
+              {method === "passkey"
+                ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Mawee stores nothing secret."
+                : protectedRecovery
+                  ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
+                  : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
             </p>
           </div>
         }
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
-            {protectedRecovery && !loading ? (
+            {method === "pin" && protectedRecovery && !loading ? (
               <Button variant="glass" onClick={onChangePin}>
                 Change PIN
               </Button>

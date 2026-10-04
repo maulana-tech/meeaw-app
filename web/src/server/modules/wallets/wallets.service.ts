@@ -13,6 +13,7 @@ import {
 } from "./wallets.errors";
 import type {
   EscrowOutput,
+  PasskeyRecord,
   PrivyWalletInput,
   RotateEscrowInput,
   RotateEscrowOutput,
@@ -184,6 +185,9 @@ export async function saveEscrow(
   const result = await users.updateOne(
     {
       privyUserId,
+      // A passkey account derives its keys from the passkey; a PIN escrow
+      // would be a second, different master.
+      passkeyCredentialId: { $exists: false },
       $or: [
         { encryptedMaster: { $exists: false } },
         { masterSalt: { $exists: false } },
@@ -250,5 +254,51 @@ export async function getEscrow(privyUserId: string): Promise<EscrowOutput> {
     masterSaltHex: hex(doc.masterSalt),
     kdfParams: doc.kdfParams,
     revision: doc.escrowRevision ?? 1,
+  };
+}
+
+/**
+ * Records which passkey protects this account. Only public data is stored;
+ * the keys are re-derived from the passkey's PRF output on each device.
+ * Write-once, and exclusive with PIN escrow.
+ */
+export async function savePasskey(
+  privyUserId: string,
+  input: PasskeyRecord,
+): Promise<void> {
+  const users = await getUsers();
+  const result = await users.updateOne(
+    {
+      privyUserId,
+      passkeyCredentialId: { $exists: false },
+      encryptedMaster: { $exists: false },
+    },
+    {
+      $set: {
+        passkeyCredentialId: input.credentialId,
+        passkeyTransports: input.transports,
+        passkeyViewPubkey: input.viewPubkeyHex.toLowerCase(),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  if (result.matchedCount === 1) return;
+  if (!(await users.findOne({ privyUserId }))) {
+    throw new WalletMigrationError(
+      "No Mawee wallet is linked to this Privy identity.",
+    );
+  }
+  throw new WalletEscrowAlreadyInitializedError();
+}
+
+export async function getPasskey(
+  privyUserId: string,
+): Promise<PasskeyRecord | null> {
+  const doc = await (await getUsers()).findOne({ privyUserId });
+  if (!doc?.passkeyCredentialId || !doc.passkeyViewPubkey) return null;
+  return {
+    credentialId: doc.passkeyCredentialId,
+    transports: doc.passkeyTransports ?? [],
+    viewPubkeyHex: doc.passkeyViewPubkey,
   };
 }

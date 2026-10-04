@@ -23,8 +23,12 @@ recovery path.
 
 * **Sign-in + embedded wallet** — Google, email or a passkey via Privy gives you
   a Monad wallet that signs your transactions. No seed phrase to lose.
-* **6-digit PIN** — your backup and recovery key. It lets you get back into your
-  account and unlock spending.
+* **Passkey (recommended)** — your private keys are *derived* from your passkey
+  (Face ID / Touch ID / device PIN) every time you need them. Nothing secret
+  is stored by Mawee; the same synced passkey restores your balance on any
+  device.
+* **6-digit PIN** — the alternative for browsers without passkey key
+  derivation. Your key is encrypted with your PIN and backed up.
 
 {% hint style="danger" %}
 **We will never ask for your PIN, passkey, or any recovery info** — not by email,

@@ -9,6 +9,7 @@ import { chain } from "../lib/chain";
 import { DashboardBackground } from "./dashboard/DashboardBackground";
 import { DashboardShell } from "./dashboard/DashboardShell";
 import { PinDialog } from "./PinDialog";
+import { RecoveryDialog } from "./RecoveryDialog";
 import { UsernameModal } from "./UsernameModal";
 import { StickyBanner } from "./ui/sticky-banner";
 import { useWallet } from "./WalletProvider";
@@ -23,6 +24,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     pinError,
     submitPin,
     closePinModal,
+    recoveryModal,
+    recoveryBusy,
+    recoveryError,
+    passkeySupported,
+    chooseRecovery,
+    unlockWithPasskey,
+    closeRecoveryModal,
   } = useWallet();
   const pathname = usePathname();
   const isPay = pathname.startsWith("/pay");
@@ -54,6 +62,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       onClose={closePinModal}
     />
   );
+  const recoveryDialog = (
+    <RecoveryDialog
+      modal={recoveryModal}
+      busy={recoveryBusy}
+      error={recoveryError}
+      passkeySupported={passkeySupported}
+      onChoose={(method) => void chooseRecovery(method)}
+      onUnlock={() => void unlockWithPasskey()}
+      onClose={closeRecoveryModal}
+    />
+  );
 
   if (pathname === "/" || protectedRoute) {
     if (pathname !== "/") {
@@ -63,6 +82,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="block w-full m-0 p-0">{children}</div>
           {usernameModal}
           {pinModal}
+          {recoveryDialog}
+          {recoveryDialog}
         </div>
       );
     }
@@ -73,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="block w-full m-0 p-0">{children}</div>
         {usernameModal}
         {pinModal}
+        {recoveryDialog}
       </>
     );
   }

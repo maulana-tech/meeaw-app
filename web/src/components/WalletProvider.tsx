@@ -24,6 +24,7 @@ import {
   setUsernamePubkeys,
   usernameOf,
 } from "../lib/chain";
+import { bytesToHex } from "../lib/crypto";
 import { deriveNoteSecrets, randomMaster } from "../lib/keys";
 import {
   accountPubkeys,
@@ -32,6 +33,13 @@ import {
   hasLocalAccount,
   syncLocalAccountIdentity,
 } from "../lib/notes";
+import {
+  createPasskeyMaster,
+  type PasskeyRecord,
+  passkeyErrorMessage,
+  passkeysAvailable,
+  unlockPasskeyMaster,
+} from "../lib/passkey";
 import { BadPinError } from "../lib/pin-errors";
 import { findEmbeddedWallet, privySigner } from "../lib/privy-wallet";
 import { api } from "../trpc/client";
@@ -61,7 +69,20 @@ type WalletState = {
   disconnect: () => Promise<void>;
   /** Signer for the user's embedded wallet on Monad (pays gas, signs writes). */
   getSigner: () => Promise<Signer>;
+  /** How this account's privacy keys are recovered on a new device. */
+  recoveryMethod: RecoveryMethod | null;
+  /** "choose" for new accounts, "passkey-unlock" to re-derive on a device. */
+  recoveryModal: RecoveryModal | null;
+  recoveryBusy: boolean;
+  recoveryError: string;
+  passkeySupported: boolean;
+  chooseRecovery: (method: RecoveryMethod) => Promise<void>;
+  unlockWithPasskey: () => Promise<void>;
+  closeRecoveryModal: () => void;
 };
+
+export type RecoveryMethod = "passkey" | "pin";
+export type RecoveryModal = "choose" | "passkey-unlock";
 
 type WalletMapping = { address: string };
 
@@ -86,6 +107,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [pinMode, setPinMode] = useState<PinMode>("unlock");
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [pinError, setPinError] = useState("");
+  const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod | null>(
+    null,
+  );
+  const [recoveryModal, setRecoveryModal] = useState<RecoveryModal | null>(
+    null,
+  );
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const passkeyRef = useRef<(PasskeyRecord & { viewPubkeyHex: string }) | null>(
+    null,
+  );
   const mappingRef = useRef<WalletMapping | null>(null);
   const pendingMasterRef = useRef<Uint8Array | null>(null);
   const revisionRef = useRef(0);
@@ -99,6 +132,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   walletsRef.current = wallets;
   createWalletRef.current = createWallet;
+
+  useEffect(() => {
+    setPasskeySupported(passkeysAvailable());
+  }, []);
+
+  const openRecoveryModal = useCallback((modal: RecoveryModal) => {
+    setRecoveryError("");
+    setRecoveryModal(modal);
+  }, []);
 
   const openPinModal = useCallback((mode: PinMode) => {
     setPinMode(mode);
@@ -118,22 +160,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const activateMapping = useCallback(
     async (mapping: WalletMapping) => {
       if (sessionAbortedRef.current) return;
-      const escrow = await api.wallets.getEscrow.query();
+      const [escrow, passkey] = await Promise.all([
+        api.wallets.getEscrow.query(),
+        api.wallets.getPasskey.query(),
+      ]);
       if (sessionAbortedRef.current) return;
       mappingRef.current = mapping;
       setAddress(mapping.address);
-      if (!escrow) {
+      passkeyRef.current = passkey;
+      if (passkey) {
+        setRecoveryMethod("passkey");
+        if (hasLocalAccount()) setAccountUnlocked(true);
+        else openRecoveryModal("passkey-unlock");
+      } else if (escrow) {
+        setRecoveryMethod("pin");
+        if (hasLocalAccount()) setAccountUnlocked(true);
+        else openPinModal("unlock");
+      } else if (passkeysAvailable()) {
+        // New account: let the user pick passkey (no secret leaves the
+        // device) or PIN escrow before any keys are registered.
+        setRecoveryMethod(null);
+        openRecoveryModal("choose");
+      } else {
+        setRecoveryMethod(null);
         const master = randomMaster();
         pendingMasterRef.current = master;
         deriveAndStoreAccount(master);
         setAccountUnlocked(true);
-      } else if (hasLocalAccount()) {
-        setAccountUnlocked(true);
-      } else {
-        openPinModal("unlock");
       }
     },
-    [openPinModal],
+    [openPinModal, openRecoveryModal],
   );
 
   useEffect(() => {
@@ -243,11 +299,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       usernameResolved &&
       !username &&
       accountUnlocked &&
-      !pinModalOpen
+      !pinModalOpen &&
+      !recoveryModal
     ) {
       setUsernameModalOpen(true);
     }
-  }, [address, usernameResolved, username, accountUnlocked, pinModalOpen]);
+  }, [
+    address,
+    usernameResolved,
+    username,
+    accountUnlocked,
+    pinModalOpen,
+    recoveryModal,
+  ]);
 
   useEffect(() => {
     if (username && pendingMasterRef.current && !usernameModalOpen)
@@ -266,6 +330,97 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       throw new Error("Your Mawee wallet is still loading. Try again.");
     }
     return privySigner(wallet);
+  }, []);
+
+  const chooseRecovery = useCallback(
+    async (method: RecoveryMethod) => {
+      if (!mappingRef.current) return;
+      setRecoveryError("");
+      if (method === "pin") {
+        // Existing PIN flow: a random master now, the PIN escrow after the
+        // username is claimed (see the "set" effect above).
+        const master = randomMaster();
+        pendingMasterRef.current = master;
+        deriveAndStoreAccount(master);
+        setRecoveryMethod("pin");
+        setRecoveryModal(null);
+        setAccountUnlocked(true);
+        return;
+      }
+      setRecoveryBusy(true);
+      try {
+        const { master, record } = await createPasskeyMaster({
+          userName:
+            user?.email?.address ??
+            user?.google?.email ??
+            mappingRef.current.address,
+        });
+        const account = deriveNoteSecrets(master);
+        const { notePubkey, viewPubkey } = await accountPubkeys(account);
+        const viewPubkeyHex = bytesToHex(viewPubkey);
+        // An account that already claimed a username under other keys (e.g.
+        // an interrupted PIN setup) must re-key on-chain first.
+        if (username) {
+          await setUsernamePubkeys(
+            await getSigner(),
+            username,
+            notePubkey,
+            viewPubkey,
+          );
+          try {
+            await registerUsernameCache(username);
+          } catch (cause) {
+            console.warn("re-key on-chain ok but mirror failed", cause);
+          }
+        }
+        await api.wallets.savePasskey.mutate({ ...record, viewPubkeyHex });
+        passkeyRef.current = { ...record, viewPubkeyHex };
+        deriveAndStoreAccount(master);
+        master.fill(0);
+        pendingMasterRef.current = null;
+        setRecoveryMethod("passkey");
+        setRecoveryModal(null);
+        setAccountUnlocked(true);
+      } catch (cause) {
+        setRecoveryError(passkeyErrorMessage(cause));
+      } finally {
+        setRecoveryBusy(false);
+      }
+    },
+    [user, username, getSigner],
+  );
+
+  const unlockWithPasskey = useCallback(async () => {
+    const record = passkeyRef.current;
+    if (!record) return;
+    setRecoveryBusy(true);
+    setRecoveryError("");
+    try {
+      const master = await unlockPasskeyMaster({ record });
+      const account = deriveNoteSecrets(master);
+      const { viewPubkey } = await accountPubkeys(account);
+      // The passkey must reproduce the keys this account registered; any
+      // other passkey would silently show an empty balance.
+      if (bytesToHex(viewPubkey) !== record.viewPubkeyHex.toLowerCase()) {
+        master.fill(0);
+        throw new Error(
+          "This passkey derived different keys than your account uses. Choose the passkey you created for Mawee.",
+        );
+      }
+      deriveAndStoreAccount(master);
+      master.fill(0);
+      setRecoveryModal(null);
+      setAccountUnlocked(true);
+    } catch (cause) {
+      setRecoveryError(passkeyErrorMessage(cause));
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }, []);
+
+  const closeRecoveryModal = useCallback(() => {
+    // Choosing a method is mandatory for a new account; unlocking can wait.
+    setRecoveryModal((current) => (current === "choose" ? current : null));
   }, []);
 
   const signIn = useCallback(() => {
@@ -353,6 +508,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setupRef.current = null;
     mappingRef.current = null;
     pendingMasterRef.current = null;
+    passkeyRef.current = null;
+    setRecoveryModal(null);
+    setRecoveryMethod(null);
     clearLocalAccount();
     syncLocalAccountIdentity(null);
     setAddress("");
@@ -374,10 +532,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const closePinModal = useCallback(() => {
     if (pinMode !== "set") setPinModalOpen(false);
   }, [pinMode]);
-  const promptUnlock = useCallback(
-    () => openPinModal("unlock"),
-    [openPinModal],
-  );
+  const promptUnlock = useCallback(() => {
+    if (passkeyRef.current) openRecoveryModal("passkey-unlock");
+    else openPinModal("unlock");
+  }, [openPinModal, openRecoveryModal]);
 
   const value = useMemo<WalletState>(
     () => ({
@@ -403,6 +561,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signIn,
       disconnect,
       getSigner,
+      recoveryMethod,
+      recoveryModal,
+      recoveryBusy,
+      recoveryError,
+      passkeySupported,
+      chooseRecovery,
+      unlockWithPasskey,
+      closeRecoveryModal,
     }),
     [
       address,
@@ -426,6 +592,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signIn,
       disconnect,
       getSigner,
+      recoveryMethod,
+      recoveryModal,
+      recoveryBusy,
+      recoveryError,
+      passkeySupported,
+      chooseRecovery,
+      unlockWithPasskey,
+      closeRecoveryModal,
     ],
   );
 

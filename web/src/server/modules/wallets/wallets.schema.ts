@@ -34,6 +34,20 @@ export const walletOutput = z.object({
 });
 export const optionalWalletOutput = walletOutput.nullable();
 
+export const passkeyRecord = z
+  .object({
+    // Canonical unpadded base64url, as WebAuthn/Mera report it.
+    credentialId: z
+      .string()
+      .min(16)
+      .max(1400)
+      .regex(/^[A-Za-z0-9_-]+$/, "credential id must be base64url"),
+    transports: z.array(z.string().min(1).max(32)).max(10).default([]),
+    viewPubkeyHex: exactHexBytes(32, "view pubkey"),
+  })
+  .strict();
+export const passkeyOutput = passkeyRecord.nullable();
+
 export const saveEscrowInput = z
   .object({ encryptedMasterHex, masterSaltHex, kdfParams })
   .strict();
@@ -46,6 +60,7 @@ export const rotateEscrowOutput = z.object({ revision }).strict();
 
 export type PrivyWalletInput = z.infer<typeof privyWalletInput>;
 export type SaveEscrowInput = z.infer<typeof saveEscrowInput>;
+export type PasskeyRecord = z.infer<typeof passkeyRecord>;
 export type RotateEscrowInput = z.infer<typeof rotateEscrowInput>;
 export type RotateEscrowOutput = z.infer<typeof rotateEscrowOutput>;
 export type WalletOutput = z.infer<typeof walletOutput>;

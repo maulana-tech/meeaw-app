@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
     kdfParams: { m: number; t: number; p: number };
     revision: number;
   },
+  passkey: null as null | {
+    credentialId: string;
+    transports: string[];
+    viewPubkeyHex: string;
+  },
   changeRecoveryPin: vi.fn(),
   validateCurrentPin: vi.fn(),
   refetch: vi.fn(),
@@ -19,6 +24,7 @@ vi.mock("../src/components/WalletProvider", () => ({
   useWallet: () => ({
     username: "alice",
     disconnect: vi.fn(),
+    recoveryMethod: mocks.passkey ? "passkey" : null,
   }),
 }));
 vi.mock("../src/trpc/react", () => ({
@@ -30,6 +36,9 @@ vi.mock("../src/trpc/react", () => ({
           isLoading: false,
           refetch: mocks.refetch,
         }),
+      },
+      getPasskey: {
+        useQuery: () => ({ data: mocks.passkey, isLoading: false }),
       },
     },
   },
@@ -59,6 +68,7 @@ describe("SettingsDashboard recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.escrow = null;
+    mocks.passkey = null;
     mocks.changeRecoveryPin.mockResolvedValue(undefined);
     mocks.validateCurrentPin.mockResolvedValue(true);
   });
@@ -99,5 +109,18 @@ describe("SettingsDashboard recovery", () => {
     );
     expect(mocks.refetch).toHaveBeenCalled();
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Recovery PIN changed");
+  });
+
+  it("shows passkey protection without a PIN to change", () => {
+    mocks.passkey = {
+      credentialId: "AAAAAAAAAAAAAAAAAAAAAA",
+      transports: ["internal"],
+      viewPubkeyHex: "ab".repeat(32),
+    };
+    render(<SettingsDashboard />);
+    expect(screen.getByText("Protected by your passkey")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Change PIN" }),
+    ).not.toBeInTheDocument();
   });
 });

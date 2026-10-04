@@ -18,6 +18,13 @@ const mocks = vi.hoisted(() => ({
   restore: vi.fn(),
   bootstrap: vi.fn(),
   getEscrow: vi.fn(),
+  getPasskey: vi.fn(),
+  savePasskey: vi.fn(),
+  passkeysAvailable: false,
+  createPasskeyMaster: vi.fn(),
+  unlockPasskeyMaster: vi.fn(),
+  hasLocal: true,
+  deriveAndStoreAccount: vi.fn(),
   replace: vi.fn(),
   usernameOf: vi.fn(),
   clearLocalAccount: vi.fn(),
@@ -64,14 +71,34 @@ vi.mock("../src/trpc/client", () => ({
       bootstrap: { mutate: mocks.bootstrap },
       getEscrow: { query: mocks.getEscrow },
       saveEscrow: { mutate: vi.fn() },
+      getPasskey: { query: mocks.getPasskey },
+      savePasskey: { mutate: mocks.savePasskey },
     },
   },
 }));
 
+vi.mock("../src/lib/passkey", () => ({
+  passkeysAvailable: () => mocks.passkeysAvailable,
+  createPasskeyMaster: mocks.createPasskeyMaster,
+  unlockPasskeyMaster: mocks.unlockPasskeyMaster,
+  passkeyErrorMessage: (e: unknown) =>
+    e instanceof Error ? e.message : "passkey failed",
+}));
+
+vi.mock("../src/lib/keys", () => ({
+  deriveNoteSecrets: (master: Uint8Array) => ({ master }),
+  randomMaster: () => new Uint8Array(32).fill(5),
+}));
+
 vi.mock("../src/lib/notes", () => ({
-  hasLocalAccount: () => true,
-  deriveAndStoreAccount: vi.fn(),
-  accountPubkeys: vi.fn(),
+  hasLocalAccount: () => mocks.hasLocal,
+  deriveAndStoreAccount: mocks.deriveAndStoreAccount,
+  // The "view pubkey" is the master's first byte, repeated: enough to tell
+  // keys from different passkeys apart.
+  accountPubkeys: async ({ master }: { master: Uint8Array }) => ({
+    notePubkey: new Uint8Array(32).fill(master[0]),
+    viewPubkey: new Uint8Array(32).fill(master[0]),
+  }),
   clearLocalAccount: mocks.clearLocalAccount,
   syncLocalAccountIdentity: mocks.syncLocalAccountIdentity,
 }));
@@ -85,9 +112,31 @@ vi.mock("../src/lib/chain", () => ({
 import { useWallet, WalletProvider } from "../src/components/WalletProvider";
 
 function Probe() {
-  const { address, error, sessionReady, signIn, disconnect } = useWallet();
+  const {
+    address,
+    error,
+    sessionReady,
+    signIn,
+    disconnect,
+    accountUnlocked,
+    recoveryModal,
+    recoveryError,
+    recoveryMethod,
+    chooseRecovery,
+    unlockWithPasskey,
+  } = useWallet();
   return (
     <div>
+      <div data-testid="unlocked">{accountUnlocked ? "yes" : "no"}</div>
+      <div data-testid="recovery-modal">{recoveryModal ?? "none"}</div>
+      <div data-testid="recovery-error">{recoveryError || "none"}</div>
+      <div data-testid="recovery-method">{recoveryMethod ?? "none"}</div>
+      <button type="button" onClick={() => void chooseRecovery("passkey")}>
+        Use passkey
+      </button>
+      <button type="button" onClick={() => void unlockWithPasskey()}>
+        Unlock passkey
+      </button>
       <div data-testid="address">{address || "none"}</div>
       <div data-testid="error">{error || "none"}</div>
       <div data-testid="ready">{sessionReady ? "yes" : "no"}</div>
@@ -120,6 +169,10 @@ beforeEach(() => {
     kdfParams: { m: 1, t: 1, p: 1 },
   });
   mocks.usernameOf.mockResolvedValue("alice");
+  mocks.getPasskey.mockResolvedValue(null);
+  mocks.savePasskey.mockResolvedValue({ ok: true });
+  mocks.passkeysAvailable = false;
+  mocks.hasLocal = true;
 });
 
 describe("WalletProvider Privy session", () => {
@@ -220,5 +273,139 @@ describe("WalletProvider Privy session", () => {
     await waitFor(() =>
       expect(screen.getByTestId("address")).toHaveTextContent("none"),
     );
+  });
+});
+
+describe("WalletProvider passkey recovery (Mera PRF)", () => {
+  const RECORD = {
+    credentialId: "Y3JlZGVudGlhbC1pZC0x",
+    transports: ["internal"],
+  };
+
+  it("asks a new account to choose how to protect its keys", async () => {
+    mocks.getEscrow.mockResolvedValue(null);
+    mocks.passkeysAvailable = true;
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent("choose"),
+    );
+    expect(screen.getByTestId("unlocked")).toHaveTextContent("no");
+    expect(mocks.deriveAndStoreAccount).not.toHaveBeenCalled();
+  });
+
+  it("derives keys from a new passkey and stores only public data", async () => {
+    mocks.getEscrow.mockResolvedValue(null);
+    mocks.usernameOf.mockResolvedValue(null);
+    mocks.passkeysAvailable = true;
+    const master = new Uint8Array(32).fill(7);
+    mocks.createPasskeyMaster.mockResolvedValue({ master, record: RECORD });
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent("choose"),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Use passkey" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("unlocked")).toHaveTextContent("yes"),
+    );
+    expect(mocks.savePasskey).toHaveBeenCalledWith({
+      ...RECORD,
+      viewPubkeyHex: "07".repeat(32),
+    });
+    // Nothing secret goes to the server.
+    expect(JSON.stringify(mocks.savePasskey.mock.calls)).not.toContain(
+      "[7,7,7",
+    );
+    expect(mocks.deriveAndStoreAccount).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("recovery-method")).toHaveTextContent("passkey");
+    expect(screen.getByTestId("recovery-modal")).toHaveTextContent("none");
+  });
+
+  it("keeps the account locked when the passkey can't derive keys", async () => {
+    mocks.getEscrow.mockResolvedValue(null);
+    mocks.passkeysAvailable = true;
+    mocks.createPasskeyMaster.mockRejectedValue(new Error("no PRF here"));
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent("choose"),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Use passkey" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-error")).toHaveTextContent(
+        "no PRF here",
+      ),
+    );
+    expect(screen.getByTestId("unlocked")).toHaveTextContent("no");
+    expect(mocks.savePasskey).not.toHaveBeenCalled();
+  });
+
+  it("re-derives the keys on a new device with the same passkey", async () => {
+    mocks.hasLocal = false;
+    mocks.getPasskey.mockResolvedValue({
+      ...RECORD,
+      viewPubkeyHex: "09".repeat(32),
+    });
+    mocks.unlockPasskeyMaster.mockResolvedValue(new Uint8Array(32).fill(9));
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent(
+        "passkey-unlock",
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Unlock passkey" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("unlocked")).toHaveTextContent("yes"),
+    );
+    expect(mocks.unlockPasskeyMaster).toHaveBeenCalledWith({
+      record: expect.objectContaining({ credentialId: RECORD.credentialId }),
+    });
+    expect(mocks.deriveAndStoreAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a passkey that derives different keys than the account's", async () => {
+    mocks.hasLocal = false;
+    mocks.getPasskey.mockResolvedValue({
+      ...RECORD,
+      viewPubkeyHex: "09".repeat(32),
+    });
+    mocks.unlockPasskeyMaster.mockResolvedValue(new Uint8Array(32).fill(3));
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent(
+        "passkey-unlock",
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Unlock passkey" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-error")).toHaveTextContent(
+        "derived different keys",
+      ),
+    );
+    expect(screen.getByTestId("unlocked")).toHaveTextContent("no");
+    expect(mocks.deriveAndStoreAccount).not.toHaveBeenCalled();
   });
 });

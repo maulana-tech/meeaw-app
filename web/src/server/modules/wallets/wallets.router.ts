@@ -11,6 +11,8 @@ import {
 import {
   escrowOutput,
   optionalWalletOutput,
+  passkeyOutput,
+  passkeyRecord,
   privyWalletInput,
   rotateEscrowInput,
   rotateEscrowOutput,
@@ -21,9 +23,11 @@ import {
   bootstrapWallet,
   currentWallet,
   getEscrow,
+  getPasskey,
   restoreWallet,
   rotateEscrow,
   saveEscrow,
+  savePasskey,
 } from "./wallets.service";
 
 function mapError(error: unknown): never {
@@ -69,6 +73,15 @@ export const walletsRouter = createTRPCRouter({
   getEscrow: protectedProcedure
     .output(escrowOutput)
     .query(({ ctx }) => getEscrow(ctx.privyUserId).catch(mapError)),
+  savePasskey: protectedProcedure
+    .input(passkeyRecord)
+    .mutation(async ({ ctx, input }) => {
+      await savePasskey(ctx.privyUserId, input).catch(mapError);
+      return { ok: true };
+    }),
+  getPasskey: protectedProcedure
+    .output(passkeyOutput)
+    .query(({ ctx }) => getPasskey(ctx.privyUserId).catch(mapError)),
   rotateEscrow: protectedProcedure
     .input(rotateEscrowInput)
     .output(rotateEscrowOutput)

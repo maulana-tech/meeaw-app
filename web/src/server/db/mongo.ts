@@ -67,6 +67,11 @@ export type UserDoc = {
   masterSalt?: Binary;
   kdfParams?: { m: number; t: number; p: number };
   escrowRevision?: number;
+  // Passkey recovery (Mera PRF). All public: the credential to ask for and
+  // the viewing pubkey its derived keys must reproduce. No secret material.
+  passkeyCredentialId?: string;
+  passkeyTransports?: string[];
+  passkeyViewPubkey?: string;
   createdAt: Date;
   updatedAt: Date;
 };

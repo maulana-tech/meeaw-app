@@ -83,9 +83,11 @@ it does not learn which deposit event produced that note.
 ### 1. Account setup
 
 A user signs in with Privy, which provisions an embedded wallet on Monad. The
-user claims a username such as `@dinar`. The app derives note and viewing keys
-from a random master secret (backed up server-side, encrypted under the user's
-PIN), then registers their public keys in `MaweeRegistry`.
+user then protects their privacy keys with a **passkey** (Mera PRF: the master
+secret is derived from the passkey on each device and never stored) or a
+**PIN** (a random master, encrypted under the PIN and escrowed). Note and
+viewing keys are HKDF-derived from that master. The user claims a username such
+as `@dinar`, registering the public keys in `MaweeRegistry`.
 
 The note key lets payers create notes the user can spend. The viewing key lets
 payers encrypt note metadata so only the recipient can discover their payments.
