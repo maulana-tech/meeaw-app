@@ -1,0 +1,137 @@
+import { type Binary, type Collection, type Db, MongoClient } from "mongodb";
+import { getServerEnv } from "../../env.server";
+
+export type DepositDoc = {
+  _id: number;
+  commitment: Binary;
+  ephemeralPk: Binary;
+  ciphertext: Binary;
+  ledger: number;
+  txHash: string;
+  ts: Date;
+};
+
+export type UsernameDoc = {
+  _id: string; // lowercased username
+  owner: string;
+  notePubkey: Binary;
+  viewPubkey: Binary;
+  createdLedger: number; // ledger this cache entry was (re)written at, not registration ledger
+  createdAt: Date;
+  updatedAt?: Date;
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+};
+
+export type IndexerStateDoc = {
+  _id: "pool" | "registry";
+  lastLedger: number;
+  lastLeafIndex?: number;
+  updatedAt: Date;
+  poolId?: string;
+  publishedLedger?: number;
+  publishedLeafIndex?: number;
+  indexedAt?: Date;
+  health?: "healthy" | "degraded";
+  lastError?: string;
+  leaseOwner?: string;
+  leaseUntil?: Date;
+  nullifiersComplete?: boolean;
+};
+
+export type SpentNullifierDoc = {
+  _id: string;
+  ledger: number;
+  eventId: string;
+  txHash: string;
+  ts: Date;
+};
+
+export type PaymentLinkDoc = {
+  _id: string;
+  owner: string;
+  slug?: string;
+  amount: string | null;
+  description?: string | null;
+  label: string | null;
+  state?: "active" | "archived";
+  status: "pending" | "paid";
+  manageTokenHash?: string; // sha-256 of the per-link manage capability token
+  createdAt: Date;
+  updatedAt?: Date;
+  archivedAt?: Date | null;
+};
+
+export type UserDoc = {
+  _id: string; // Olio C-address
+  privyUserId: string;
+  privyWalletId: string;
+  privyWalletAddress: string;
+  encryptedMaster?: Binary;
+  masterSalt?: Binary;
+  kdfParams?: { m: number; t: number; p: number };
+  escrowRevision?: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _olioMongoClientPromise: Promise<MongoClient> | undefined;
+}
+
+let clientPromise: Promise<MongoClient> | undefined;
+
+function getClient(): Promise<MongoClient> {
+  if (clientPromise) return clientPromise;
+
+  const serverEnv = getServerEnv();
+  const configuredUri = serverEnv.MONGODB_URI;
+  if (serverEnv.NODE_ENV === "production" && !configuredUri) {
+    throw new Error("MONGODB_URI must be configured in production.");
+  }
+  const uri = configuredUri || "mongodb://localhost:27017/olio";
+
+  if (serverEnv.NODE_ENV === "development") {
+    // Reuse the connection across HMR reloads in dev.
+    if (!global._olioMongoClientPromise) {
+      global._olioMongoClientPromise = new MongoClient(uri).connect();
+    }
+    clientPromise = global._olioMongoClientPromise;
+  } else {
+    clientPromise = new MongoClient(uri).connect();
+  }
+  return clientPromise;
+}
+
+export async function getDb(): Promise<Db> {
+  const client = await getClient();
+  return client.db(); // resolves db name from the URI path (`olio`)
+}
+
+export async function getDeposits(): Promise<Collection<DepositDoc>> {
+  return (await getDb()).collection<DepositDoc>("deposits");
+}
+
+export async function getUsernames(): Promise<Collection<UsernameDoc>> {
+  return (await getDb()).collection<UsernameDoc>("usernames");
+}
+
+export async function getIndexerState(): Promise<Collection<IndexerStateDoc>> {
+  return (await getDb()).collection<IndexerStateDoc>("indexer_state");
+}
+
+export async function getSpentNullifiers(): Promise<
+  Collection<SpentNullifierDoc>
+> {
+  return (await getDb()).collection<SpentNullifierDoc>("spent_nullifiers");
+}
+
+export async function getUsers(): Promise<Collection<UserDoc>> {
+  return (await getDb()).collection<UserDoc>("users");
+}
+
+export async function getPaymentLinks(): Promise<Collection<PaymentLinkDoc>> {
+  return (await getDb()).collection<PaymentLinkDoc>("payment_links");
+}

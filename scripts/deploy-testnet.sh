@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# Build + deploy Olio (registry + shielded pool) to Stellar Testnet, wire them
+# to Circle's testnet USDC, and write the resulting IDs into web/.env.local.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+SOURCE_ACCOUNT="${1:-alice}"
+NETWORK="${STELLAR_NETWORK:-testnet}"
+# Circle-issued USDC on Stellar Testnet (override via env if it ever changes).
+USDC_ISSUER="${USDC_ISSUER:-GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5}"
+USDC_ASSET="USDC:${USDC_ISSUER}"
+POOL_DEPTH="${POOL_DEPTH:-20}"
+
+REGISTRY_WASM="target/wasm32v1-none/release/olio_registry.wasm"
+POOL_WASM="target/wasm32v1-none/release/olio_pool.wasm"
+INTAKE_WASM="target/wasm32v1-none/release/olio_intake.wasm"
+ENV_FILE="web/.env.local"
+# Dedicated CCTP relay operator (tx source / fee payer / intake-contract admin).
+CCTP_OPERATOR="${CCTP_OPERATOR:-cctp-operator}"
+
+log() { printf '\033[0;36m==>\033[0m %s\n' "$*"; }
+
+# 1. Deployer identity.
+if ! stellar keys address "${SOURCE_ACCOUNT}" >/dev/null 2>&1; then
+  log "Creating and funding identity '${SOURCE_ACCOUNT}' on ${NETWORK}"
+  stellar keys generate "${SOURCE_ACCOUNT}" --network "${NETWORK}" --fund
+fi
+ADMIN_ADDR=$(stellar keys address "${SOURCE_ACCOUNT}")
+log "Deployer: ${ADMIN_ADDR}"
+
+# 2. Build both contracts.
+log "Building contracts"
+stellar contract build
+
+# 3. Resolve (and ensure deployed) the USDC Stellar Asset Contract.
+USDC_SAC=$(stellar contract id asset --asset "${USDC_ASSET}" --network "${NETWORK}")
+log "USDC SAC: ${USDC_SAC}"
+if ! stellar contract info interface --id "${USDC_SAC}" --network "${NETWORK}" >/dev/null 2>&1; then
+  log "USDC SAC not yet instantiated on ${NETWORK}; deploying wrapper"
+  stellar contract asset deploy \
+    --asset "${USDC_ASSET}" \
+    --source "${SOURCE_ACCOUNT}" \
+    --network "${NETWORK}" || true
+fi
+
+# 4. Deploy registry + pool.
+log "Deploying olio-registry"
+REGISTRY_ID=$(stellar contract deploy \
+  --wasm "${REGISTRY_WASM}" \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}")
+log "Registry: ${REGISTRY_ID}"
+
+log "Deploying olio-pool"
+POOL_ID=$(stellar contract deploy \
+  --wasm "${POOL_WASM}" \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}" \
+  -- \
+  --admin "${ADMIN_ADDR}" \
+  --asset "${USDC_SAC}" \
+  --depth "${POOL_DEPTH}")
+log "Pool: ${POOL_ID}"
+
+# 5. Register the Groth16 verification key (from the circuit build).
+VK_FILE="circuits/build/vk_soroban.json"
+if [ ! -f "${VK_FILE}" ]; then
+  echo "Missing ${VK_FILE}. Run circuits/build.sh first." >&2
+  exit 1
+fi
+log "Setting Groth16 verifier key (withdraw)"
+stellar contract invoke \
+  --id "${POOL_ID}" \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}" \
+  -- set_verifier_key \
+  --vk "$(cat "${VK_FILE}")"
+
+# 5a. Register the transfer (shielded send) Groth16 verification key.
+VK_TRANSFER_FILE="circuits/build/vk_transfer_soroban.json"
+if [ ! -f "${VK_TRANSFER_FILE}" ]; then
+  echo "Missing ${VK_TRANSFER_FILE}. Run circuits/build.sh first." >&2
+  exit 1
+fi
+log "Setting Groth16 verifier key (transfer)"
+stellar contract invoke \
+  --id "${POOL_ID}" \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}" \
+  -- set_transfer_verifier_key \
+  --vk "$(cat "${VK_TRANSFER_FILE}")"
+
+# 5b. Build + upload the vendored passkey smart-wallet WASM. It lives in its own
+# workspace (soroban-sdk 23, excluded from the root) and is uploaded, not
+# instantiated — clients deploy a per-user smart-wallet instance from this hash
+# (no factory contract).
+log "Building + uploading passkey smart-wallet WASM"
+( cd vendor/passkey-contracts && stellar contract build --package smart-wallet >/dev/null )
+SMART_WALLET_WASM_HASH=$(stellar contract upload \
+  --wasm vendor/passkey-contracts/target/wasm32v1-none/release/smart_wallet.wasm \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}")
+log "Smart-wallet WASM hash: ${SMART_WALLET_WASM_HASH}"
+
+# 5c. CCTP intake/forwarder contract + relay operator.
+#
+# Circle's Stellar CCTP minter always mints to a *contract* address, so the
+# intake is a Soroban contract (not a G-account). The dedicated operator account
+# is the intake's admin: it signs receive_message and the admin-gated
+# deposit_to_pool. It only needs XLM for fees — no USDC trustline (the contract
+# holds the bridged USDC as a SAC balance).
+if ! stellar keys address "${CCTP_OPERATOR}" >/dev/null 2>&1; then
+  log "Creating and funding CCTP operator '${CCTP_OPERATOR}'"
+  stellar keys generate "${CCTP_OPERATOR}" --network "${NETWORK}" --fund
+fi
+OPERATOR_ADDR=$(stellar keys address "${CCTP_OPERATOR}")
+OPERATOR_SECRET=$(stellar keys secret "${CCTP_OPERATOR}")
+log "CCTP operator: ${OPERATOR_ADDR}"
+
+log "Deploying olio-intake (admin=operator, pool, asset=USDC)"
+INTAKE_ID=$(stellar contract deploy \
+  --wasm "${INTAKE_WASM}" \
+  --source "${SOURCE_ACCOUNT}" \
+  --network "${NETWORK}" \
+  -- \
+  --admin "${OPERATOR_ADDR}" \
+  --pool "${POOL_ID}" \
+  --asset "${USDC_SAC}")
+log "Intake contract: ${INTAKE_ID}"
+
+# 7. Write web env.
+NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+RPC_URL="${STELLAR_RPC_URL:-https://soroban-testnet.stellar.org}"
+# Preserve an existing Circle API key across redeploys (the file is regenerated).
+EXISTING_CIRCLE_API_KEY=""
+if [ -f "${ENV_FILE}" ]; then
+  EXISTING_CIRCLE_API_KEY=$(grep -E '^CIRCLE_API_KEY=' "${ENV_FILE}" | head -1 | cut -d= -f2- || true)
+fi
+log "Writing ${ENV_FILE}"
+cat > "${ENV_FILE}" <<EOF
+NEXT_PUBLIC_STELLAR_NETWORK=${NETWORK}
+NEXT_PUBLIC_STELLAR_RPC_URL=${RPC_URL}
+NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE="${NETWORK_PASSPHRASE}"
+NEXT_PUBLIC_OLIO_REGISTRY_ID=${REGISTRY_ID}
+NEXT_PUBLIC_OLIO_POOL_ID=${POOL_ID}
+NEXT_PUBLIC_USDC_SAC_ID=${USDC_SAC}
+NEXT_PUBLIC_USDC_ISSUER=${USDC_ISSUER}
+NEXT_PUBLIC_POOL_DEPTH=${POOL_DEPTH}
+NEXT_PUBLIC_SMART_WALLET_WASM_HASH=${SMART_WALLET_WASM_HASH}
+
+# CCTP V2 cross-chain deposits. Intake is a contract (Circle mints to contracts);
+# the operator is its admin / tx source / fee payer.
+NEXT_PUBLIC_CCTP_INTAKE_CONTRACT=${INTAKE_ID}
+CCTP_OPERATOR_SECRET=${OPERATOR_SECRET}
+CIRCLE_API_KEY=${EXISTING_CIRCLE_API_KEY}
+EOF
+
+log "Done. Contract IDs written to ${ENV_FILE}:"
+echo "  registry: ${REGISTRY_ID}"
+echo "  pool:     ${POOL_ID}"
+echo "  usdc SAC: ${USDC_SAC}"
+echo "  intake:   ${INTAKE_ID}"
+echo "  operator: ${OPERATOR_ADDR}"
