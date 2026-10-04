@@ -5,7 +5,6 @@ import {
   commitment,
   decryptNote,
   fromBE,
-  hexToBytes,
   nullifier,
   ownerPk,
   TREE_DEPTH,
@@ -19,33 +18,34 @@ import {
   refreshPoolMirror,
 } from "./poolMirror";
 
-const OWNER_KEY = "mawee.ownerSecret";
-const VIEW_KEY = "mawee.viewSecret";
 const USERNAME_KEY = "mawee.username";
 const IDENTITY_KEY = "mawee.privyUserId";
 
 export type LocalAccount = { ownerSecret: bigint; viewSk: Uint8Array };
 
+/// Note secrets live in this module's memory for the lifetime of the tab and
+/// are never written to localStorage, sessionStorage, IndexedDB, cookies or
+/// the server (Mera: "nothing sensitive persisted to disk"). The recoverable
+/// master stays in the argon2id-encrypted PIN escrow, or is re-derived from
+/// the passkey's PRF — so a reload re-locks the account and the same passkey
+/// (or PIN) rebuilds the identical keys on any device.
+let sessionAccount: LocalAccount | null = null;
+
 export function getAccount(): LocalAccount | null {
   if (typeof window === "undefined") return null;
-  const owner = window.localStorage.getItem(OWNER_KEY);
-  const view = window.localStorage.getItem(VIEW_KEY);
-  if (!owner || !view) return null;
-  return { ownerSecret: fromBE(hexToBytes(owner)), viewSk: hexToBytes(view) };
+  return sessionAccount;
 }
 
-/// True when this browser already holds cached note secrets. localStorage is a
-/// cache of secrets derived from the recoverable master, never the source of
-/// truth — the master lives in the PIN-escrow. WalletProvider uses this to
-/// decide whether a restored session still needs to unlock its master.
+/// True while this tab holds unlocked note secrets in memory. WalletProvider
+/// uses this to decide whether a restored session still needs to unlock its
+/// master: after a reload it is false, so the passkey/PIN prompt reappears.
 export function hasLocalAccount(): boolean {
-  return getAccount() !== null;
+  return sessionAccount !== null;
 }
 
 export function clearLocalAccount(): void {
+  sessionAccount = null;
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(OWNER_KEY);
-  window.localStorage.removeItem(VIEW_KEY);
   window.localStorage.removeItem(USERNAME_KEY);
 }
 
@@ -57,15 +57,15 @@ export function syncLocalAccountIdentity(privyUserId: string | null): void {
   else window.localStorage.removeItem(IDENTITY_KEY);
 }
 
-/// Derive the deterministic note secrets from the recoverable master and cache
-/// them in localStorage. The same master always yields the same owner/view
-/// keypair (see deriveNoteSecrets), so a re-derive on any device reproduces the
-/// exact pubkeys registered on-chain — that is what makes balances recoverable.
+/// Derive the deterministic note secrets from the recoverable master and hold
+/// them in memory for this tab. The same master always yields the same
+/// owner/view keypair (see deriveNoteSecrets), so a re-derive on any device
+/// reproduces the exact pubkeys registered on-chain — that is what makes
+/// balances recoverable without ever persisting a secret.
 export function deriveAndStoreAccount(master: Uint8Array): LocalAccount {
   const { ownerSecret, viewSk } = deriveNoteSecrets(master);
-  window.localStorage.setItem(OWNER_KEY, bytesToHex(toBE32(ownerSecret)));
-  window.localStorage.setItem(VIEW_KEY, bytesToHex(viewSk));
-  return { ownerSecret, viewSk };
+  sessionAccount = { ownerSecret, viewSk };
+  return sessionAccount;
 }
 
 export async function accountPubkeys(

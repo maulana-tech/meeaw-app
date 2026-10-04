@@ -39,8 +39,9 @@ export function Dashboard() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addCashOpen, setAddCashOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const { notes, claimable, loading, refreshing, stale, refresh } =
-    useMyNotes(address);
+  const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
+    accountUnlocked ? address : undefined,
+  );
   const insight = useMemo(() => weeklyActivity(notes), [notes]);
 
   useEffect(() => {

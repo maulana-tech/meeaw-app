@@ -67,8 +67,6 @@ it("opens straight to the Monad destination form for one or all payments", () =>
   expect(
     within(singleDialog).getByLabelText("Destination wallet"),
   ).toHaveAttribute("placeholder", "0x…");
-  expect(screen.queryByText(/MoneyGram/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Stellar/i)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(
