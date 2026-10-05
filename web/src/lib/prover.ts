@@ -91,17 +91,25 @@ export async function proveWithdraw(
 
 export async function proveTransfer(
   input: TransferInput,
+  artifactRoot = "/zk",
 ): Promise<{ proof: EvmProof; publicSignals: string[]; ms: number }> {
   const snarkjs = await import("snarkjs");
   const started = performance.now();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
     input,
-    "/zk/transfer.wasm",
-    "/zk/transfer.zkey",
+    `${artifactRoot}/transfer.wasm`,
+    `${artifactRoot}/transfer.zkey`,
   );
   return {
     proof: encodeProof(proof as SnarkProof),
     publicSignals,
     ms: performance.now() - started,
   };
+}
+
+export type MergeInput={root:string;nullifierA:string;nullifierB:string;outCommitment:string;ownerSecret:string;amounts:readonly [string,string];salts:readonly [string,string];pathElements:readonly [readonly string[],readonly string[]];pathIndices:readonly [readonly number[],readonly number[]];outSalt:string};
+export async function proveMerge(input:MergeInput,artifactRoot="/zk"):Promise<{proof:EvmProof;publicSignals:string[];ms:number}>{
+  const snarkjs=await import("snarkjs"),started=performance.now();
+  const {proof,publicSignals}=await snarkjs.groth16.fullProve(input,`${artifactRoot}/merge.wasm`,`${artifactRoot}/merge.zkey`);
+  return {proof:encodeProof(proof as SnarkProof),publicSignals,ms:performance.now()-started};
 }

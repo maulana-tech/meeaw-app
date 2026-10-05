@@ -67,14 +67,14 @@ export function useMyNotes(
     void (async () => {
       try {
         if (!initiallyLoaded) {
-          const cached = await scanMyNotes(account, { refresh: false, pool });
+          const cached = await scanMyNotes(account, { refresh: false, pool, includeRequestRecovery: true });
           if (!cancelled && cached.mirrorAvailable) {
             applyResult(cached);
             setLoading(false);
             setRefreshing(true);
           }
         }
-        const result = await scanMyNotes(account, { pool });
+        const result = await scanMyNotes(account, { pool, includeRequestRecovery: true });
         if (!cancelled) applyResult(result);
       } catch (e) {
         if (cancelled) return;

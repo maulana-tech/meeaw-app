@@ -5,8 +5,10 @@ import {
   depositOwnedNote,
   expectRevert,
   H,
+  makeMergeProof,
   makeTransferProof,
   output,
+  rememberOwned,
   prove,
 } from "./helpers/poolFixture";
 
@@ -16,6 +18,31 @@ import {
 describe("request settlement uniqueness", () => {
   const PAYER = 900n;
   const REQUESTER = 4242n;
+
+  it("consolidates 10 + 15 private USDC, pays a fixed 20 USDC request, and returns 5 USDC privately", async () => {
+    const f=await deployPoolFixture();
+    await depositOwnedNote(f,{amount:10_000_000n,ownerSecret:PAYER,salt:101n});
+    await depositOwnedNote(f,{amount:15_000_000n,ownerSecret:PAYER,salt:102n});
+    const merged=await makeMergeProof(f,{indices:[0,1],ownerSecret:PAYER,outSalt:103n});
+    expect(merged.outputAmount).to.equal(25_000_000n);
+    await f.pool.write.merge([merged.root,merged.nullifiers[0],merged.nullifiers[1],merged.proof,output(merged.outputCommitment)]);
+    const mergedIndex=await rememberOwned(f,BigInt(merged.outputCommitment),{amount:merged.outputAmount,ownerSecret:PAYER,salt:103n});
+    expect(mergedIndex).to.equal(2);
+
+    const requestSalt=777n,requestCommitment=await H([20_000_000n,await H([REQUESTER]),requestSalt]);
+    const payment=await makeTransferProof(f,{index:mergedIndex,ownerSecret:PAYER,recipientPk:await H([REQUESTER]),recipientAmount:20_000_000n,recipientSalt:requestSalt,changeSalt:104n});
+    expect(payment.recipientCommitment).to.equal(b32(requestCommitment));
+    await f.pool.write.transfer([payment.root,payment.nullifier,payment.proof,output(payment.recipientCommitment),output(payment.changeCommitment)]);
+
+    expect(await f.pool.read.isSpent([merged.nullifiers[0]])).to.equal(true);
+    expect(await f.pool.read.isSpent([merged.nullifiers[1]])).to.equal(true);
+    expect(await f.pool.read.isSpent([payment.nullifier])).to.equal(true);
+    const delivered=await f.pool.read.isCommitmentInserted([b32(requestCommitment)]);
+    expect(delivered).to.equal(true);
+    expect(await f.usdc.read.balanceOf([f.pool.address])).to.equal(25_000_000n);
+    const deposits=await f.pool.getEvents.Deposit({}, {fromBlock:0n});
+    expect(deposits.filter(e=>e.args.commitment===b32(requestCommitment))).to.have.length(1);
+  });
 
   it("lets only one of two independently valid payments reach the same commitment", async () => {
     const f = await deployPoolFixture();

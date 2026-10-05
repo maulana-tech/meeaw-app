@@ -107,14 +107,19 @@ export type ScanResult = {
 /// needed to build Merkle proofs. Never mix results from different pools.
 export async function scanMyNotes(
   acct: LocalAccount,
-  options: { refresh?: boolean; pool?: PoolDescriptor } = {},
+  options: { refresh?: boolean; pool?: PoolDescriptor; includeRequestRecovery?:boolean } = {},
 ): Promise<ScanResult> {
   const pool = options.pool ?? activePool();
   const mirror =
     options.refresh === false
       ? await loadPoolMirror(pool)
       : await refreshPoolMirror(pool);
-  return scanMirrorForAccount(acct, mirror, pool);
+  const scan=await scanMirrorForAccount(acct, mirror, pool);
+  if(options.includeRequestRecovery){
+    const {recoverPaidRequestOutputs}=await import("../features/requests/requestNoteRecovery");
+    return recoverPaidRequestOutputs(acct,pool,scan);
+  }
+  return scan;
 }
 
 async function scanMirrorForAccount(
@@ -161,8 +166,7 @@ async function scanMirrorForAccount(
         );
       continue;
     }
-    if (debug)
-      console.info(`[mawee] leaf ${d.leafIndex}: MINE, amount=${dec.amount}`);
+    if (debug) console.info(`[mawee] leaf ${d.leafIndex}: MINE`);
     const nullifierBytes = toBE32(
       await nullifier(acct.ownerSecret, d.leafIndex),
     );
