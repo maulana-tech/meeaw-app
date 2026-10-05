@@ -74,6 +74,12 @@ export const depositInput = z.object({
 });
 
 export const withdrawInput = z.object({
+  // The note's pool (`${chainId}:${poolAddress}`); omitted means the active
+  // pool. Only scopes in the deployment's manifest are accepted.
+  pool: z
+    .string()
+    .regex(/^\d{1,16}:0x[0-9a-f]{40}$/)
+    .optional(),
   recipient: address,
   amount: uint,
   root: hex32,

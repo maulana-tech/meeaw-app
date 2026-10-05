@@ -2,7 +2,9 @@ import { type Binary, type Collection, type Db, MongoClient } from "mongodb";
 import { getServerEnv } from "../../env.server";
 
 export type DepositDoc = {
-  _id: number; // leaf index
+  _id: string; // `${scope}:${leafIndex}` (see deposits/poolScope.ts)
+  scope: string; // `${chainId}:${poolAddress}`
+  leafIndex: number;
   commitment: Binary;
   ephemeralPk: Binary;
   ciphertext: Binary;
@@ -24,8 +26,9 @@ export type UsernameDoc = {
 };
 
 export type IndexerStateDoc = {
-  _id: "pool" | "registry";
-  /** `${network}:${poolAddress}` the mirror was built from. */
+  /** `pool:${scope}` per pool; bare "pool" only exists before migration. */
+  _id: "pool" | "registry" | `pool:${string}`;
+  /** Pool scope (`${chainId}:${poolAddress}`) the watermark belongs to. */
   scope?: string;
   publishedBlock?: number;
   publishedLeafIndex?: number;
@@ -38,7 +41,9 @@ export type IndexerStateDoc = {
 };
 
 export type SpentNullifierDoc = {
-  _id: string; // nullifier hex, no 0x
+  _id: string; // `${scope}:${nullifierHex}` (see deposits/poolScope.ts)
+  scope: string;
+  nullifierHex: string; // no 0x
   block: number;
   txHash: string;
   ts: Date;
@@ -73,6 +78,61 @@ export type UserDoc = {
   passkeyTransports?: string[];
   passkeyViewPubkey?: string;
   createdAt: Date;
+  updatedAt: Date;
+};
+
+export type RequestParticipantDoc = {
+  username: string;
+  wallet: string; // lowercase
+  notePubkey: string; // 0x-prefixed, lowercase
+  viewPubkey: string; // 0x-prefixed, lowercase
+};
+
+export type RequestEnvelopeDoc = { ephemeralPk: Binary; ciphertext: Binary };
+
+/** Active payment reservation, embedded so reserve/cancel races are one atomic write. */
+export type RequestReservationDoc = {
+  attemptId: string;
+  phase:
+    | "preparing"
+    | "submitting"
+    | "submitted"
+    | "confirmed"
+    | "failed"
+    | "needsReconciliation";
+  updatedAt: Date;
+  completedMerges: number;
+  nextStep: number;
+  txHash: string | null;
+  relayWallet: string | null;
+  currentSubmission: import("../../features/requests/types").SignedSubmission | null;
+  currentDigest: string | null;
+};
+
+/**
+ * A private payment request. Holds only signed public metadata, the two
+ * opaque fixed-size envelopes and public status: never a plaintext amount,
+ * note, salt or decrypted payload.
+ */
+export type PaymentRequestDoc = {
+  _id: string; // client-generated UUID v4
+  version: 1;
+  scope: string; // `${chainId}:${poolAddress}`
+  requesterWallet: string; // lowercase
+  addresseeWallet: string; // lowercase
+  requester: RequestParticipantDoc;
+  addressee: RequestParticipantDoc;
+  createdAt: Date; // the signed creation time
+  recipientCommitment: string; // 0x-prefixed, lowercase
+  requesterEnvelope: RequestEnvelopeDoc;
+  addresseeEnvelope: RequestEnvelopeDoc;
+  signature: string;
+  digest: string; // EIP-712 digest of the immutable record
+  status: "pending" | "paid" | "declined" | "cancelled";
+  revision: number;
+  operationId: string | null;
+  reservation: RequestReservationDoc | null;
+  receipt: { txHash: string; leafIndex: number; block: number } | null;
   updatedAt: Date;
 };
 
@@ -139,4 +199,10 @@ export async function getUsers(): Promise<Collection<UserDoc>> {
 
 export async function getPaymentLinks(): Promise<Collection<PaymentLinkDoc>> {
   return (await getDb()).collection<PaymentLinkDoc>("payment_links");
+}
+
+export async function getPaymentRequests(): Promise<
+  Collection<PaymentRequestDoc>
+> {
+  return (await getDb()).collection<PaymentRequestDoc>("payment_requests");
 }

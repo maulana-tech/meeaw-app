@@ -22,6 +22,7 @@ ARG NEXT_PUBLIC_MONAD_RPC_URL
 ARG NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS
 ARG NEXT_PUBLIC_MAWEE_POOL_ADDRESS
 ARG NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK
+ARG NEXT_PUBLIC_MAWEE_POOLS
 ARG NEXT_PUBLIC_USDC_ADDRESS
 ARG NEXT_PUBLIC_USDC_DECIMALS
 ARG NEXT_PUBLIC_USDC_MINTABLE
@@ -50,6 +51,7 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/web/public ./web/public
+COPY --from=builder --chown=nextjs:nodejs /app/web/scripts/request-payments-local.mjs ./scripts/request-payments-local.mjs
 COPY --from=migrate --chown=nextjs:nodejs /migrate /migrate
 
 USER nextjs

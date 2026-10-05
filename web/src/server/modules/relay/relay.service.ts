@@ -10,6 +10,7 @@ import {
   usdcMintable,
 } from "../../../lib/chain";
 import { USDC_DECIMALS } from "../../../lib/crypto";
+import { activePool, findPool } from "../../../lib/pools";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
 import { currentWallet } from "../wallets/wallets.service";
 import { RelayerUnavailableError, RelayRejectedError } from "./relay.errors";
@@ -129,9 +130,12 @@ export async function relayDeposit(
 export async function relayWithdraw(
   input: WithdrawInput,
 ): Promise<{ txHash: string }> {
+  // Legacy pools stay withdrawable; anything outside the manifest is refused.
+  const pool = input.pool ? findPool(input.pool) : activePool();
+  if (!pool) throw new RelayRejectedError("Unknown pool.");
   const { hash } = await relay(() =>
     relayWrite({
-      address: poolAddress,
+      address: pool.address,
       abi: maweePoolAbi,
       functionName: "withdraw",
       args: [

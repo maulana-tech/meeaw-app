@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "indexer:local": "node --use-system-ca --env-file=.env.local scripts/pool-indexer-local.mjs",
+    "payments:local": "node --use-system-ca --env-file=.env.local scripts/request-payments-local.mjs",
     "build": "next build",
     "lint": "next lint",
     "start": "next start",

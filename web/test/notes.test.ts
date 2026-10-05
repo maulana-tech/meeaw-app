@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isSpent } from "../src/lib/chain";
 import { scanMyNotes } from "../src/lib/notes";
+import { activePool } from "../src/lib/pools";
 
 vi.mock("../src/lib/crypto", () => ({
   decryptNote: vi.fn(() => ({ amount: 5_000_000n, salt: 9n })),
@@ -92,6 +93,36 @@ describe("scanMyNotes on-chain spent check", () => {
     // Only leaf 1 (mirror-unspent) needs the on-chain round-trip.
     expect(mockIsSpent).toHaveBeenCalledTimes(1);
     expect(mockIsSpent.mock.calls[0]?.[0]?.[0]).toBe(1);
+  });
+
+  it("scans each pool separately and tags notes with their pool", async () => {
+    setMirror([]);
+    mockIsSpent.mockResolvedValue(false);
+    const { refreshPoolMirror } = await import("../src/lib/poolMirror");
+    const legacy = {
+      ...activePool(),
+      scope: "10143:0x00000000000000000000000000000000000000c0" as const,
+      address: "0x00000000000000000000000000000000000000c0" as const,
+      role: "legacy" as const,
+      requestCapable: false,
+    };
+
+    const active = await scanMyNotes(acct);
+    const old = await scanMyNotes(acct, { pool: legacy });
+
+    // Same leaf indices, different pools: never the same note.
+    expect(active.notes.map((n) => n.leafIndex)).toEqual([0, 1]);
+    expect(old.notes.map((n) => n.leafIndex)).toEqual([0, 1]);
+    expect(new Set(active.notes.map((n) => n.scope))).toEqual(
+      new Set([activePool().scope]),
+    );
+    expect(new Set(old.notes.map((n) => n.scope))).toEqual(
+      new Set([legacy.scope]),
+    );
+    expect(old.scope).toBe(legacy.scope);
+    expect(vi.mocked(refreshPoolMirror)).toHaveBeenLastCalledWith(legacy);
+    // Spent checks go to the pool the note lives in.
+    expect(mockIsSpent.mock.calls.at(-1)?.[1]).toBe(legacy);
   });
 
   it("falls back to the mirror value when the on-chain check throws", async () => {

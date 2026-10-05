@@ -1,6 +1,7 @@
 import { api } from "../trpc/client";
-import { type DepositEvent, network, poolAddress } from "./chain";
+import type { DepositEvent } from "./chain";
 import { hexToBytes } from "./crypto";
+import { activePool, mirrorScope, type PoolDescriptor } from "./pools";
 
 const DB_NAME = "mawee-pool-mirror";
 const STORE_NAME = "mirrors";
@@ -18,16 +19,15 @@ export type PoolMirror = {
   hydrated: boolean;
 };
 
+// Every pool has its own mirror (keyed by chain and pool address), so leaf 0 of
+// a legacy pool never mixes with leaf 0 of the active pool, and configuring a
+// new active pool leaves the legacy mirror intact.
 const memory = new Map<string, PoolMirror>();
 const inFlight = new Map<string, Promise<PoolMirror>>();
 
-function scopeKey(): string {
-  return `${network}:${poolAddress.toLowerCase()}`;
-}
-
-function emptyMirror(): PoolMirror {
+function emptyMirror(pool: PoolDescriptor): PoolMirror {
   return {
-    scope: scopeKey(),
+    scope: mirrorScope(pool),
     deposits: [],
     spentNullifiers: [],
     spentAtByNullifier: {},
@@ -87,8 +87,10 @@ async function writeIndexedDb(mirror: PoolMirror): Promise<void> {
   }
 }
 
-export async function loadPoolMirror(): Promise<PoolMirror> {
-  const scope = scopeKey();
+export async function loadPoolMirror(
+  pool: PoolDescriptor = activePool(),
+): Promise<PoolMirror> {
+  const scope = mirrorScope(pool);
   const cached = memory.get(scope);
   if (cached) return cached;
   try {
@@ -101,19 +103,23 @@ export async function loadPoolMirror(): Promise<PoolMirror> {
   } catch {
     // IndexedDB can be unavailable in private modes; use the session mirror.
   }
-  const empty = emptyMirror();
+  const empty = emptyMirror(pool);
   memory.set(scope, empty);
   return empty;
 }
 
-async function fetchAndMerge(): Promise<PoolMirror> {
-  const current = await loadPoolMirror();
+async function fetchAndMerge(pool: PoolDescriptor): Promise<PoolMirror> {
+  const current = await loadPoolMirror(pool);
   const snapshot = await api.deposits.snapshot.query({
+    pool: pool.scope,
     afterLeafIndex: current.publishedLeafIndex,
     spentAfterBlock: current.publishedBlock,
   });
   const responseScope = `${snapshot.index.network}:${snapshot.index.poolAddress.toLowerCase()}`;
-  const base = responseScope === current.scope ? current : emptyMirror();
+  // Never merge another pool's leaves into this mirror.
+  if (responseScope !== current.scope)
+    throw new Error("The pool index answered for a different pool.");
+  const base = current;
   const deposits = new Map(base.deposits.map((row) => [row.leafIndex, row]));
   for (const row of snapshot.deposits) {
     deposits.set(row.leafIndex, {
@@ -151,11 +157,13 @@ async function fetchAndMerge(): Promise<PoolMirror> {
   return merged;
 }
 
-export function refreshPoolMirror(): Promise<PoolMirror> {
-  const scope = scopeKey();
+export function refreshPoolMirror(
+  pool: PoolDescriptor = activePool(),
+): Promise<PoolMirror> {
+  const scope = mirrorScope(pool);
   const pending = inFlight.get(scope);
   if (pending) return pending;
-  const refresh = fetchAndMerge().finally(() => inFlight.delete(scope));
+  const refresh = fetchAndMerge(pool).finally(() => inFlight.delete(scope));
   inFlight.set(scope, refresh);
   return refresh;
 }

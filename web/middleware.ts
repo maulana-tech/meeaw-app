@@ -59,5 +59,6 @@ export const config = {
     "/links/:path*",
     "/withdraw/:path*",
     "/history/:path*",
+    "/requests/:path*",
   ],
 };

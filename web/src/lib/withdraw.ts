@@ -13,6 +13,7 @@ import {
   toBE32,
 } from "./crypto";
 import type { LocalAccount, MyNote, ScanResult } from "./notes";
+import { resolvePool } from "./pools";
 import { proveWithdraw, type WithdrawInput } from "./prover";
 
 export type WithdrawResult = {
@@ -83,6 +84,9 @@ export async function withdrawAll(params: {
     throw new Error("Enter a valid Monad address (0x…).");
   }
   const dest = getAddress(destination.trim());
+  if (notes.some((n) => n.scope !== scan.scope)) {
+    throw new Error("Withdraw from one pool at a time.");
+  }
 
   const succeeded: WithdrawResult[] = [];
   const failed: BatchWithdrawResult["failed"] = [];
@@ -116,6 +120,11 @@ async function directWithdraw(params: {
   dest: string;
 }): Promise<WithdrawResult> {
   const { signer, acct, scan, note, dest } = params;
+  // A note's Merkle path and nullifier are only meaningful in its own pool.
+  if (note.scope !== scan.scope) {
+    throw new Error("This balance belongs to a different pool.");
+  }
+  const pool = resolvePool(note.scope);
 
   const mp = await merkleProof(scan.leaves, note.leafIndex, TREE_DEPTH);
   const nf = await nullifierHash(acct.ownerSecret, note.leafIndex);
@@ -139,6 +148,7 @@ async function directWithdraw(params: {
     toBE32(mp.root),
     toBE32(nf),
     proof,
+    pool,
   );
   return { provingMs: ms, txHash };
 }

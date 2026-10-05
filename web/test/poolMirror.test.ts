@@ -8,15 +8,37 @@ vi.mock("../src/trpc/client", () => ({
   api: { deposits: { snapshot: { query: mocks.snapshot } } },
 }));
 
-vi.mock("../src/lib/chain", () => ({
-  network: "eip155:10143",
-  poolAddress: "0x00000000000000000000000000000000000000B0",
+const ACTIVE = {
+  scope: "10143:0x00000000000000000000000000000000000000b0",
+  chainId: 10143,
+  address: "0x00000000000000000000000000000000000000b0",
+  deployBlock: 0,
+  token: "0x00000000000000000000000000000000000000d0",
+  tokenDecimals: 6,
+  depth: 20,
+  confirmations: 1,
+  role: "active",
+  requestCapable: true,
+} as const;
+const LEGACY = {
+  ...ACTIVE,
+  scope: "10143:0x00000000000000000000000000000000000000c0",
+  address: "0x00000000000000000000000000000000000000c0",
+  role: "legacy",
+  requestCapable: false,
+} as const;
+
+vi.mock("../src/lib/pools", () => ({
+  activePool: () => ACTIVE,
+  mirrorScope: (p: { chainId: number; address: string }) =>
+    `eip155:${p.chainId}:${p.address}`,
 }));
 
 function response(
   leafIndex: number,
   publishedBlock: number,
   nullifierHex: string,
+  poolAddress: string = ACTIVE.address,
 ) {
   return {
     deposits: [
@@ -38,7 +60,7 @@ function response(
       },
     ],
     index: {
-      poolAddress: "0x00000000000000000000000000000000000000B0",
+      poolAddress,
       network: "eip155:10143",
       publishedBlock,
       publishedLeafIndex: leafIndex,
@@ -66,10 +88,12 @@ describe("poolMirror", () => {
     const second = await refreshPoolMirror();
 
     expect(mocks.snapshot).toHaveBeenNthCalledWith(1, {
+      pool: ACTIVE.scope,
       afterLeafIndex: -1,
       spentAfterBlock: 0,
     });
     expect(mocks.snapshot).toHaveBeenNthCalledWith(2, {
+      pool: ACTIVE.scope,
       afterLeafIndex: 0,
       spentAfterBlock: 10,
     });
@@ -97,5 +121,39 @@ describe("poolMirror", () => {
 
     expect(await first).toEqual(await second);
     expect(mocks.snapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a separate mirror per pool, so equal leaf indices never mix", async () => {
+    mocks.snapshot
+      .mockResolvedValueOnce(response(0, 10, "aa".repeat(32)))
+      .mockResolvedValueOnce(response(0, 7, "bb".repeat(32), LEGACY.address));
+    const { refreshPoolMirror, loadPoolMirror } = await import(
+      "../src/lib/poolMirror"
+    );
+    await refreshPoolMirror(ACTIVE);
+    await refreshPoolMirror(LEGACY);
+
+    expect(mocks.snapshot).toHaveBeenLastCalledWith({
+      pool: LEGACY.scope,
+      afterLeafIndex: -1,
+      spentAfterBlock: 0,
+    });
+    const active = await loadPoolMirror(ACTIVE);
+    const legacy = await loadPoolMirror(LEGACY);
+    expect(active.scope).toBe(`eip155:10143:${ACTIVE.address}`);
+    expect(legacy.scope).toBe(`eip155:10143:${LEGACY.address}`);
+    expect(active.spentNullifiers).toEqual(["aa".repeat(32)]);
+    expect(legacy.spentNullifiers).toEqual(["bb".repeat(32)]);
+  });
+
+  it("refuses a snapshot that answers for another pool", async () => {
+    mocks.snapshot.mockResolvedValueOnce(
+      response(0, 10, "aa".repeat(32), ACTIVE.address),
+    );
+    const { refreshPoolMirror, loadPoolMirror } = await import(
+      "../src/lib/poolMirror"
+    );
+    await expect(refreshPoolMirror(LEGACY)).rejects.toThrow("different pool");
+    expect((await loadPoolMirror(LEGACY)).deposits).toEqual([]);
   });
 });

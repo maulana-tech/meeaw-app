@@ -1,9 +1,14 @@
 # Public pool data only. Note contents stay encrypted to each recipient's
 # viewing key; the app decrypts them in the browser.
+#
+# Several pools (one active, older ones withdraw-only) can be indexed at once.
+# `pool` is `${chainId}:${lowercase pool address}` and every pool entity id is
+# prefixed with it, so equal leaf indices or nullifiers never collide.
 
-"""A note commitment added to the pool (a payment or a transfer output)."""
+"""A note commitment added to a pool (a payment, transfer or merge output)."""
 type Note {
-  id: ID! # leaf index
+  id: ID! # `${pool}:${leafIndex}`
+  pool: String! @index
   leafIndex: Int! @index
   commitment: String!
   ephemeralPk: String!
@@ -15,16 +20,19 @@ type Note {
 
 """A spent note's nullifier. The pool never reveals which note it spent."""
 type Nullifier {
-  id: ID! # nullifier hex, lowercase, no 0x
+  id: ID! # `${pool}:${nullifier}`
+  pool: String! @index
+  nullifier: String! # hex, lowercase, no 0x
   blockNumber: Int! @index
   timestamp: Int!
   txHash: String!
-  "Set when the spend paid out of the pool (absent for shielded transfers)."
+  "Set when the spend paid out of the pool (absent for transfers and merges)."
   withdrawal: Withdrawal
 }
 
 type Withdrawal {
-  id: ID! # nullifier hex, lowercase, no 0x
+  id: ID! # `${pool}:${nullifier}`
+  pool: String! @index
   recipient: String! @index
   amount: BigInt!
   blockNumber: Int!
@@ -32,9 +40,27 @@ type Withdrawal {
   txHash: String!
 }
 
-"""A @username in the registry with its current public keys."""
+"""
+Events of one pool call, grouped by transaction so a transfer (two notes,
+one spend) and a merge (one note, two spends) are each counted once, and
+only after the whole group has been seen.
+"""
+type PoolTransaction {
+  id: ID! # `${pool}:${txHash}`
+  pool: String! @index
+  deposits: Int!
+  spends: Int!
+  withdrawals: Int!
+  "deposit | withdraw | transfer | merge | incomplete"
+  kind: String!
+  blockNumber: Int!
+  timestamp: Int!
+}
+
+"""A @username in a registry with its current public keys."""
 type Account {
-  id: ID! # username
+  id: ID! # `${registry}:${username}`
+  registry: String! @index # `${chainId}:${lowercase registry address}`
   username: String!
   owner: String! @index
   notePubkey: String!
@@ -53,7 +79,7 @@ type KeyRotation {
   timestamp: Int!
 }
 
-"""Pool-wide aggregates (single row, id "global")."""
+"""Aggregates for one pool (id = pool scope)."""
 type PoolStats {
   id: ID!
   notes: Int!
@@ -62,19 +88,35 @@ type PoolStats {
   anonymitySet: Int!
   withdrawals: Int!
   shieldedTransfers: Int!
+  "Private consolidations of two notes into one; not payments."
+  merges: Int!
   totalWithdrawn: BigInt!
-  accounts: Int!
   paused: Boolean!
   updatedAt: Int!
 }
 
-"""Per-day activity (UTC), for charts."""
+"""Registry aggregates (id = registry scope)."""
+type RegistryStats {
+  id: ID!
+  accounts: Int!
+  updatedAt: Int!
+}
+
+"""Per-pool, per-day activity (UTC), for charts."""
 type DailyStats {
-  id: ID! # YYYY-MM-DD
+  id: ID! # `${pool}:${YYYY-MM-DD}`
+  pool: String! @index
   dayStart: Int!
   notes: Int!
   spent: Int!
   withdrawals: Int!
   withdrawnVolume: BigInt!
+}
+
+"""Per-registry, per-day new accounts (UTC)."""
+type RegistryDailyStats {
+  id: ID! # `${registry}:${YYYY-MM-DD}`
+  registry: String! @index
+  dayStart: Int!
   newAccounts: Int!
 }

@@ -17,6 +17,7 @@ import {
   type PoolMirror,
   refreshPoolMirror,
 } from "./poolMirror";
+import { activePool, type PoolDescriptor, type PoolScope } from "./pools";
 
 const USERNAME_KEY = "mawee.username";
 const IDENTITY_KEY = "mawee.privyUserId";
@@ -82,6 +83,8 @@ export function setStoredUsername(username: string): void {
 }
 
 export type MyNote = {
+  /** The pool this note lives in; leaf indices are only unique per pool. */
+  scope: PoolScope;
   leafIndex: number;
   amount: bigint;
   salt: bigint;
@@ -90,6 +93,7 @@ export type MyNote = {
   spentAt?: string;
 };
 export type ScanResult = {
+  scope: PoolScope;
   notes: MyNote[];
   leaves: bigint[];
   claimable: bigint;
@@ -98,22 +102,30 @@ export type ScanResult = {
   health: "healthy" | "stale" | "degraded";
 };
 
-/// Scan the pool, decrypting each deposit; the ones that decrypt are ours.
-/// Also returns the full ordered leaf set needed to build Merkle proofs.
+/// Scan one pool (the active pool by default), decrypting each deposit; the
+/// ones that decrypt are ours. Also returns that pool's full ordered leaf set
+/// needed to build Merkle proofs. Never mix results from different pools.
 export async function scanMyNotes(
   acct: LocalAccount,
-  options: { refresh?: boolean } = {},
+  options: { refresh?: boolean; pool?: PoolDescriptor; includeRequestRecovery?:boolean } = {},
 ): Promise<ScanResult> {
+  const pool = options.pool ?? activePool();
   const mirror =
     options.refresh === false
-      ? await loadPoolMirror()
-      : await refreshPoolMirror();
-  return scanMirrorForAccount(acct, mirror);
+      ? await loadPoolMirror(pool)
+      : await refreshPoolMirror(pool);
+  const scan=await scanMirrorForAccount(acct, mirror, pool);
+  if(options.includeRequestRecovery){
+    const {recoverPaidRequestOutputs}=await import("../features/requests/requestNoteRecovery");
+    return recoverPaidRequestOutputs(acct,pool,scan);
+  }
+  return scan;
 }
 
 async function scanMirrorForAccount(
   acct: LocalAccount,
   mirror: PoolMirror,
+  pool: PoolDescriptor,
 ): Promise<ScanResult> {
   const deposits = mirror.deposits;
   const spentNullifiers = new Set(mirror.spentNullifiers);
@@ -154,14 +166,14 @@ async function scanMirrorForAccount(
         );
       continue;
     }
-    if (debug)
-      console.info(`[mawee] leaf ${d.leafIndex}: MINE, amount=${dec.amount}`);
+    if (debug) console.info(`[mawee] leaf ${d.leafIndex}: MINE`);
     const nullifierBytes = toBE32(
       await nullifier(acct.ownerSecret, d.leafIndex),
     );
     const nullifierHex = bytesToHex(nullifierBytes);
     const spent = spentNullifiers.has(nullifierHex);
     const note: MyNote = {
+      scope: pool.scope,
       leafIndex: d.leafIndex,
       amount: dec.amount,
       salt: dec.salt,
@@ -183,7 +195,7 @@ async function scanMirrorForAccount(
   await Promise.all(
     unverified.map(async ({ note, nullifierBytes }) => {
       try {
-        if (await isSpent(nullifierBytes)) note.spent = true;
+        if (await isSpent(nullifierBytes, pool)) note.spent = true;
       } catch {
         // A failed view leaves the mirror's optimistic value; the pool still
         // rejects an actual double-spend on-chain.
@@ -195,6 +207,7 @@ async function scanMirrorForAccount(
     .filter((n) => !n.spent)
     .reduce((s, n) => s + n.amount, 0n);
   return {
+    scope: pool.scope,
     notes,
     leaves,
     claimable,

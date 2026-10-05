@@ -1,61 +1,98 @@
-// Deploys Poseidon, the three Groth16 verifiers, MaweeRegistry and MaweePool,
-// then writes the resulting addresses into web/.env.local.
+// Deploy a Merge-capable pool, then write explicit review candidates. Nothing
+// redirects the app or indexer; activation is a separate reviewed operation.
 //
-//   DEPLOYER_PRIVATE_KEY=0x… pnpm --filter contracts deploy:testnet
-//
-// USDC_ADDRESS selects the pool asset. When it is unset on testnet, a
-// MockUSDC (anyone can mint) is deployed so the demo can be funded freely.
+//   DEPLOYER_PRIVATE_KEY=<secret> pnpm --filter contracts exec hardhat run scripts/deploy.ts --network monadTestnet
+//   Inspect .deploy-candidates/<network>-<chain>-<block>-<pool>/ before activation.
+
 import fs from "node:fs";
 import path from "node:path";
 import hre from "hardhat";
+import { getAddress, isAddress } from "viem";
+import {
+  candidateManifest,
+  configuredIndexerAddresses,
+  manifestForChain,
+  readPublicSetting,
+  renderIndexerCandidate,
+  writeDeploymentCandidates,
+  type CandidatePool,
+} from "./deployment-config";
 
-const ENV_FILE = path.join(__dirname, "../../web/.env.local");
-const INDEXER_CONFIG = path.join(__dirname, "../../indexer/config.yaml");
+const ROOT = path.resolve(__dirname, "../..");
+const SOURCE_ENV = path.join(ROOT, "web/.env.local");
+const SOURCE_INDEXER = path.join(ROOT, "indexer/config.yaml");
+const ZERO = "0x0000000000000000000000000000000000000000";
+const ERC20_DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+  },
+] as const;
 
-/**
- * Points the Envio indexer at the fresh deployment: chain id, start block and
- * the address listed under each named contract in indexer/config.yaml.
- */
-function updateIndexerConfig(
-  file: string,
-  chainId: number,
-  startBlock: bigint,
-  addresses: Record<string, string>,
-) {
-  if (!fs.existsSync(file)) return;
-  const lines = fs.readFileSync(file, "utf8").split("\n");
-  let current: string | null = null;
-  const seen = new Set<string>();
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    const chain = line.match(/^(\s*- id: )\d+\s*$/);
-    if (chain) lines[i] = `${chain[1]}${chainId}`;
-    const start = line.match(/^(\s*start_block: )\d+\s*$/);
-    if (start) lines[i] = `${start[1]}${startBlock}`;
-    const name = line.match(/^\s*- name: (\w+)\s*$/);
-    if (name) current = name[1];
-    const address = line.match(/^(\s*- )"0x[0-9a-fA-F]{40}"\s*$/);
-    if (address && current && addresses[current] && !seen.has(current)) {
-      lines[i] = `${address[1]}"${addresses[current]}"`;
-      seen.add(current);
-    }
+function publicAddress(name: string): `0x${string}` | undefined {
+  const value = readPublicSetting(SOURCE_ENV, name);
+  if (!value) return undefined;
+  if (!isAddress(value, { strict: false })) {
+    throw new Error(`${name} is not a valid public address.`);
   }
-  for (const contract of Object.keys(addresses)) {
-    if (!seen.has(contract)) {
-      throw new Error(`indexer/config.yaml has no address entry for ${contract}`);
-    }
-  }
-  fs.writeFileSync(file, lines.join("\n"));
+  return getAddress(value);
 }
 
-function upsertEnv(file: string, values: Record<string, string>) {
-  const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : [];
-  for (const [key, value] of Object.entries(values)) {
-    const i = lines.findIndex((l) => l.startsWith(`${key}=`));
-    if (i >= 0) lines[i] = `${key}=${value}`;
-    else lines.push(`${key}=${value}`);
+function tokenDecimals(value: string | undefined): number {
+  const parsed = Number(value ?? "6");
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 18) {
+    throw new Error("USDC_DECIMALS must be an integer from 0 to 18.");
   }
-  fs.writeFileSync(file, `${lines.filter((l, i) => l || i < lines.length - 1).join("\n")}\n`);
+  return parsed;
+}
+
+function previousPool(
+  chainId: number,
+  indexerPools: readonly string[],
+  useConfiguredEnvironment: boolean,
+): CandidatePool | null {
+  if (indexerPools.length > 1) {
+    throw new Error(
+      "Add a verified descriptor for every indexed pool before enabling pool history.",
+    );
+  }
+  const address =
+    (useConfiguredEnvironment
+      ? publicAddress("NEXT_PUBLIC_MAWEE_POOL_ADDRESS")
+      : undefined) ?? indexerPools[0];
+  if (!address || address.toLowerCase() === ZERO) return null;
+  const token = useConfiguredEnvironment
+    ? publicAddress("NEXT_PUBLIC_USDC_ADDRESS")
+    : undefined;
+  if (!token || token.toLowerCase() === ZERO) {
+    throw new Error(
+      "The previous pool's USDC address is missing; no legacy candidate can be created safely.",
+    );
+  }
+  const configuredBlock = Number(
+    readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK") ?? "0",
+  );
+  if (!Number.isSafeInteger(configuredBlock) || configuredBlock < 0) {
+    throw new Error("The previous pool's deployment block is invalid.");
+  }
+  return {
+    chainId,
+    address: address as `0x${string}`,
+    deployBlock: configuredBlock,
+    token,
+    tokenDecimals: tokenDecimals(
+      useConfiguredEnvironment
+        ? readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_USDC_DECIMALS")
+        : undefined,
+    ),
+    depth: 20,
+    confirmations: 1,
+    role: "legacy",
+    requestCapable: false,
+  };
 }
 
 async function main() {
@@ -63,58 +100,239 @@ async function main() {
   if (!deployer) throw new Error("Set DEPLOYER_PRIVATE_KEY to deploy.");
   const publicClient = await hre.viem.getPublicClient();
   const chainId = await publicClient.getChainId();
-  const admin = (process.env.POOL_ADMIN as `0x${string}` | undefined) ?? deployer.account.address;
-  console.log(`network=${hre.network.name} chainId=${chainId} deployer=${deployer.account.address}`);
-  // Index from just before the first deployment transaction.
-  const firstBlock = await publicClient.getBlockNumber();
+  const requestedAdmin = process.env.POOL_ADMIN ?? deployer.account.address;
+  if (!isAddress(requestedAdmin, { strict: false })) {
+    throw new Error("POOL_ADMIN is not a valid address.");
+  }
+  const admin = getAddress(requestedAdmin);
+  if (admin.toLowerCase() === ZERO) {
+    throw new Error("POOL_ADMIN cannot be the zero address.");
+  }
+  console.log(
+    `network=${hre.network.name} chainId=${chainId} deployer=${deployer.account.address}`,
+  );
+
+  if (!fs.existsSync(SOURCE_INDEXER)) {
+    throw new Error("indexer/config.yaml is required to produce a candidate.");
+  }
+  const sourceIndexer = fs.readFileSync(SOURCE_INDEXER, "utf8");
+  const indexedPools = configuredIndexerAddresses(sourceIndexer, chainId, "Pool");
+  const indexedRegistries = configuredIndexerAddresses(
+    sourceIndexer,
+    chainId,
+    "Registry",
+  );
+  if (indexedRegistries.length > 1) {
+    throw new Error("The selected indexer chain has multiple Registry addresses.");
+  }
+
+  const configuredChainValue = readPublicSetting(
+    SOURCE_ENV,
+    "NEXT_PUBLIC_MONAD_CHAIN_ID",
+  );
+  const configuredChain = Number(configuredChainValue ?? chainId);
+  if (!Number.isSafeInteger(configuredChain) || configuredChain < 1) {
+    throw new Error("NEXT_PUBLIC_MONAD_CHAIN_ID is invalid.");
+  }
+  const sameConfiguredChain = configuredChain === chainId;
+  const priorManifest = sameConfiguredChain
+    ? manifestForChain(
+        readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MAWEE_POOLS"),
+        chainId,
+      )
+    : undefined;
+
+  let oldPool: CandidatePool | null = null;
+  if (priorManifest) {
+    const descriptors = JSON.parse(priorManifest) as { address: string }[];
+    const described = new Set(descriptors.map((pool) => pool.address.toLowerCase()));
+    if (indexedPools.some((address) => !described.has(address.toLowerCase()))) {
+      throw new Error(
+        "Every indexed legacy pool must have a verified public descriptor before deployment.",
+      );
+    }
+    if (descriptors.some((pool) => !indexedPools.includes(pool.address.toLowerCase()))) {
+      throw new Error(
+        "Every public pool must already be indexed before deployment; repair the pool manifest first.",
+      );
+    }
+  } else {
+    oldPool = previousPool(chainId, indexedPools, sameConfiguredChain);
+    if (
+      oldPool &&
+      !indexedPools.some((address) => address.toLowerCase() === oldPool!.address.toLowerCase())
+    ) {
+      throw new Error("The configured previous pool is missing from the indexer.");
+    }
+  }
+
+  const previousRegistry = sameConfiguredChain
+    ? publicAddress("NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS") ?? indexedRegistries[0]
+    : indexedRegistries[0];
+  let reuseRegistry = false;
+  if (previousRegistry) {
+    const code = await publicClient.getCode({ address: previousRegistry as `0x${string}` });
+    if (!code || code === "0x") {
+      throw new Error(
+        "The configured username Registry has no code on this chain; verify the candidate source.",
+      );
+    }
+    reuseRegistry = true;
+  }
 
   let usdc = process.env.USDC_ADDRESS as `0x${string}` | undefined;
-  let usdcDecimals = process.env.USDC_DECIMALS ?? "6";
-  let usdcMintable = "false";
+  const configuredDecimals =
+    process.env.USDC_DECIMALS ??
+    (sameConfiguredChain
+      ? readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_USDC_DECIMALS")
+      : undefined);
+  let decimals = tokenDecimals(configuredDecimals);
+  let mintable = false;
+  if (usdc) {
+    if (!isAddress(usdc, { strict: false })) {
+      throw new Error("USDC_ADDRESS is invalid.");
+    }
+    usdc = getAddress(usdc);
+  } else if (sameConfiguredChain) {
+    usdc = publicAddress("NEXT_PUBLIC_USDC_ADDRESS");
+  }
+  if (chainId === 143 && !usdc) {
+    throw new Error("USDC_ADDRESS is required on mainnet.");
+  }
+  if (usdc) {
+    if (usdc.toLowerCase() === ZERO) {
+      throw new Error("USDC_ADDRESS cannot be the zero address.");
+    }
+    const code = await publicClient.getCode({ address: usdc });
+    if (!code || code === "0x") {
+      throw new Error("USDC_ADDRESS has no contract code on this chain.");
+    }
+    const actualDecimals = await publicClient.readContract({
+      address: usdc,
+      abi: ERC20_DECIMALS_ABI,
+      functionName: "decimals",
+    });
+    if (
+      !Number.isSafeInteger(actualDecimals) ||
+      actualDecimals < 0 ||
+      actualDecimals > 18 ||
+      (configuredDecimals !== undefined && actualDecimals !== decimals)
+    ) {
+      throw new Error("Configured USDC decimals do not match the token contract.");
+    }
+    decimals = actualDecimals;
+  }
+
+  // All local manifest, indexer and token inputs have been checked before the
+  // first deployment transaction is sent.
+  const firstBlock = await publicClient.getBlockNumber();
   if (!usdc) {
-    if (chainId === 143) throw new Error("USDC_ADDRESS is required on mainnet.");
     const mock = await hre.viem.deployContract("MockUSDC");
     usdc = mock.address;
-    usdcDecimals = "6";
-    usdcMintable = "true";
+    decimals = 6;
+    mintable = true;
     console.log(`MockUSDC        ${usdc}`);
   }
 
-  const poseidon = await hre.viem.deployContract("poseidon-solidity/PoseidonT3.sol:PoseidonT3");
+  const poseidon = await hre.viem.deployContract(
+    "poseidon-solidity/PoseidonT3.sol:PoseidonT3",
+  );
   const depositVerifier = await hre.viem.deployContract("DepositVerifier");
   const withdrawVerifier = await hre.viem.deployContract("WithdrawVerifier");
   const transferVerifier = await hre.viem.deployContract("TransferVerifier");
-  const registry = await hre.viem.deployContract("MaweeRegistry");
+  const mergeVerifier = await hre.viem.deployContract("MergeVerifier");
+  const registry = reuseRegistry
+    ? await (
+        hre.viem.getContractAt as unknown as (
+          name: string,
+          address: `0x${string}`,
+        ) => Promise<{ address: `0x${string}` }>
+      )("MaweeRegistry", previousRegistry as `0x${string}`)
+    : await hre.viem.deployContract("MaweeRegistry");
   const pool = await hre.viem.deployContract(
     "MaweePool",
-    [admin, usdc, depositVerifier.address, withdrawVerifier.address, transferVerifier.address],
-    { libraries: { "poseidon-solidity/PoseidonT3.sol:PoseidonT3": poseidon.address } },
+    [
+      admin,
+      usdc,
+      depositVerifier.address,
+      withdrawVerifier.address,
+      transferVerifier.address,
+      mergeVerifier.address,
+    ],
+    {
+      libraries: {
+        "poseidon-solidity/PoseidonT3.sol:PoseidonT3": poseidon.address,
+      },
+    },
   );
   const deployBlock = await publicClient.getBlockNumber();
-
-  console.log(`PoseidonT3      ${poseidon.address}`);
-  console.log(`MaweeRegistry   ${registry.address}`);
-  console.log(`MaweePool       ${pool.address} (admin ${admin})`);
-
-  upsertEnv(ENV_FILE, {
-    NEXT_PUBLIC_MONAD_CHAIN_ID: String(chainId),
-    NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS: registry.address,
-    NEXT_PUBLIC_MAWEE_POOL_ADDRESS: pool.address,
-    NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK: deployBlock.toString(),
-    NEXT_PUBLIC_USDC_ADDRESS: usdc,
-    NEXT_PUBLIC_USDC_DECIMALS: usdcDecimals,
-    NEXT_PUBLIC_USDC_MINTABLE: usdcMintable,
+  const newPool: CandidatePool = {
+    chainId,
+    address: pool.address,
+    deployBlock: Number(deployBlock),
+    token: usdc,
+    tokenDecimals: decimals,
+    depth: 20,
+    confirmations: 1,
+    role: "active",
+    requestCapable: true,
+  };
+  const manifest = candidateManifest({
+    chainId,
+    priorManifest,
+    previousPool: oldPool,
+    newPool,
+    confirmations: 1,
   });
-  console.log(`wrote ${path.relative(process.cwd(), ENV_FILE)}`);
+  const knownPools = [
+    ...manifest.map((entry) => entry.address.toLowerCase()),
+    ...indexedPools.map((address) => address.toLowerCase()),
+  ];
+  const candidateIndexer = renderIndexerCandidate(
+    sourceIndexer,
+    chainId,
+    firstBlock,
+    { Pool: [...new Set(knownPools)], Registry: registry.address },
+  );
 
-  updateIndexerConfig(INDEXER_CONFIG, chainId, firstBlock, {
-    Pool: pool.address,
-    Registry: registry.address,
+  const output = writeDeploymentCandidates({
+    root: ROOT,
+    network: hre.network.name,
+    chainId,
+    deployBlock: Number(deployBlock),
+    pool: pool.address,
+    manifest,
+    webValues: {
+      NEXT_PUBLIC_MONAD_CHAIN_ID: String(chainId),
+      NEXT_PUBLIC_MONAD_RPC_URL:
+        readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MONAD_RPC_URL") ?? "",
+      NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS: registry.address,
+      NEXT_PUBLIC_MAWEE_POOL_ADDRESS: pool.address,
+      NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK: deployBlock.toString(),
+      NEXT_PUBLIC_USDC_ADDRESS: usdc,
+      NEXT_PUBLIC_USDC_DECIMALS: String(decimals),
+      NEXT_PUBLIC_USDC_MINTABLE: String(mintable),
+      NEXT_PUBLIC_POOL_DEPTH: "20",
+      NEXT_PUBLIC_MAWEE_POOLS: JSON.stringify(manifest),
+      NEXT_PUBLIC_PRIVY_APP_ID:
+        readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_PRIVY_APP_ID") ?? "",
+    },
+    indexerConfig: candidateIndexer,
   });
-  console.log(`updated ${path.relative(process.cwd(), INDEXER_CONFIG)} (start_block ${firstBlock})`);
+
+  console.log(
+    `MaweePool candidate ${pool.address}; Registry ${reuseRegistry ? "reused" : "deployed"} ${registry.address}`,
+  );
+  console.log(
+    `Wrote review candidates to ${path.relative(ROOT, output.directory)}. Live application/indexer settings were not changed.`,
+  );
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((error: unknown) => {
+  console.error(
+    error instanceof Error
+      ? error.message
+      : "Deployment candidate generation failed.",
+  );
   process.exitCode = 1;
 });

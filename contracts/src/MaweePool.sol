@@ -39,9 +39,15 @@ interface IVerifier4 {
 ///   deposit  = [commitment, amount]
 ///   withdraw = [root, nullifier, recipient, amount]
 ///   transfer = [root, nullifier, outCommitmentRecipient, outCommitmentChange]
+///   merge    = [root, nullifierA, nullifierB, outCommitment]
+///
+/// Every inserted commitment is unique. A payment request has one immutable
+/// recipient commitment, so two independently valid proofs paying the same
+/// request can never both settle: the second reverts with DuplicateCommitment
+/// and keeps its input note unspent.
 ///
 /// Every entry point can be submitted by a relayer, so users never need gas:
-/// withdraw/transfer are authorized by their proofs, and deposits by the
+/// withdraw/transfer/merge are authorized by their proofs, and deposits by the
 /// payer's EIP-712 signature (plus an optional EIP-2612 permit).
 contract MaweePool is EIP712, Nonces {
     /// Fixed by the circuits (`Withdraw(20)` / `Transfer(20)`).
@@ -92,6 +98,8 @@ contract MaweePool is EIP712, Nonces {
     error ZeroAddress();
     error SignatureExpired();
     error InvalidSignature();
+    error DuplicateCommitment();
+    error DuplicateNullifier();
 
     /// Encrypted note metadata for recipients to scan. Emitted for direct
     /// deposits and for both outputs of a shielded transfer.
@@ -106,6 +114,7 @@ contract MaweePool is EIP712, Nonces {
     IVerifier2 public immutable depositVerifier;
     IVerifier4 public immutable withdrawVerifier;
     IVerifier4 public immutable transferVerifier;
+    IVerifier4 public immutable mergeVerifier;
 
     address public admin;
     address public pendingAdmin;
@@ -117,23 +126,27 @@ contract MaweePool is EIP712, Nonces {
     uint256[TREE_DEPTH] private filledSubtrees;
     uint256[ROOT_HISTORY_SIZE] private roots;
     mapping(bytes32 nullifier => bool) private spent;
+    mapping(bytes32 commitment => bool) private insertedCommitments;
 
     constructor(
         address admin_,
         IERC20 token_,
         IVerifier2 depositVerifier_,
         IVerifier4 withdrawVerifier_,
-        IVerifier4 transferVerifier_
+        IVerifier4 transferVerifier_,
+        IVerifier4 mergeVerifier_
     ) EIP712("MaweePool", "1") {
         if (
             admin_ == address(0) || address(token_) == address(0) || address(depositVerifier_) == address(0)
                 || address(withdrawVerifier_) == address(0) || address(transferVerifier_) == address(0)
+                || address(mergeVerifier_) == address(0)
         ) revert ZeroAddress();
         admin = admin_;
         token = token_;
         depositVerifier = depositVerifier_;
         withdrawVerifier = withdrawVerifier_;
         transferVerifier = transferVerifier_;
+        mergeVerifier = mergeVerifier_;
 
         uint256 z = 0;
         zeros[0] = z;
@@ -242,6 +255,32 @@ contract MaweePool is EIP712, Nonces {
         emit Spend(nullifier);
     }
 
+    /// @notice Consolidate two notes of the same owner into one note worth
+    /// their exact sum, without tokens leaving the pool. Ownership, the shared
+    /// root, distinct inputs and conservation are enforced by the merge circuit.
+    function merge(
+        bytes32 root,
+        bytes32 nullifierA,
+        bytes32 nullifierB,
+        Proof calldata proof,
+        NoteOutput calldata output
+    ) external whenNotPaused returns (uint32 outputIndex) {
+        if (!isKnownRoot(root)) revert UnknownRoot();
+        if (nullifierA == nullifierB) revert DuplicateNullifier();
+        if (spent[nullifierA] || spent[nullifierB]) revert DoubleSpend();
+        uint256 outLeaf = uint256(output.commitment);
+
+        uint256[4] memory signals = [uint256(root), uint256(nullifierA), uint256(nullifierB), outLeaf];
+        if (!mergeVerifier.verifyProof(proof.a, proof.b, proof.c, signals)) revert InvalidProof();
+
+        spent[nullifierA] = true;
+        spent[nullifierB] = true;
+        outputIndex = _insert(outLeaf);
+        emit Deposit(outputIndex, output.commitment, output.ephemeralPk, output.ciphertext);
+        emit Spend(nullifierA);
+        emit Spend(nullifierB);
+    }
+
     // --- views ---------------------------------------------------------------
 
     /// The withdraw circuit's `recipient` signal is the destination address as
@@ -271,6 +310,10 @@ contract MaweePool is EIP712, Nonces {
 
     function isSpent(bytes32 nullifier) external view returns (bool) {
         return spent[nullifier];
+    }
+
+    function isCommitmentInserted(bytes32 commitment) external view returns (bool) {
+        return insertedCommitments[commitment];
     }
 
     function zeroAt(uint32 level) external view returns (bytes32) {
@@ -334,7 +377,15 @@ contract MaweePool is EIP712, Nonces {
         emit Deposit(leafIndex, commitment, ephemeralPk, ciphertext);
     }
 
+    /// Every entry point inserts through here, so commitment uniqueness and the
+    /// field bound hold for deposits, transfers and merges alike. A revert
+    /// rolls back any nullifier or earlier insert in the same transaction.
     function _insert(uint256 leaf) private returns (uint32 index) {
+        if (leaf >= FIELD_SIZE) revert InvalidFieldElement();
+        bytes32 key = bytes32(leaf);
+        if (insertedCommitments[key]) revert DuplicateCommitment();
+        insertedCommitments[key] = true;
+
         index = nextIndex;
         if (index >= uint32(1) << TREE_DEPTH) revert TreeFull();
 
