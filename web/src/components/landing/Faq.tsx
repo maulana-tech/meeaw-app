@@ -58,15 +58,15 @@ export function Faq() {
       id="faq"
       data-ed-section
       aria-labelledby="faq-title"
-      className="relative bg-void py-24 sm:py-32"
+      className="relative py-24 sm:py-32"
     >
       <Frame>
         <div className="grid gap-12 lg:grid-cols-[1fr_2fr]">
           <div>
-            <MonoLabel className="text-starlight/60">{"/// FAQ"}</MonoLabel>
+            <MonoLabel className="text-starlight/60">FAQ</MonoLabel>
             <h2
               id="faq-title"
-              className="mt-4 text-[clamp(1.9rem,2.8vw,2.6rem)] font-light tracking-tight"
+              className="mt-4 text-[clamp(1.9rem,2.8vw,2.6rem)] font-normal tracking-tight"
             >
               Questions, answered
             </h2>

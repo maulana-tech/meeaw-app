@@ -27,7 +27,7 @@ vi.mock("gsap/ScrollTrigger", () => ({
 }));
 
 describe("ProblemStatement scroll reveal", () => {
-  it("leads with the gradient sentence and reveals the rest word by word", () => {
+  it("leads with the accent sentence and reveals the rest word by word", () => {
     const { container } = render(<ProblemStatement />);
 
     expect(
@@ -35,9 +35,10 @@ describe("ProblemStatement scroll reveal", () => {
         name: /public wallets were never designed for business/i,
       }),
     ).toBeInTheDocument();
-    expect(container.querySelector(".text-nebula")).toHaveTextContent(
-      "Public wallets were never designed for business.",
-    );
+    // The lead sentence carries the accent as solid signal-ink, not a gradient.
+    expect(
+      container.querySelector('[class*="--signal-ink"]'),
+    ).toHaveTextContent("Public wallets were never designed for business.");
     // Nested emphasis is split into words too.
     expect(screen.getByText("earn,")).toHaveClass("word");
     expect(screen.getByText("earn,").parentElement).toHaveClass("font-normal");

@@ -161,7 +161,7 @@ export function LinkEditorDialog({
             </Label>
             <textarea
               id={`${mode}-link-description`}
-              className={`${linenFieldClass} min-h-28 rounded-lg border px-3 py-3 text-sm outline-none focus-visible:ring-2`}
+              className={`${linenFieldClass} min-h-28 rounded-(--dash-radius-sm) border px-3 py-3 text-sm outline-none focus-visible:ring-2`}
               placeholder="Tell people what this payment is for..."
               maxLength={500}
               {...register("description")}
@@ -193,7 +193,7 @@ export function LinkEditorDialog({
                   key={modeKey}
                   type="button"
                   onClick={() => setAmountMode(modeKey)}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-(--dash-radius-sm) px-3 py-2 text-sm font-medium transition-colors ${
                     amountMode === modeKey
                       ? "bg-foreground/18 text-foreground ring-1 ring-foreground/25"
                       : "text-foreground/65 hover:bg-foreground/8 hover:text-foreground"

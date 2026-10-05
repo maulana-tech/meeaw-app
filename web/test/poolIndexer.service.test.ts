@@ -292,4 +292,14 @@ describe("syncPoolIndex", () => {
     expect(result.status).toBe("skipped");
     expect(mocks.fetchPoolLogs).not.toHaveBeenCalled();
   });
+  it("skips an undeployed pool without acquiring a lease or scanning genesis", async () => {
+    const { syncPoolIndex } = await service();
+    const result = await syncPoolIndex({
+      ...pools.active,
+      address: "0x0000000000000000000000000000000000000000",
+    });
+    expect(result.status).toBe("skipped");
+    expect(mocks.stateFindOneAndUpdate).not.toHaveBeenCalled();
+    expect(mocks.fetchPoolLogs).not.toHaveBeenCalled();
+  });
 });

@@ -4,7 +4,12 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useWallet } from "../WalletProvider";
 import { LANDING_SECTIONS } from "./Nav";
-import { Frame, MonoLabel, Nebula, pillOutlineDark } from "./primitives";
+import {
+  Frame,
+  MonoLabel,
+  pillOutlineDark,
+  pillSolidViolet,
+} from "./primitives";
 
 // Product facts only — no vanity metrics.
 const FACTS = [
@@ -23,19 +28,12 @@ export function Hero() {
       aria-labelledby="hero-title"
       className="relative isolate overflow-hidden"
     >
-      <Nebula className="-z-10" />
-      {/* Fade the nebula into the black sections below. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-2/5 bg-gradient-to-b from-transparent to-void"
-      />
-
       <Frame className="flex min-h-[92svh] flex-col justify-end pt-28 pb-14 sm:pb-20">
         <div className="grid items-end gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="max-w-3xl">
             <h1
               id="hero-title"
-              className="text-[clamp(2.6rem,6.2vw,5.4rem)] font-light leading-[1.02] tracking-[-0.02em]"
+              className="text-[clamp(2.6rem,6.2vw,5.4rem)] font-normal leading-[1.02] tracking-[-0.02em]"
             >
               Get paid in USDC.
               <br />
@@ -48,13 +46,13 @@ export function Hero() {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               {address ? (
-                <Link href="/dashboard" className={pillOutlineDark}>
+                <Link href="/dashboard" className={pillSolidViolet}>
                   Open your dashboard
                 </Link>
               ) : (
                 <button
                   type="button"
-                  className={pillOutlineDark}
+                  className={pillSolidViolet}
                   onClick={() => signIn()}
                 >
                   Create your payment link
@@ -68,14 +66,14 @@ export function Hero() {
 
           <nav aria-label="Explore Mawee" className="hidden lg:block">
             <MonoLabel className="block border-b border-starlight/70 pb-3 text-starlight/85">
-              {"/// Explore Mawee"}
+              Explore Mawee
             </MonoLabel>
             <ul className="list-none">
               {LANDING_SECTIONS.map((section) => (
                 <li key={section.id}>
                   <a
                     href={`#${section.id}`}
-                    className="group flex items-center justify-between border-b border-starlight/15 py-3 font-landing-mono text-xs uppercase tracking-[0.22em] text-starlight/80 transition-colors hover:text-starlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
+                    className="group flex items-center justify-between border-b border-starlight/15 py-3 font-landing text-xs uppercase tracking-[0.22em] text-starlight/80 transition-colors hover:text-starlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
                   >
                     {section.label}
                     <ArrowRight
@@ -91,7 +89,7 @@ export function Hero() {
       </Frame>
 
       <Frame>
-        <dl className="grid grid-cols-2 border-y border-starlight/10 lg:grid-cols-4">
+        <dl className="grid grid-cols-2 border-y border-starlight/10 bg-void-2 lg:grid-cols-4">
           {FACTS.map((fact, index) => (
             <div
               key={fact.label}
@@ -108,7 +106,7 @@ export function Hero() {
                   {fact.label}
                 </MonoLabel>
               </dt>
-              <dd className="text-[clamp(2.2rem,4.2vw,3.6rem)] font-light leading-none tracking-tight">
+              <dd className="text-[clamp(2.2rem,4.2vw,3.6rem)] font-normal leading-none tracking-tight">
                 {fact.value}
               </dd>
             </div>

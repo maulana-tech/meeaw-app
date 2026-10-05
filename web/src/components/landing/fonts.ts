@@ -1,7 +1,7 @@
 import { JetBrains_Mono, Urbanist } from "next/font/google";
 
-// Scoped to the landing page (applied on its root in Chrome), so the product
-// UI keeps its own typography.
+// Shared by the landing page and the dashboard. The variables are set on <html>
+// (app/layout.tsx); each surface opts in through its own font-family.
 export const urbanist = Urbanist({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],

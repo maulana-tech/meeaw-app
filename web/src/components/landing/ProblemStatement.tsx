@@ -29,15 +29,15 @@ export function ProblemStatement() {
     <section
       id="problem"
       aria-labelledby="problem-title"
-      className="relative bg-void py-24 sm:py-32"
+      className="relative py-24 sm:py-32"
     >
       <Frame>
         <h2 className="sr-only" id="problem-title">
           Public wallets were never designed for business.
         </h2>
         <LatticeGlyph />
-        <div className="mt-10 max-w-[1100px] text-[clamp(1.7rem,3.3vw,2.9rem)] font-light leading-[1.22] tracking-[-0.01em]">
-          <span data-ed-article className="text-nebula">
+        <div className="mt-10 max-w-[1100px] text-[clamp(1.7rem,3.3vw,2.9rem)] font-normal leading-[1.22] tracking-[-0.01em]">
+          <span data-ed-article className="text-(--signal-ink)">
             Public wallets were never designed for business.{" "}
           </span>
           <ScrollReveal

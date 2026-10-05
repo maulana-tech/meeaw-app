@@ -18,10 +18,10 @@ export const glassPopoverClass =
 export const glassThemeClass = "theme-glass";
 
 export const linenInsetClass =
-  "rounded-2xl border border-brand-obsidian/10 bg-brand-obsidian/[0.035]";
+  "rounded-(--dash-radius-sm) border border-foreground/10 bg-foreground/[0.035]";
 
 export const linenFieldClass =
-  "rounded-lg border border-brand-obsidian/15 bg-white text-brand-obsidian placeholder:text-brand-obsidian/45 focus-visible:border-brand-obsidian/40 focus-visible:ring-brand-obsidian/20";
+  "rounded-lg border border-foreground/15 bg-background text-foreground placeholder:text-foreground/45 focus-visible:border-foreground/40 focus-visible:ring-foreground/20";
 
 export const linenSegmentedClass =
-  "rounded-xl border border-brand-obsidian/10 bg-brand-obsidian/[0.04]";
+  "rounded-xl border border-foreground/10 bg-foreground/[0.04]";

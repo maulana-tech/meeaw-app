@@ -38,8 +38,8 @@ export function PersonalLinkCard({
       </div>
 
       <div className="grid min-h-0 gap-3">
-        <div className="flex items-center gap-3 rounded-xl bg-secondary p-3 ring-1 ring-border">
-          <div className="flex size-10 shrink-0 rotate-2 items-center justify-center rounded-lg border border-border bg-background text-foreground">
+        <div className="flex items-center gap-3 rounded-(--dash-radius-sm) bg-secondary p-3 ring-1 ring-border">
+          <div className="flex size-10 shrink-0 rotate-2 items-center justify-center rounded-(--dash-radius-sm) border border-border bg-background text-foreground">
             <ReceiptText className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1 truncate font-mono text-sm font-medium text-foreground">

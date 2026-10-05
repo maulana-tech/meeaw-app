@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "../components/AppShell";
+import { jetbrainsMono, urbanist } from "../components/landing/fonts";
 import { PrivyAppProvider } from "../components/PrivyAppProvider";
 import { Toaster } from "../components/ui/sonner";
 import { WalletProvider } from "../components/WalletProvider";
@@ -16,7 +17,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="min-h-full font-sans">
+    <html
+      lang="en"
+      className={`min-h-full font-sans ${urbanist.variable} ${jetbrainsMono.variable}`}
+      // The dashboard sets data-dash-mode before hydration to avoid a flash.
+      suppressHydrationWarning
+    >
       <body className="min-h-full bg-background text-foreground antialiased font-sans">
         <a
           href="#main-content"

@@ -34,12 +34,11 @@ describe("payment link QR dialog", () => {
       "size-10",
       "rounded-full",
     );
-    expect(dialog.querySelector('path[fill="#1A1F12"]')).toBeInTheDocument();
-    expect(dialog.querySelector('path[fill="#F5F3EA"]')).toBeInTheDocument();
-    expect(dialog.querySelector(".bg-brand-linen")).toHaveClass(
-      "bg-brand-linen",
-      "p-4",
-      "rounded-xl",
+    expect(dialog.querySelector('path[fill="#0D0C14"]')).toBeInTheDocument();
+    expect(dialog.querySelector('path[fill="#FFFFFF"]')).toBeInTheDocument();
+    // QR stays black on white in both dashboard modes so it always scans.
+    expect(dialog.querySelector(".p-4.bg-\\[\\#fff\\]")).toHaveClass(
+      "rounded-(--dash-radius-sm)",
     );
     const overlay = document.querySelector('[data-slot="dialog-overlay"]');
     expect(overlay).toHaveClass("bg-brand-obsidian/60");

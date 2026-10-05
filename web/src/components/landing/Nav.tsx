@@ -35,26 +35,20 @@ export function EditionsTopNav() {
   return (
     <header
       data-ed-topnav
-      className="fixed inset-x-0 top-0 z-[70] flex items-center justify-between gap-3 px-4 py-4 text-starlight transition-[background-color,backdrop-filter] duration-300 data-[scrolled=true]:bg-void/70 data-[scrolled=true]:backdrop-blur-md sm:px-8 lg:px-14"
+      className="fixed inset-x-0 top-0 z-[70] flex items-center justify-between gap-3 px-4 py-4 text-starlight border-b border-transparent transition-colors duration-300 data-[scrolled=true]:border-starlight/10 data-[scrolled=true]:bg-void sm:px-8 lg:px-14"
     >
       <a
-        className="flex flex-none items-center gap-2.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
+        className="flex flex-none items-center gap-2.5 rounded-full text-starlight hover:text-starlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
         href="#top"
         aria-label="Mawee home"
       >
-        <Image
-          src="/assets/mawee-white.svg"
-          alt=""
-          width={32}
-          height={32}
-          priority
-        />
+        <Image src="/assets/mawee.svg" alt="" width={32} height={32} priority />
         <span className="text-xl font-medium tracking-tight">Mawee</span>
       </a>
 
       <nav
         aria-label="Sections"
-        className="absolute left-1/2 hidden -translate-x-1/2 items-center rounded-full border border-starlight/10 bg-void/80 px-2 py-1.5 backdrop-blur-md lg:flex"
+        className="absolute left-1/2 hidden -translate-x-1/2 items-center rounded-full border border-starlight/10 bg-void px-2 py-1.5 lg:flex"
       >
         {LANDING_SECTIONS.map((section) => (
           <a
@@ -72,7 +66,7 @@ export function EditionsTopNav() {
         {address && usernameResolved && !username && (
           <button
             type="button"
-            className="inline-flex min-h-11 items-center text-sm font-medium text-violet transition-colors hover:text-starlight"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-(--signal-ink) transition-colors hover:text-starlight"
             onClick={openUsernameModal}
             aria-label="Claim username"
           >
@@ -97,7 +91,7 @@ export function EditionsTopNav() {
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="min-w-44 border border-starlight/10 bg-void-2 p-1.5 text-starlight shadow-xl ring-0"
+              className="min-w-44 border border-starlight/10 bg-void-2 p-1.5 text-starlight ring-0"
             >
               <DropdownMenuItem
                 className="cursor-pointer px-2.5 py-2 font-medium text-starlight focus:bg-starlight/10 focus:text-starlight [&_svg]:text-starlight"

@@ -1,6 +1,16 @@
 "use client";
 
-import { ChevronLeft, LogOut, Moon, Palette } from "lucide-react";
+import {
+  ArrowUpRight,
+  History,
+  Inbox,
+  LayoutGrid,
+  Link2,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,20 +27,52 @@ import { cn } from "../../lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useWallet } from "../WalletProvider";
-import { useDashboardTheme } from "./DashboardBackground";
+import { useDashboardMode } from "./DashboardBackground";
+import { dashFocus, dashIconButton } from "./styles";
 
-const PAGE_LABELS: Record<string, string> = {
-  [DASHBOARD_PATH]: "Overview",
-  [LINKS_PATH]: "Links",
-  [WITHDRAW_PATH]: "Cash out",
-  [HISTORY_PATH]: "History",
-  [SETTINGS_PATH]: "Settings",
-  [REQUESTS_PATH]: "Requests",
-};
+const NAV_ITEMS = [
+  { href: DASHBOARD_PATH, label: "Overview", icon: LayoutGrid },
+  { href: LINKS_PATH, label: "Links", icon: Link2 },
+  { href: WITHDRAW_PATH, label: "Cash out", icon: ArrowUpRight },
+  { href: HISTORY_PATH, label: "History", icon: History },
+  { href: REQUESTS_PATH, label: "Requests", icon: Inbox },
+  { href: SETTINGS_PATH, label: "Settings", icon: Settings },
+] as const;
+
+const MAIN_ITEMS = NAV_ITEMS.filter((item) => item.href !== SETTINGS_PATH);
+const FOOTER_ITEMS = NAV_ITEMS.filter((item) => item.href === SETTINGS_PATH);
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function LogoMark() {
+  return (
+    <>
+      <Image
+        src="/assets/mawee.svg"
+        alt=""
+        width={28}
+        height={28}
+        className="dash-logo-light size-7"
+      />
+      <Image
+        src="/assets/mawee-white.svg"
+        alt=""
+        width={28}
+        height={28}
+        className="dash-logo-dark size-7"
+      />
+    </>
+  );
+}
 
 export function DashboardShell({
   children,
@@ -41,125 +83,227 @@ export function DashboardShell({
   contentClassName?: string;
   navigation?: boolean;
 }) {
+  const pathname = usePathname();
+
+  if (!navigation) {
+    return (
+      <div className="relative min-h-svh overflow-x-clip">
+        <main
+          id="main-content"
+          className={cn(
+            "relative isolate mx-auto w-full max-w-7xl px-(--dashboard-gutter) py-5 sm:py-6 lg:py-7",
+            contentClassName,
+          )}
+        >
+          {children}
+        </main>
+      </div>
+    );
+  }
+
+  const current =
+    NAV_ITEMS.find((item) => isActive(pathname, item.href))?.label ??
+    "Overview";
+
   return (
-    <div className="relative min-h-svh overflow-x-clip text-brand-linen">
-      <main
-        id="main-content"
-        className={cn(
-          "relative isolate mx-auto w-full max-w-7xl px-(--dashboard-gutter) py-5 sm:py-6 lg:py-7",
-          contentClassName,
-        )}
-      >
-        {navigation ? <DashboardNavigation /> : null}
-        {children}
-      </main>
+    <div className="relative flex min-h-svh">
+      <aside className="hidden w-[5.5rem] shrink-0 lg:block">
+        <div className="sticky top-14 ml-4 flex h-[calc(100svh-4.5rem)] w-14 flex-col items-center rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) py-4">
+          <Link
+            href="/"
+            aria-label="Mawee home"
+            className={cn("rounded-(--dash-radius-sm) p-1", dashFocus)}
+          >
+            <LogoMark />
+          </Link>
+          <nav
+            aria-label="Dashboard"
+            className="flex w-full flex-1 flex-col items-center"
+          >
+            <ul className="my-auto grid gap-2">
+              {MAIN_ITEMS.map((item) => (
+                <RailLink key={item.href} item={item} pathname={pathname} />
+              ))}
+            </ul>
+            <ul className="grid gap-2">
+              {FOOTER_ITEMS.map((item) => (
+                <RailLink key={item.href} item={item} pathname={pathname} />
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-16 items-center justify-between gap-4 px-(--dashboard-gutter) lg:pr-10 lg:pl-6">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              aria-label="Mawee home"
+              className={cn("rounded-(--dash-radius-sm) lg:hidden", dashFocus)}
+            >
+              <LogoMark />
+            </Link>
+            <span className="dashboard-tile-title">{current}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ModeToggle />
+            <AccountMenu />
+          </div>
+        </header>
+
+        <main
+          id="main-content"
+          className={cn(
+            "relative isolate mx-auto w-full max-w-6xl px-(--dashboard-gutter) pt-4 pb-28 lg:pr-10 lg:pb-16 lg:pl-6",
+            contentClassName,
+          )}
+        >
+          {children}
+        </main>
+      </div>
+
+      <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) lg:hidden">
+        <MobileTabs pathname={pathname} />
+      </div>
     </div>
   );
 }
 
-function DashboardNavigation() {
-  const pathname = usePathname();
+function RailLink({
+  item: { href, label, icon: Icon },
+  pathname,
+}: {
+  item: (typeof NAV_ITEMS)[number];
+  pathname: string;
+}) {
+  const active = isActive(pathname, href);
+  return (
+    <li>
+      <Link
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "group relative flex size-10 items-center justify-center rounded-full transition-colors",
+          dashFocus,
+          active
+            ? "bg-(--dash-fg) text-(--dash-surface)"
+            : "text-(--dash-ash) hover:bg-(--dash-tint) hover:text-(--dash-fg)",
+        )}
+      >
+        <Icon
+          className="size-[1.125rem]"
+          strokeWidth={1.6}
+          aria-hidden="true"
+        />
+        {active ? (
+          <span
+            className="absolute -left-[9px] h-4 w-0.5 rounded-full bg-(--dash-accent)"
+            aria-hidden="true"
+          />
+        ) : null}
+        <span className="pointer-events-none absolute left-full z-50 ml-4 rounded-(--dash-radius-sm) bg-(--dash-fg) px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] whitespace-nowrap text-(--dash-surface) uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+          {label}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function MobileTabs({ pathname }: { pathname: string }) {
+  return (
+    <nav aria-label="Dashboard tabs">
+      <ul className="grid grid-cols-5">
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex min-h-15 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+                  dashFocus,
+                  active
+                    ? "text-(--dash-fg)"
+                    : "text-(--dash-fg)/50 hover:text-(--dash-fg)",
+                )}
+              >
+                {active ? (
+                  <span
+                    className="absolute top-0 h-0.5 w-6 rounded-full bg-(--dash-accent)"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                <Icon
+                  className="size-[1.125rem]"
+                  strokeWidth={1.6}
+                  aria-hidden="true"
+                />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+function ModeToggle() {
+  const { mode, toggleMode } = useDashboardMode();
+  const dark = mode === "dark";
+  return (
+    <button
+      type="button"
+      onClick={toggleMode}
+      className={cn(dashIconButton, "border border-(--dash-line)")}
+      aria-label={dark ? "Use light mode" : "Use dark mode"}
+      title={dark ? "Light mode" : "Dark mode"}
+    >
+      {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+    </button>
+  );
+}
+
+function AccountMenu() {
   const { username, disconnect } = useWallet();
-  const { theme, toggleTheme } = useDashboardTheme();
-  const currentLabel = PAGE_LABELS[pathname] ?? "Overview";
-  const isOverview = pathname === DASHBOARD_PATH;
   const identity = username ? `@${username}` : "Account";
 
   return (
-    <header className="sticky top-4 z-50 mb-12 flex items-center justify-between gap-4 sm:top-5 lg:mb-20">
-      <div className="flex min-w-0 items-center gap-3">
-        {isOverview ? (
-          <Link
-            href="/"
-            aria-label="Mawee home"
-            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
-          >
-            <Image
-              src="/assets/mawee-white.svg"
-              alt=""
-              width={72}
-              height={72}
-              className="size-16 sm:size-[4.5rem]"
-            />
-          </Link>
-        ) : (
-          <Link
-            href={DASHBOARD_PATH}
-            className="flex size-11 items-center justify-center rounded-full bg-brand-linen/12 text-brand-linen ring-1 ring-brand-linen/20 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
-            aria-label="Back to dashboard"
-            title="Back to dashboard"
-          >
-            <ChevronLeft className="size-5" aria-hidden="true" />
-          </Link>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        id="dashboard-account-menu-trigger"
+        className={cn(
+          "flex h-9 items-center gap-2 rounded-full border border-(--dash-line) pr-3.5 pl-1 text-sm font-medium transition-colors hover:bg-(--dash-tint)",
+          dashFocus,
         )}
-        {!isOverview ? (
-          <span
-            className="truncate font-heading text-lg font-semibold text-brand-linen"
-            aria-current="page"
-          >
-            {currentLabel}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={theme === "painting"}
-          aria-label={
-            theme === "painting"
-              ? "Use dark dashboard theme"
-              : "Use painting dashboard theme"
-          }
-          title={theme === "painting" ? "Use dark theme" : "Use painting"}
-          onClick={toggleTheme}
-          className="relative flex h-11 w-[4.25rem] items-center rounded-full bg-brand-linen/16 p-1 text-brand-linen ring-1 ring-brand-linen/25 backdrop-blur-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
+        aria-label={`${identity} account menu`}
+      >
+        <span className="flex size-7 items-center justify-center rounded-full bg-(--dash-fg) text-xs font-semibold text-(--dash-surface) uppercase">
+          {username?.slice(0, 1) || "?"}
+        </span>
+        <span className="max-w-40 truncate">{identity}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        appearance="glass"
+        align="end"
+        sideOffset={8}
+        className="min-w-52"
+      >
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="dashboard-tile-title px-2 py-1.5">
+            Signed in as {identity}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator className="bg-(--dash-line)" />
+        <DropdownMenuItem
+          className="cursor-pointer !text-(--dash-fg) focus:bg-(--dash-tint) focus:!text-(--dash-fg) [&_svg]:!text-(--dash-fg)"
+          onClick={disconnect}
         >
-          <span
-            className={`flex size-9 items-center justify-center rounded-full bg-brand-linen text-brand-obsidian transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-              theme === "painting" ? "translate-x-6" : "translate-x-0"
-            }`}
-          >
-            {theme === "painting" ? (
-              <Palette className="size-4" aria-hidden="true" />
-            ) : (
-              <Moon className="size-4" aria-hidden="true" />
-            )}
-          </span>
-        </button>
-
-        <Link
-          href={SETTINGS_PATH}
-          className="hidden min-h-11 items-center rounded-full bg-brand-linen/16 px-5 text-sm font-medium text-brand-linen/80 ring-1 ring-brand-linen/20 backdrop-blur-md transition-colors hover:bg-brand-linen/24 hover:text-brand-linen focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen sm:flex"
-          title="Settings"
-        >
-          Settings
-        </Link>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            id="dashboard-account-menu-trigger"
-            className="flex size-11 items-center justify-center rounded-full bg-brand-linen/20 text-sm font-semibold uppercase text-brand-linen ring-1 ring-brand-linen/25 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
-            aria-label={`${identity} account menu`}
-          >
-            {username?.slice(0, 1) || "O"}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            appearance="glass"
-            align="end"
-            sideOffset={8}
-            className="min-w-48"
-          >
-            <DropdownMenuItem
-              className="cursor-pointer bg-brand-linen/10 !text-brand-linen focus:bg-brand-linen/18 focus:!text-brand-linen [&_svg]:!text-brand-linen"
-              onClick={disconnect}
-            >
-              <LogOut aria-hidden="true" /> Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+          <LogOut aria-hidden="true" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

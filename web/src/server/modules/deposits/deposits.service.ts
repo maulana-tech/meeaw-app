@@ -142,7 +142,11 @@ export async function syncPoolIndex(
   const owner = randomUUID();
   const stateId = poolStateId(pool.scope);
   // With Envio HyperIndex serving this pool, Envio is the mirror; nothing to poll.
-  if (servedByEnvio(pool) || !(await acquireLease(pool, owner))) {
+  if (
+    servedByEnvio(pool) ||
+    BigInt(pool.address) === 0n ||
+    !(await acquireLease(pool, owner))
+  ) {
     return {
       pool: pool.scope,
       status: "skipped",

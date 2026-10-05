@@ -79,7 +79,7 @@ export function RequestsDashboard({
         <Link
           href="/dashboard"
           aria-label="Back to dashboard"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full text-brand-linen/75 transition-colors hover:bg-brand-linen/10 hover:text-brand-linen focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-(--dash-ash) transition-colors hover:bg-(--dash-tint) hover:text-(--dash-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
         </Link>
@@ -92,7 +92,7 @@ export function RequestsDashboard({
         <div
           role="tablist"
           aria-label="Request direction"
-          className="flex gap-1 border-b border-brand-linen/20"
+          className="flex gap-1 border-b border-(--dash-line-solid)"
         >
           <button
             id="requests-received-tab"
@@ -107,8 +107,8 @@ export function RequestsDashboard({
             className={cn(
               "min-h-11 border-b-2 px-4 text-sm",
               direction === "received"
-                ? "border-brand-linen text-brand-linen"
-                : "border-transparent text-brand-linen/65 hover:text-brand-linen",
+                ? "border-brand-linen text-(--dash-fg)"
+                : "border-transparent text-(--dash-ash) hover:text-(--dash-fg)",
             )}
           >
             Received <span className="ml-1 tabular-nums">{list.count}</span>
@@ -126,20 +126,20 @@ export function RequestsDashboard({
             className={cn(
               "min-h-11 border-b-2 px-4 text-sm",
               direction === "sent"
-                ? "border-brand-linen text-brand-linen"
-                : "border-transparent text-brand-linen/65 hover:text-brand-linen",
+                ? "border-brand-linen text-(--dash-fg)"
+                : "border-transparent text-(--dash-ash) hover:text-(--dash-fg)",
             )}
           >
             Sent
           </button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 py-5">
-          <p className="text-sm text-brand-linen/65">
+          <p className="text-sm text-(--dash-ash)">
             {direction === "received"
               ? "People asking you to pay"
               : "Requests you have sent"}
           </p>
-          <Button onClick={onCreate} variant="glass" disabled={!address}>
+          <Button onClick={onCreate} variant="secondary" disabled={!address}>
             <Plus className="size-4" aria-hidden="true" />
             New request
           </Button>
@@ -151,7 +151,7 @@ export function RequestsDashboard({
         >
           {list.isLoading ? (
             <div
-              className="flex min-h-24 items-center gap-3 text-sm text-brand-linen/70"
+              className="flex min-h-24 items-center gap-3 text-sm text-(--dash-ash)"
               role="status"
             >
               <Loader className="size-4 animate-spin" aria-hidden="true" />
@@ -160,7 +160,7 @@ export function RequestsDashboard({
           ) : list.error ? (
             <div className="flex items-center justify-between gap-4 py-7">
               <p className="text-sm">Your requests could not be loaded.</p>
-              <Button variant="glass" onClick={list.refresh}>
+              <Button variant="secondary" onClick={list.refresh}>
                 <RefreshCw className="size-4" />
                 Try again
               </Button>
@@ -171,29 +171,29 @@ export function RequestsDashboard({
             list.count > 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 py-10 text-center">
               <LockKeyhole
-                className="size-6 text-brand-linen/70"
+                className="size-6 text-(--dash-ash)"
                 aria-hidden="true"
               />
-              <p className="text-sm text-brand-linen/75">
+              <p className="text-sm text-(--dash-ash)">
                 {list.count} incoming request{list.count === 1 ? "" : "s"}.
                 Unlock to view them privately.
               </p>
-              <Button variant="glass" onClick={promptUnlock}>
+              <Button variant="secondary" onClick={promptUnlock}>
                 Unlock Mawee
               </Button>
             </div>
           ) : list.rows.length === 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 py-10 text-center">
               <Inbox
-                className="size-6 text-brand-linen/70"
+                className="size-6 text-(--dash-ash)"
                 aria-hidden="true"
               />
-              <p className="text-sm text-brand-linen/75">
+              <p className="text-sm text-(--dash-ash)">
                 {direction === "received"
                   ? "No payment requests yet."
                   : "You haven't sent any requests yet."}
               </p>
-              <Button variant="glass" onClick={onCreate}>
+              <Button variant="secondary" onClick={onCreate}>
                 <Plus className="size-4" />
                 New request
               </Button>
@@ -218,13 +218,13 @@ export function RequestsDashboard({
         {list.hasNext || list.hasPrevious ? (
           <div className="flex justify-end gap-2 pt-5">
             {list.hasPrevious && (
-              <Button variant="glass" onClick={list.previousPage}>
+              <Button variant="secondary" onClick={list.previousPage}>
                 <ArrowLeft className="size-4" />
                 Previous
               </Button>
             )}
             {list.hasNext && (
-              <Button variant="glass" onClick={list.loadMore}>
+              <Button variant="secondary" onClick={list.loadMore}>
                 More requests
                 <ArrowRight className="size-4" />
               </Button>
