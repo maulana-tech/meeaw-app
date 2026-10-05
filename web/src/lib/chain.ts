@@ -25,6 +25,7 @@ import { env } from "../env";
 import { api } from "../trpc/client";
 import { erc20Abi, maweePoolAbi, maweeRegistryAbi } from "./abi";
 import { bytesToHex, fromBaseUnits, hexToBytes } from "./crypto";
+import { activePool, type PoolDescriptor } from "./pools";
 import type { EvmProof } from "./prover";
 import {
   depositTypedData,
@@ -59,10 +60,10 @@ export const network = `eip155:${chain.id}`;
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
 export const registryAddress = (env.NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS ??
   ZERO) as Address;
-export const poolAddress = (env.NEXT_PUBLIC_MAWEE_POOL_ADDRESS ??
-  ZERO) as Address;
-export const usdcAddress = (env.NEXT_PUBLIC_USDC_ADDRESS ?? ZERO) as Address;
-export const poolDeployBlock = BigInt(env.NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK);
+/** The active pool: deposits and new notes go here (see lib/pools.ts). */
+export const poolAddress = activePool().address as Address;
+export const usdcAddress = activePool().token as Address;
+export const poolDeployBlock = BigInt(activePool().deployBlock);
 
 export const publicClient = createPublicClient({
   chain,
@@ -617,6 +618,7 @@ export async function transferUsdc(
 /**
  * Spend a note to `recipient`. With the relayer, no signer is needed: the
  * proof binds the recipient and amount, so the relayer cannot redirect it.
+ * `pool` is the note's own pool; legacy notes withdraw from their legacy pool.
  */
 export async function poolWithdraw(
   signer: Signer | null,
@@ -625,9 +627,11 @@ export async function poolWithdraw(
   root: Uint8Array,
   nullifier: Uint8Array,
   proof: EvmProof,
+  pool: PoolDescriptor = activePool(),
 ): Promise<string> {
   if (await gaslessEnabled()) {
     const { txHash } = await api.relay.withdraw.mutate({
+      pool: pool.scope,
       recipient: getAddress(recipient),
       amount: amount.toString(),
       root: hexOf(root),
@@ -638,7 +642,7 @@ export async function poolWithdraw(
   }
   if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { hash } = await send(signer, {
-    address: poolAddress,
+    address: pool.address,
     abi: maweePoolAbi,
     functionName: "withdraw",
     args: [getAddress(recipient), amount, hexOf(root), hexOf(nullifier), proof],
@@ -703,18 +707,23 @@ export async function poolTransfer(
   };
 }
 
-export async function isSpent(nullifierBytes: Uint8Array): Promise<boolean> {
+export async function isSpent(
+  nullifierBytes: Uint8Array,
+  pool: PoolDescriptor = activePool(),
+): Promise<boolean> {
   return publicClient.readContract({
-    address: poolAddress,
+    address: pool.address,
     abi: maweePoolAbi,
     functionName: "isSpent",
     args: [hexOf(nullifierBytes)],
   });
 }
 
-export async function poolLeafCount(): Promise<number> {
+export async function poolLeafCount(
+  pool: PoolDescriptor = activePool(),
+): Promise<number> {
   return publicClient.readContract({
-    address: poolAddress,
+    address: pool.address,
     abi: maweePoolAbi,
     functionName: "nextIndex",
   });
@@ -779,33 +788,46 @@ export function parsePoolLogs(logs: Log[]): PoolLog[] {
 
 /**
  * Pool Deposit/Spend logs in (fromBlock, toBlock], fetched in `blockRange`
- * chunks because public Monad RPCs cap eth_getLogs spans. At most
+ * chunks because public Monad RPCs cap eth_getLogs spans. Four chunks are
+ * fetched concurrently, with results consumed in block order. At most
  * `maxChunks` requests run per call; `scannedTo` reports how far it got.
  */
 export async function fetchPoolLogs(options: {
   afterBlock: bigint;
   blockRange: number;
   maxChunks?: number;
+  pool?: PoolDescriptor;
 }): Promise<{ logs: PoolLog[]; scannedTo: bigint; latestBlock: bigint }> {
+  const pool = options.pool ?? activePool();
+  const deployBlock = BigInt(pool.deployBlock);
   const latestBlock = await publicClient.getBlockNumber();
   const step = BigInt(options.blockRange);
   const maxChunks = options.maxChunks ?? 500;
   let from =
-    options.afterBlock + 1n > poolDeployBlock
+    options.afterBlock + 1n > deployBlock
       ? options.afterBlock + 1n
-      : poolDeployBlock;
+      : deployBlock;
   let scannedTo = options.afterBlock;
   const logs: PoolLog[] = [];
-  for (let i = 0; i < maxChunks && from <= latestBlock; i += 1) {
-    const to = from + step - 1n < latestBlock ? from + step - 1n : latestBlock;
-    const raw = await publicClient.getLogs({
-      address: poolAddress,
-      fromBlock: from,
-      toBlock: to,
-    });
-    logs.push(...parsePoolLogs(raw));
-    scannedTo = to;
-    from = to + 1n;
+  for (let i = 0; i < maxChunks && from <= latestBlock; ) {
+    const ranges: { fromBlock: bigint; toBlock: bigint }[] = [];
+    while (ranges.length < 4 && i < maxChunks && from <= latestBlock) {
+      const to =
+        from + step - 1n < latestBlock ? from + step - 1n : latestBlock;
+      ranges.push({ fromBlock: from, toBlock: to });
+      from = to + 1n;
+      i += 1;
+    }
+    const results = await Promise.all(
+      ranges.map((range) =>
+        publicClient.getLogs({
+          address: pool.address,
+          ...range,
+        }),
+      ),
+    );
+    for (const raw of results) logs.push(...parsePoolLogs(raw));
+    scannedTo = ranges[ranges.length - 1].toBlock;
   }
   return { logs, scannedTo, latestBlock };
 }

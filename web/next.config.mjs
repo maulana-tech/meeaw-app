@@ -68,6 +68,24 @@ const nextConfig = {
     if (dev) {
       config.cache = { type: "memory" };
     }
+
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@farcaster/mini-app-solana": false,
+    };
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "@farcaster/mini-app-solana": false,
+    };
+
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /@farcaster\/mini-app-solana/ },
+      { module: /@privy-io\/react-auth/ },
+      /Critical dependency: the request of a dependency is an expression/,
+    ];
+
     return config;
   },
 };

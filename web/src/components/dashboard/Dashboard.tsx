@@ -31,6 +31,8 @@ import {
 } from "./styles";
 import { useMyNotes } from "./useMyNotes";
 
+import { CreateRequestDialog } from "./CreateRequestDialog";
+import { RequestsTile } from "./RequestsTile";
 export function Dashboard() {
   const {
     address,
@@ -44,6 +46,7 @@ export function Dashboard() {
   const [origin, setOrigin] = useState("");
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
   );
@@ -141,11 +144,19 @@ export function Dashboard() {
         </section>
       </div>
 
+      <section aria-label="Requests" className="mt-4">
+        <RequestsTile />
+      </section>
+      <CreateRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
       <ReceiveDialog
         open={receiveOpen}
         onClose={() => setReceiveOpen(false)}
         username={username ?? ""}
         origin={origin}
+        onRequest={() => {
+          setReceiveOpen(false);
+          setRequestOpen(true);
+        }}
       />
       <AddFundsDialog
         open={addFundsOpen}

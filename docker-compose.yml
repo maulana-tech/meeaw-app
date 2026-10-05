@@ -60,11 +60,32 @@ services:
       [
         "node",
         "-e",
-        "const run=async()=>{try{const r=await fetch('http://web:3000/api/cron/pool-indexer',{headers:{authorization:'Bearer '+(process.env.CRON_SECRET||'')}});const body=await r.text();if(!r.ok)throw new Error('HTTP '+r.status+': '+body);console.log('[pool-indexer]',body)}catch(e){console.error('[pool-indexer]',e)}};run();setInterval(run,60000)",
+        "const run=async()=>{try{const r=await fetch('http://web:3000/api/cron/pool-indexer',{headers:{authorization:'Bearer '+(process.env.CRON_SECRET||'')}});if(!r.ok)throw new Error('HTTP '+r.status);console.log('[cron] pool-indexer',r.status)}catch(e){console.error('[cron] pool-indexer',e.message)}finally{setTimeout(run,60000)}};run()",
       ]
     depends_on:
       web:
         condition: service_healthy
+    networks:
+      - edge
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  request-payments:
+    image: ${MAWEE_IMAGE:-ghcr.io/OWNER/mawee-web:latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      LOCAL_APP_URL: http://web:3000
+    command: ["node", "scripts/request-payments-local.mjs"]
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     networks:
       - edge
     logging:

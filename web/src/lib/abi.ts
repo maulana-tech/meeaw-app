@@ -28,6 +28,11 @@ export const maweePoolAbi = [
         name: "transferVerifier_",
         type: "address",
       },
+      {
+        internalType: "contract IVerifier4",
+        name: "mergeVerifier_",
+        type: "address",
+      },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
@@ -35,6 +40,16 @@ export const maweePoolAbi = [
   {
     inputs: [],
     name: "DoubleSpend",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "DuplicateCommitment",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "DuplicateNullifier",
     type: "error",
   },
   {
@@ -585,6 +600,25 @@ export const maweePoolAbi = [
     inputs: [
       {
         internalType: "bytes32",
+        name: "commitment",
+        type: "bytes32",
+      },
+    ],
+    name: "isCommitmentInserted",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
         name: "root",
         type: "bytes32",
       },
@@ -614,6 +648,92 @@ export const maweePoolAbi = [
         internalType: "bool",
         name: "",
         type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "root",
+        type: "bytes32",
+      },
+      {
+        internalType: "bytes32",
+        name: "nullifierA",
+        type: "bytes32",
+      },
+      {
+        internalType: "bytes32",
+        name: "nullifierB",
+        type: "bytes32",
+      },
+      {
+        components: [
+          {
+            internalType: "uint256[2]",
+            name: "a",
+            type: "uint256[2]",
+          },
+          {
+            internalType: "uint256[2][2]",
+            name: "b",
+            type: "uint256[2][2]",
+          },
+          {
+            internalType: "uint256[2]",
+            name: "c",
+            type: "uint256[2]",
+          },
+        ],
+        internalType: "struct MaweePool.Proof",
+        name: "proof",
+        type: "tuple",
+      },
+      {
+        components: [
+          {
+            internalType: "bytes32",
+            name: "commitment",
+            type: "bytes32",
+          },
+          {
+            internalType: "bytes32",
+            name: "ephemeralPk",
+            type: "bytes32",
+          },
+          {
+            internalType: "bytes",
+            name: "ciphertext",
+            type: "bytes",
+          },
+        ],
+        internalType: "struct MaweePool.NoteOutput",
+        name: "output",
+        type: "tuple",
+      },
+    ],
+    name: "merge",
+    outputs: [
+      {
+        internalType: "uint32",
+        name: "outputIndex",
+        type: "uint32",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "mergeVerifier",
+    outputs: [
+      {
+        internalType: "contract IVerifier4",
+        name: "",
+        type: "address",
       },
     ],
     stateMutability: "view",

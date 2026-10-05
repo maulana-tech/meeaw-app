@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import type { PoolDescriptor } from "../../lib/pools";
 
 type NotesState = {
   notes: MyNote[];
@@ -14,7 +15,11 @@ type NotesState = {
   refresh: () => void;
 };
 
-export function useMyNotes(address: string | null | undefined): NotesState {
+/** Notes in one pool: the active pool unless `pool` names a legacy one. */
+export function useMyNotes(
+  address: string | null | undefined,
+  pool?: PoolDescriptor,
+): NotesState {
   const [notes, setNotes] = useState<MyNote[]>([]);
   const [claimable, setClaimable] = useState<bigint>(0n);
   const [loading, setLoading] = useState(false);
@@ -24,13 +29,14 @@ export function useMyNotes(address: string | null | undefined): NotesState {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const hasResult = useRef(false);
-  const previousAddress = useRef<string | null | undefined>(address);
+  const previousKey = useRef<string>(`${address}|${pool?.scope}`);
 
   useEffect(() => {
     void tick;
-    if (previousAddress.current !== address) {
+    const key = `${address}|${pool?.scope}`;
+    if (previousKey.current !== key) {
       hasResult.current = false;
-      previousAddress.current = address;
+      previousKey.current = key;
     }
     const account = address ? getAccount() : null;
     if (!account) {
@@ -61,14 +67,21 @@ export function useMyNotes(address: string | null | undefined): NotesState {
     void (async () => {
       try {
         if (!initiallyLoaded) {
-          const cached = await scanMyNotes(account, { refresh: false });
+          const cached = await scanMyNotes(account, {
+            refresh: false,
+            pool,
+            includeRequestRecovery: true,
+          });
           if (!cancelled && cached.mirrorAvailable) {
             applyResult(cached);
             setLoading(false);
             setRefreshing(true);
           }
         }
-        const result = await scanMyNotes(account);
+        const result = await scanMyNotes(account, {
+          pool,
+          includeRequestRecovery: true,
+        });
         if (!cancelled) applyResult(result);
       } catch (e) {
         if (cancelled) return;
@@ -84,7 +97,7 @@ export function useMyNotes(address: string | null | undefined): NotesState {
     return () => {
       cancelled = true;
     };
-  }, [address, tick]);
+  }, [address, tick, pool]);
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
@@ -94,10 +107,12 @@ export function useMyNotes(address: string | null | undefined): NotesState {
       if (document.visibilityState === "visible") refresh();
     };
     window.addEventListener("focus", onFocus);
+    window.addEventListener("mawee:balance-changed", refresh);
     document.addEventListener("visibilitychange", onFocus);
     const id = window.setInterval(onFocus, 20_000);
     return () => {
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("mawee:balance-changed", refresh);
       document.removeEventListener("visibilitychange", onFocus);
       window.clearInterval(id);
     };

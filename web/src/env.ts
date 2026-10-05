@@ -49,6 +49,9 @@ export const publicEnvSchema = z.object({
       .default("false")
       .transform((v) => v === "true"),
   ),
+  // JSON pool manifest (one active pool plus optional legacy pools); see
+  // src/lib/pools.ts. Unset keeps the single-pool variables above.
+  NEXT_PUBLIC_MAWEE_POOLS: optionalString,
   NEXT_PUBLIC_POOL_DEPTH: z.preprocess(
     emptyToUndefined,
     z.coerce.number().int().min(1).max(32).default(20),
@@ -73,6 +76,7 @@ export function getPublicEnv() {
     NEXT_PUBLIC_USDC_ADDRESS: process.env.NEXT_PUBLIC_USDC_ADDRESS,
     NEXT_PUBLIC_USDC_DECIMALS: process.env.NEXT_PUBLIC_USDC_DECIMALS,
     NEXT_PUBLIC_USDC_MINTABLE: process.env.NEXT_PUBLIC_USDC_MINTABLE,
+    NEXT_PUBLIC_MAWEE_POOLS: process.env.NEXT_PUBLIC_MAWEE_POOLS,
     NEXT_PUBLIC_POOL_DEPTH: process.env.NEXT_PUBLIC_POOL_DEPTH,
     NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   });

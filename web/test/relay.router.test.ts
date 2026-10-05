@@ -150,6 +150,29 @@ describe("relay router", () => {
     expect(request.args[4].a).toEqual([1n, 2n]);
   });
 
+  it("withdraws from a configured pool scope and refuses unknown pools", async () => {
+    const { activePool } = await import("../src/lib/pools");
+    const base = {
+      recipient: OWNER,
+      amount: "1",
+      root: B32,
+      nullifier: B32,
+      proof,
+    };
+    await caller(null).withdraw({ ...base, pool: activePool().scope });
+    expect(mocks.relayWrite.mock.calls[0][0].address).toBe(
+      activePool().address,
+    );
+
+    await expect(
+      caller(null).withdraw({
+        ...base,
+        pool: "10143:0x00000000000000000000000000000000000000c0",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "Unknown pool." });
+    expect(mocks.relayWrite).toHaveBeenCalledTimes(1);
+  });
+
   it("translates contract reverts into user-facing errors", async () => {
     mocks.relayWrite.mockRejectedValue(revert("DoubleSpend"));
     await expect(

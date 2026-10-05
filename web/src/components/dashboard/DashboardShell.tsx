@@ -3,6 +3,7 @@
 import {
   ArrowUpRight,
   History,
+  Inbox,
   LayoutGrid,
   Link2,
   LogOut,
@@ -20,6 +21,7 @@ import {
   LINKS_PATH,
   SETTINGS_PATH,
   WITHDRAW_PATH,
+  REQUESTS_PATH,
 } from "../../lib/auth-routes";
 import { cn } from "../../lib/utils";
 import {
@@ -40,6 +42,7 @@ const NAV_ITEMS = [
   { href: LINKS_PATH, label: "Links", icon: Link2 },
   { href: WITHDRAW_PATH, label: "Cash out", icon: ArrowUpRight },
   { href: HISTORY_PATH, label: "History", icon: History },
+  { href: REQUESTS_PATH, label: "Requests", icon: Inbox },
   { href: SETTINGS_PATH, label: "Settings", icon: Settings },
 ] as const;
 
@@ -210,7 +213,7 @@ function RailLink({
 function MobileTabs({ pathname }: { pathname: string }) {
   return (
     <nav aria-label="Dashboard tabs">
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-6">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (

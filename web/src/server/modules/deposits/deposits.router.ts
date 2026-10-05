@@ -1,11 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure } from "../../trpc";
-import { DepositIndexGapError } from "./deposits.errors";
+import { DepositIndexGapError, UnknownPoolError } from "./deposits.errors";
 import {
   depositOutput,
   listDepositsInput,
   poolSnapshotInput,
   poolSnapshotOutput,
+  poolStatsInput,
   poolStatsOutput,
 } from "./deposits.schema";
 import {
@@ -18,6 +19,9 @@ function mapError(e: unknown): never {
   if (e instanceof DepositIndexGapError) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e.message });
   }
+  if (e instanceof UnknownPoolError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+  }
   throw e;
 }
 
@@ -29,11 +33,13 @@ export const depositsRouter = createTRPCRouter({
       getPoolSnapshot(
         input?.afterLeafIndex ?? -1,
         input?.spentAfterBlock ?? 0,
+        input?.pool,
       ).catch(mapError),
     ),
   stats: publicProcedure
+    .input(poolStatsInput)
     .output(poolStatsOutput)
-    .query(() => getPoolStats().catch(mapError)),
+    .query(({ input }) => getPoolStats(input?.pool).catch(mapError)),
   list: publicProcedure
     .input(listDepositsInput)
     .output(depositOutput.array())

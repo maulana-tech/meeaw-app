@@ -47,6 +47,7 @@ describe("DashboardShell", () => {
       "/links",
       "/withdraw",
       "/history",
+      "/requests",
       "/settings",
     ]);
     expect(within(nav).getByRole("link", { name: "History" })).toHaveAttribute(

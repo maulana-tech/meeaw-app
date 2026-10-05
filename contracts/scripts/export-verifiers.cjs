@@ -11,6 +11,7 @@ const CIRCUITS = [
   ["deposit", "DepositVerifier"],
   ["withdraw", "WithdrawVerifier"],
   ["transfer", "TransferVerifier"],
+  ["merge", "MergeVerifier"],
 ];
 
 async function main() {
