@@ -3,7 +3,9 @@
 Date: 2026-10-05
 Branch: `feature/username-payment-requests`
 Base: `origin/monad-migration`, commit `d2ba32cd6a68e084735b5e477856b10deb35cec1`
-Stage: design for user review; implementation and deployment have not started.
+Stage: approved design; local implementation is in progress on
+`feature/username-payment-requests`. Testnet deployment and activation are
+separate operational steps.
 
 ## Intent and agreed decisions
 

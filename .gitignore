@@ -28,3 +28,4 @@ backups/
 circuits/build/
 docs/monad-hackathon/
 design-ref/
+.deploy-candidates/

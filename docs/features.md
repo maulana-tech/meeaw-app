@@ -19,6 +19,16 @@ Share a link or QR code and get paid. Two flavors:
 
 Every link comes with a QR code for in-person or mobile payments.
 
+## Payment Requests
+
+Ask a registered `@username` for a fixed USDC amount with an optional private
+note. The request appears in the sender's **Sent** list and the recipient's
+**Received** list. The recipient can pay it from their private balance, even
+when that balance is split across multiple notes, or decline it; the requester
+can cancel a pending request. Amounts and notes are encrypted for both users.
+See the [payment-request operations runbook](request-payments-operations.md)
+for deployment and recovery requirements.
+
 ## History
 
 A private log of the payments you've received, readable only by you. Use it to

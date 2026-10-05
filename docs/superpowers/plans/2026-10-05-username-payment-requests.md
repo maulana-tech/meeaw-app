@@ -1,6 +1,6 @@
 # Username Payment Requests Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let registered Mawee users request a fixed private USDC payment from another username and pay it from fragmented private balances, with encrypted request details and recoverable settlement.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing Next.js 15/React 19, tRPC 11, Zod 4, MongoDB Node driver 6, viem 2.52.0, Noble 2, Circom 2/circomlib, snarkjs 0.7.6, Solidity 0.8.24/Hardhat 2, Envio 3.12.1, Vitest and Testing Library. Do not upgrade dependencies to deliver this feature.
 
-**Spec:** [Approved design](../specs/2026-10-05-username-payment-requests-design.md). Read both documents before implementation. The user approved written-spec planning on 2026-10-05; implementation awaits plan review and execution-method selection.
+**Spec:** [Approved design](../specs/2026-10-05-username-payment-requests-design.md). The user approved inline execution on 2026-10-05. Task evidence and deviations are recorded in the ignored local SDD ledger at `.superpowers/sdd/2026-10-05-username-payment-requests/progress.md`.
 
 ## Global Constraints
 
@@ -60,11 +60,10 @@ with a UI-only workaround. Reviews use the spec, not just the task's test names.
 
 ## Preparation and file ownership
 
-Execution starts by inspecting `git status --short`, staged diffs, the branch,
-installed tools, and existing checks. Respect the checkout choice already made;
-do not create a worktree implicitly. Run baseline web and contract tests once,
-report existing failures, and keep caches and local test environments isolated.
-This planning turn does not run product tests or change product code.
+Execution began by inspecting the branch, existing changes, installed tools, and
+baseline checks. Preserve the user's existing checkout choice, unrelated local
+changes, and isolated test environments. Do not deploy, activate configuration,
+move funds, push, or open a PR as part of this plan.
 
 The existing VPS MongoDB configuration is standalone. The design below therefore
 uses single-document compare-and-set and recoverable projections, not a hidden
@@ -194,7 +193,7 @@ DB documents use `Date`/`Binary`; router serializers convert to these wire types
 and `submissionDigest(body: SubmissionBody): Hex`. Typed-data builders return
 viem-compatible EIP-712 parameters for client signing and server verification.
 
-- [ ] Write failing tests for exact base-unit parsing, self-request, invalid
+- [x] Write failing tests for exact base-unit parsing, self-request, invalid
   usernames, 200 Unicode code points, wrong scope, uint64 overflow, malformed
   ciphertext/keys, and digest changes when any immutable field changes.
 
@@ -215,8 +214,8 @@ describe('request validation', () => {
 });
 ```
 
-- [ ] Run `pnpm --filter web test -- test/requestValidation.test.ts test/requestTypedData.test.ts`; expect missing-module failures before implementation.
-- [ ] Implement schemas and canonical digest encoding. Use numeric base-unit
+- [x] Run `pnpm --filter web test -- test/requestValidation.test.ts test/requestTypedData.test.ts`; expect missing-module failures before implementation.
+- [x] Implement schemas and canonical digest encoding. Use numeric base-unit
   strings, UUID request/operation IDs, normalized addresses, strict 32-byte field
   elements, and bounds on proof coordinates. Do not copy the existing payment-link
   schema's hardcoded seven decimal places.
@@ -249,8 +248,8 @@ Submission message binds operation, step, kind, pool, root, every nullifier,
 proof hash and output hashes including ciphertext. Encode explicit typed fields
 and arrays; never sign insertion-order-dependent `JSON.stringify` output.
 
-- [ ] Repeat both focused tests; expect PASS and matching client/server digests.
-- [ ] Commit only Task 1 files: `feat: define private payment request contracts`.
+- [x] Repeat both focused tests; expect PASS and matching client/server digests.
+- [x] Commit only Task 1 files: `feat: define private payment request contracts`.
 
 ### Task 2: Implement two-party encrypted request payloads
 
@@ -263,7 +262,7 @@ Produce `sealRequest(payload: RequestPayload): { requesterEnvelope: Envelope; ad
 and `createSignedRequest(input: { id: string; pool: PoolDescriptor; requester: Participant; addressee: Participant; amount: bigint; note: string; createdAt: string }, signer: Signer): Promise<SignedRequest>`.
 `requestFixtures.ts` exports `makeRequestFixture(): Promise<{ record: SignedRequest; payload: RequestPayload; requester: LocalAccount; addressee: LocalAccount; outsider: LocalAccount; pool: PoolDescriptor }>` with deterministic test-only accounts/signatures.
 
-- [ ] Write a failing real-crypto test using the fixture. Test different
+- [x] Write a failing real-crypto test using the fixture. Test different
   envelope randomness, both participants, outsider rejection, fixed-length
   emoji payloads, wrong identity/AAD, tampered signature, and inconsistent
   decrypted amount versus recipient commitment.
@@ -277,8 +276,8 @@ it('opens for both participants and rejects outsiders', async () => {
 });
 ```
 
-- [ ] Run `pnpm --filter web test -- test/requestCrypto.test.ts`; expect FAIL.
-- [ ] Implement the padded codec and authenticated encryption using existing
+- [x] Run `pnpm --filter web test -- test/requestCrypto.test.ts`; expect FAIL.
+- [x] Implement the padded codec and authenticated encryption using existing
   Noble x25519/XChaCha20-Poly1305/HKDF imports after verifying their installed
   APIs through Context7. Use a 4,096-byte padded plaintext frame: 4-byte encoded
   JSON length, bounded canonical JSON bytes, and random remaining padding.
@@ -305,9 +304,9 @@ metadata, and recompute Poseidon(amount, requesterPk, salt). Reject mismatches
 with a generic user error. Test fixture builders return complete records; they
 must never appear in production modules.
 
-- [ ] Run crypto and validation tests; inspect tests that assert ciphertext
+- [x] Run crypto and validation tests; inspect tests that assert ciphertext
   length stays equal for empty, ASCII, and 200-emoji notes and test log redaction.
-- [ ] Commit: `feat: encrypt and authenticate payment requests`.
+- [x] Commit: `feat: encrypt and authenticate payment requests`.
 
 ### Task 3: Add real Merge proofs and atomic pool invariants
 
@@ -329,7 +328,7 @@ and `makeTransferProof(fixture, { index: number; ownerSecret: bigint; recipientP
 Returned fixture includes deployed `pool`, `usdc`, `publicClient`, `payer`, and
 realization-order `leaves`/owned-note witness fixtures, following current pool tests.
 
-- [ ] Add failing circuit witness and contract tests: honest merge, duplicate
+- [x] Add failing circuit witness and contract tests: honest merge, duplicate
   indices, wrong owner, different roots, overflow, corrupted nullifier/output,
   spent input, pause, full tree, and duplicate recipient commitment from two
   independently valid proofs. Keep input funds and spent flags unchanged on revert.
@@ -348,8 +347,8 @@ it('merges 10 and 15 without tokens leaving the pool', async () => {
 });
 ```
 
-- [ ] Run `pnpm --filter contracts test -- test/merge.test.ts test/requestSettlement.test.ts`; expect FAIL before pool/circuit implementation.
-- [ ] Implement constrained merge circuit and pool method. Share unchanged
+- [x] Run `pnpm --filter contracts test -- test/merge.test.ts test/requestSettlement.test.ts`; expect FAIL before pool/circuit implementation.
+- [x] Implement constrained merge circuit and pool method. Share unchanged
   Merkle math rather than including transfer.circom's `main` in another circuit.
   Use Num2Bits(64) on amounts/sum, Bits2Num(20) on indices, and explicit inequality
   constraints. Input commitment/Poseidon owner and nullifier match existing notes.
@@ -374,18 +373,18 @@ in `_insert`, including field-bound validation. A revert must undo any earlier
 nullifier writes or inserts in the same transaction. Existing zero-change notes
 remain allowed, with fresh random salts and distinct commitments.
 
-- [ ] Compile with the existing Circom build workflow; inspect actual R1CS
+- [x] Compile with the existing Circom build workflow; inspect actual R1CS
   constraint count and choose a powers-of-tau capacity that exceeds the required
   constraints. Add an isolated merge setup/staging path that does not regenerate
   shipped deposit/withdraw/transfer keys. Verify unchanged artifact hashes,
   generate MergeVerifier, and regenerate ABIs. The build script must expose
   `bash circuits/build.sh merge` for this path; Windows execution may use the
   existing compatible Bash/WSL environment after tool discovery.
-- [ ] Run `node circuits/test/merge.test.cjs`, targeted contract tests and then
+- [x] Run `node circuits/test/merge.test.cjs`, targeted contract tests and then
   existing pool/gasless suites once. Tests use shipped wasm/zkeys and actual
   on-chain proof verification. Existing fixture helpers must pass the new merge
   verifier constructor argument; old deployed contracts remain ABI-readable.
-- [ ] Commit: `feat: add private note consolidation and unique outputs`.
+- [x] Commit: `feat: add private note consolidation and unique outputs`.
 
 ### Task 4: Make pool discovery and withdrawal explicitly scoped
 
@@ -403,7 +402,7 @@ Extend existing env/mirror/notes/withdraw tests.
 Default omitted pool preserves active-pool behavior. Attach `scope` to ScanResult
 and MyNote; withdrawal receives/validates scope and sends to that pool.
 
-- [ ] Write failing tests for duplicate descriptors, exactly one active pool,
+- [x] Write failing tests for duplicate descriptors, exactly one active pool,
   wrong chain/depth, legacy balances and equal leaf indices in different pools.
   Input manifest `NEXT_PUBLIC_MAWEE_POOLS` is bounded JSON; old public environment
   variables produce one legacy/non-request-capable descriptor if no manifest is supplied.
@@ -418,8 +417,8 @@ it('separates the same leaf index in different pools', () => {
 });
 ```
 
-- [ ] Run `pnpm --filter web test -- test/pools.test.ts test/poolMirror.test.ts test/notes.test.ts test/withdraw.test.ts`; expect scope failures.
-- [ ] Implement normalized manifest parsing, direct Next public env access,
+- [x] Run `pnpm --filter web test -- test/pools.test.ts test/poolMirror.test.ts test/notes.test.ts test/withdraw.test.ts`; expect scope failures.
+- [x] Implement normalized manifest parsing, direct Next public env access,
   approved-scope resolution, scoped RPC reads/write arguments, and mirror keys.
   Preserve existing IndexedDB public mirrors under their original scope.
 
@@ -441,9 +440,9 @@ environment and is idempotent; its down path must not delete transaction history
 Withdraw UI has a pool selector only when legacy balances exist, with clear
 active versus legacy labels and no automatic withdrawal/redeposit.
 
-- [ ] Repeat scoped tests and existing withdrawal UI tests. Verify manifests
+- [x] Repeat scoped tests and existing withdrawal UI tests. Verify manifests
   are publicly safe and contain no RPC credentials.
-- [ ] Commit: `feat: preserve scoped active and legacy pool balances`.
+- [x] Commit: `feat: preserve scoped active and legacy pool balances`.
 
 ### Task 5: Index merge spends correctly across all configured pools
 
@@ -459,7 +458,7 @@ queries. Input includes `{ pool?: PoolScope; afterLeafIndex?: number; spentAfter
 server resolves it through Task 4's manifest, never arbitrary caller addresses.
 Existing outputs keep their public data contract with explicit selected pool.
 
-- [ ] Add failing event tests for Deposit + two Spend events in one merge,
+- [x] Add failing event tests for Deposit + two Spend events in one merge,
   pool-specific roots, statistics, registry account scope, and old-pool queries.
   A merge consumes two notes and creates one: notes +1, spent +2, anonymity set -1.
   It must not count as two shielded transfers.
@@ -477,8 +476,8 @@ the implementation step below. Add handler-level tests using existing Envio test
 fixtures to assert actual per-pool aggregate deltas; the pure classification
 test alone is not evidence that indexing correctly applies those deltas.
 
-- [ ] Run `pnpm --dir indexer test` and scoped web snapshot tests; expect FAIL.
-- [ ] Add scope to Note/Nullifier/Withdrawal/PoolStats/DailyStats, with
+- [x] Run `pnpm --dir indexer test` and scoped web snapshot tests; expect FAIL.
+- [x] Add scope to Note/Nullifier/Withdrawal/PoolStats/DailyStats, with
   `${scope}:${leafIndex}` and `${scope}:${nullifier}` IDs. Aggregate non-withdrawal
   spends once per scoped transaction using two deposits/one spend for transfer
   versus one deposit/two spends for merge; record incomplete groups without
@@ -501,10 +500,10 @@ are chain/registry scoped separately from pool-specific transaction histories.
 Preserve contiguous-leaf publication bounded by indexer progress; a missing leaf
 in one pool cannot be filled using another pool's leaf at the same index.
 
-- [ ] Run codegen/typecheck with `pnpm --dir indexer codegen` and
+- [x] Run codegen/typecheck with `pnpm --dir indexer codegen` and
   `pnpm --dir indexer typecheck`, then indexer and targeted web tests. Envio isn't
   in the root workspace, so do not use `pnpm --filter mawee-indexer`.
-- [ ] Commit: `feat: index consolidation and legacy pools without collisions`.
+- [x] Commit: `feat: index consolidation and legacy pools without collisions`.
 
 ### Task 6: Deliver authenticated encrypted request records and state transitions
 
@@ -524,7 +523,7 @@ Public transport signatures:
 return the updated request. Server uses `Date`/`Binary` and does not import the
 payload decoder or accept plaintext body fields.
 
-- [ ] Write failing ownership, idempotency, signature, terminal-race, envelope
+- [x] Write failing ownership, idempotency, signature, terminal-race, envelope
   bounds, cursor tie-break, generic 404, and independent pending-count tests.
 
 ```ts
@@ -543,8 +542,8 @@ Create test-only openIsolatedRequestDb/seedRequests/listReceivedForWallet adapte
 to real repository methods. Use a uniquely named disposable Mongo test DB,
 never the configured application DB; close/drop only that verified test DB.
 
-- [ ] Run focused repository/service/router tests; expect FAIL before modules exist.
-- [ ] Implement one-document atomic transitions, signature verification, wallet
+- [x] Run focused repository/service/router tests; expect FAIL before modules exist.
+- [x] Implement one-document atomic transitions, signature verification, wallet
   and registry checks, idempotent create, and strict outputs. Use creation index
   `(participantWallet, createdAt DESC, _id DESC)` and a matching two-field cursor.
   Cursor decoding is bounded and participant-filtered. Query 21 rows to return
@@ -567,9 +566,9 @@ Apply the spec's limits to authenticated user IDs. Call terminal operations only
 after reconciliation of known submitted work. Do not expose raw envelopes via
 public routes or include plaintext in error/log context.
 
-- [ ] Run focused tests with real Mongo repository evidence plus router unit
+- [x] Run focused tests with real Mongo repository evidence plus router unit
   auth boundaries; report those evidence classes separately.
-- [ ] Commit: `feat: add participant-only encrypted request APIs`.
+- [x] Commit: `feat: add participant-only encrypted request APIs`.
 
 ### Task 7: Persist relayer signing and nonce ownership before broadcast
 
@@ -584,7 +583,7 @@ Modify existing relayer.ts/service calls to share the same durable wallet coordi
 Internal docs record wallet/chain, fenced owner, operation key, nonce, signed bytes,
 hash, expected output metadata, and execution phase, never private note inputs.
 
-- [ ] Write failing tests at each crash boundary, two process instances,
+- [x] Write failing tests at each crash boundary, two process instances,
   concurrent ordinary withdraw plus merge, duplicate idempotency keys with
   altered calldata, and uncertain RPC errors. Persist before send is asserted.
 
@@ -605,8 +604,8 @@ it('rebroadcasts identical bytes after an uncertain send', async () => {
 viem client port. Its tests provide full fake RPC responses and a real-Mongo journal
 where verifying cross-process atomicity; signCount is a test spy, not persisted data.
 
-- [ ] Run focused journal/sender and existing relayer tests; expect missing durability assertions to fail.
-- [ ] Implement a single in-flight send per `(chainId, relayerWallet)` in one
+- [x] Run focused journal/sender and existing relayer tests; expect missing durability assertions to fail.
+- [x] Implement a single in-flight send per `(chainId, relayerWallet)` in one
   Mongo wallet-coordinator document. Use revision/fencing CAS and embed the active
   nonce and signed-send record in that atomic document before any broadcast.
   History records are projections recoverable from it. A reservation without signed
@@ -633,9 +632,9 @@ RPC uncertainty or fee starvation cannot be resolved by identical rebroadcast.
 All existing register/deposit/withdraw/transfer/mint sends use this coordinator;
 leaving a second process-local sender bypass would break nonce safety.
 
-- [ ] Run crash/concurrency tests and existing relay service tests. Check that
+- [x] Run crash/concurrency tests and existing relay service tests. Check that
   serializing RPC exceptions never leaks signed payloads or secrets in logs.
-- [ ] Commit: `feat: journal relayer transactions before broadcasting`.
+- [x] Commit: `feat: journal relayer transactions before broadcasting`.
 
 ### Task 8: Reserve requests, verify submissions, and reconcile settlement
 
@@ -652,7 +651,7 @@ Internal `reconcileRequestOperation(operationId: string): Promise<PaymentOperati
 Cron uses existing CRON_SECRET validation, processes at most 20 operations/run,
 and logs only aggregate counts and opaque operation identifiers.
 
-- [ ] Add failing reserve/cancel races, stale revision, outsider/wrong addressee,
+- [x] Add failing reserve/cancel races, stale revision, outsider/wrong addressee,
   substituted ciphertext, duplicate step, wrong recipient output, direct deposit
   receipt, other-pool receipt, missing Spend, revert, pending hash, and DB-write
   failure after confirmed transfer tests.
@@ -676,8 +675,8 @@ Export pure `verifyRequestReceipt` from requestSettlement.ts with the input fiel
 above; return `{valid:boolean; leafIndex:number|null; reason:string|null}`. Tests
 define full fixture transaction input/event logs; do not only compare hashes.
 
-- [ ] Run targeted operation/settlement/route tests; expect FAIL.
-- [ ] Implement atomic request reservation, append-only step digests, signed
+- [x] Run targeted operation/settlement/route tests; expect FAIL.
+- [x] Implement atomic request reservation, append-only step digests, signed
   addressee checks, pool/capability checks, exact arity (merge: 2 nullifiers/1
   output; preparatory self-split/payment: 1 nullifier/2 outputs), duplicate-input rejection, expected
   output match, and durable journal calls. Verify stored signature/digest before
@@ -708,9 +707,9 @@ alone. Require relayer availability and request-capable scope before beginPaymen
 Schedule the protected reconciliation route alongside the existing minute poller;
 return promptly with aggregate outcome and resume remaining operations next run.
 
-- [ ] Run tests against the standalone Mongo test DB and mocked RPC uncertainty;
+- [x] Run tests against the standalone Mongo test DB and mocked RPC uncertainty;
   add a local-chain receipt test before considering settlement complete.
-- [ ] Commit: `feat: reconcile private request payments safely`.
+- [x] Commit: `feat: reconcile private request payments safely`.
 
 ### Task 9: Orchestrate browser funding, proofs, and recovery
 
@@ -734,7 +733,7 @@ prover.ts using Task 3's exact witness field names and public-signal ordering,
 and `proveMerge(input: MergeInput): Promise<{proof:EvmProof; ms:number}>` following
 the existing proveTransfer return convention. No server path receives MergeInput.
 
-- [ ] Write selection and orchestration failures first: a covering single note,
+- [x] Write selection and orchestration failures first: a covering single note,
   10+15 covering 20, many small notes, wrong pool, zero/spent notes, stale root,
   interruption after merge, duplicate click, server uncertainty, and missing note
   ciphertext recoverable from encrypted request salt. Include the uint64 edge:
@@ -754,8 +753,8 @@ it('never funds a request using another pool', () => {
 
 Define makeNote as a complete MyNote test helper with salt, spent=false and scope.
 
-- [ ] Run the four focused test files; expect missing-function failures.
-- [ ] Implement deterministic selection, actual merge witness construction,
+- [x] Run the four focused test files; expect missing-function failures.
+- [x] Implement deterministic selection, actual merge witness construction,
   fixed-salt final payment, self-change encryption, signatures, and resume.
 
 ```ts
@@ -800,9 +799,9 @@ AbortSignal stops local work/polling only. It must never convert a submitted
 operation into Cancelled or Failed. Account-switch cleanup clears plaintext
 and detaches the old progress subscription; the persisted operation survives.
 
-- [ ] Run focused tests, existing notes/withdraw/prover parity tests, and a real
+- [x] Run focused tests, existing notes/withdraw/prover parity tests, and a real
   local-chain 10+15 ->20 transfer sequence with shipped artifacts.
-- [ ] Commit: `feat: pay requests from consolidated private balances`.
+- [x] Commit: `feat: pay requests from consolidated private balances`.
 
 ### Task 10: Integrate the Requests page, modals, and dashboard entry
 
@@ -819,7 +818,7 @@ these hooks; never duplicate crypto or state transitions in view files.
 Create dialog props: `{open:boolean; onOpenChange(open:boolean):void; onCreated(record:PaymentRequest):void}`.
 Pay dialog props: `{request:PaymentRequest|null; open:boolean; onOpenChange(open:boolean):void}`.
 
-- [ ] Write failing UI tests for Received/Sent, independent count, fixed-amount
+- [x] Write failing UI tests for Received/Sent, independent count, fixed-amount
   review, insufficient active balance with legacy funds, locked/decrypt-error
   states, signature/username lookup failure, confirm decline/cancel, repeated
   Pay clicks, closing modal during submission and switching authenticated account.
@@ -838,8 +837,8 @@ it('keeps pending payment visible when the review modal closes', async () => {
 Use existing renderWithTRPC and WalletProvider test adapters to supply complete
 request/operation fixtures. These tests validate UI behavior, not real settlement.
 
-- [ ] Run these files in existing happy-dom/testing-library conventions; expect FAIL.
-- [ ] Implement Requests route protection, active-shell label/back link,
+- [x] Run these files in existing happy-dom/testing-library conventions; expect FAIL.
+- [x] Implement Requests route protection, active-shell label/back link,
   Received/Sent tab state and load-more pagination; count drives dashboard tile.
   Creation resolves username/key snapshot, creates signed encrypted data and
   redirects to Sent. Receive's username option invokes the same modal.
@@ -860,10 +859,10 @@ polite live progress region; avoid announcing every poll. Confirmation closes
 only after the action is acknowledged. On account changes, clear decrypted
 queries and modal state so another user's plaintext cannot flash on screen.
 
-- [ ] Run focused UI/auth tests and inspect browser layout at 360px and desktop.
+- [x] Run focused UI/auth tests and inspect browser layout at 360px and desktop.
   Check actual dashboard integration; the conversation preview is not a screenshot
   of these components and cannot substitute for browser evidence.
-- [ ] Commit: `feat: add payment request page and action dialogs`.
+- [x] Commit: `feat: add payment request page and action dialogs`.
 
 ### Task 11: Verify the full feature and prepare deployment without activation
 
@@ -880,7 +879,7 @@ registry addresses; require an explicit activation option outside this plan.
 Integration fixture provides an isolated local chain, disposable Mongo DB,
 funded relayer, real signed encrypted records/proofs, and scoped indexers.
 
-- [ ] Write failing local-chain integration scenarios for create ->merge ->pay,
+- [x] Write failing local-chain integration scenarios for create ->merge ->pay,
   multiple merges ->reload ->resume, two independently valid attempts targeting
   one commitment, declined/cancelled operations, unknown broadcast ->reconcile,
   missing event ciphertext ->request note recovery, and legacy withdrawal after
@@ -904,7 +903,7 @@ Browser smoke uses real configured Privy accounts and the local test chain;
 if interactive sign-in is needed, request only that missing user action and
 continue other evidence. No production bypass/mock-auth flag ships in the app.
 
-- [ ] Run the integration command with a specifically isolated database and
+- [x] Run the integration command with a specifically isolated database and
   chain. Expect FAIL before complete wiring, then implement only missing feature
   wiring/config-output behavior discovered by those tests.
 
@@ -927,7 +926,7 @@ relay balance monitoring, reconciliation job, rollback-to-old-config procedure,
 and withdrawal access to both pools. Rolling back configuration cannot roll back
 mined transfers; preserve journal and indexed history.
 
-- [ ] Run required verification serially where outputs share artifacts:
+- [x] Run required verification serially where outputs share artifacts:
 
 ```powershell
 pnpm --filter contracts build
@@ -950,13 +949,13 @@ presented as the original lint passing. The circuits package's existing `test`
 script is a placeholder; use the real circuit test command created in Task 3.
 Do not install/update tools just to hide a baseline failure.
 
-- [ ] Browser smoke at desktop/mobile covers real creation, signature/unlock,
+- [x] Browser smoke at desktop/mobile covers real creation, signature/unlock,
   payment progress, resume, count/status changes, insufficient active balance,
   and legacy withdrawal. Log exactly which parts used actual auth, real RPC,
   disposable DB or mocks. Publish no screenshot containing confidential data.
-- [ ] Review every spec acceptance criterion against evidence; stop release
+- [x] Review every spec acceptance criterion against evidence; stop release
   handoff if double-payment, privacy, rollback or nonce-recovery evidence fails.
-- [ ] Commit only feature/docs/tests: `test: verify request payment lifecycle and deployment boundaries`.
+- [x] Commit only feature/docs/tests: `test: verify request payment lifecycle and deployment boundaries`.
 
 ## Self-review map
 

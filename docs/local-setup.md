@@ -82,32 +82,37 @@ CRON_SECRET=<random string>
 
 Leave the contract addresses empty. The next step fills them in.
 
-## 5. Deploy the contracts to Monad testnet
+## 5. Prepare contracts for Monad testnet
 
 1. Create a new wallet in MetaMask or Rabby and copy its private key.
 2. Get testnet MON for it at [faucet.monad.xyz](https://faucet.monad.xyz).
-3. Deploy:
+3. Prepare a deployment candidate. Provide `DEPLOYER_PRIVATE_KEY` through a
+   secret manager or a protected shell environment; don't paste the key into a
+   command that will be saved in shell history.
 
 ```sh
-cd contracts
-DEPLOYER_PRIVATE_KEY=0x<test wallet key> pnpm deploy:testnet
-cd ..
+pnpm --filter contracts exec hardhat run scripts/deploy.ts --network monadTestnet
 ```
 
-The script deploys the Poseidon library, the three Groth16 verifiers,
-`MaweeRegistry`, `MaweePool`, and a `MockUSDC` that anyone can mint. It then
-writes these values into `web/.env.local` for you:
+The script deploys the Poseidon library, Groth16 verifiers, a Merge-capable
+`MaweePool`, and a `MockUSDC` that anyone can mint when `USDC_ADDRESS` is
+omitted on testnet. It reuses a configured Registry when that contract exists
+on the selected chain. It writes review candidates under the ignored
+`.deploy-candidates/` directory; it does not change `web/.env.local` or
+`indexer/config.yaml`.
 
-- `NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS`
-- `NEXT_PUBLIC_MAWEE_POOL_ADDRESS`
-- `NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK`
-- `NEXT_PUBLIC_USDC_ADDRESS`, `NEXT_PUBLIC_USDC_DECIMALS`,
-  `NEXT_PUBLIC_USDC_MINTABLE`
+- `pool-manifest.candidate.json` retains the previous pool as withdrawal-only
+  and marks the new pool request-capable.
+- `web.env.candidate` contains public web settings. Merge the reviewed values
+  into `web/.env.local` without replacing server credentials.
+- `indexer.config.candidate.yaml` retains the existing pool addresses and
+  Registry while setting a new start block.
 
-It also updates the addresses and start block in `indexer/config.yaml`.
-
-Typing the key inline keeps it out of any file. It is still saved in your shell
-history, so use a test wallet only.
+Verify the chain ID, token, deployed bytecode, and start block independently.
+Activate the reviewed manifest and matching indexer configuration only as a
+separate authorized operation. Request payments also need a server-only
+relayer key and the authenticated reconciliation cron. See
+[Payment Requests Operations](request-payments-operations.md).
 
 ## 6. Prepare the database and start the app
 
