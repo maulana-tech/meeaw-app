@@ -124,6 +124,25 @@ pnpm dev
 Open [http://localhost:3000](http://localhost:3000). If the dev server was
 already running, restart it: Next.js reads `.env.local` only at startup.
 
+Keep the local pool index fresh in a second terminal:
+
+```sh
+pnpm --dir web indexer:local
+```
+
+This worker reads `CRON_SECRET` from `web/.env.local` and calls the local
+pool-indexer endpoint. It runs another batch immediately while blocks remain
+to be scanned, then polls every 60 seconds. Keep MongoDB and the web server
+running. Stop the worker with Ctrl+C. If the app uses another address, set
+`LOCAL_APP_URL` before starting it. `--use-system-ca` allows Node to use the
+Windows trust store when HTTPS is scanned by endpoint protection.
+
+For payment confirmations, also run `pnpm --dir web payments:local` in another
+terminal. This worker checks the authenticated request-payments endpoint every
+five seconds, without overlapping its own runs. The endpoint reconciles only
+pending transactions; UI status checks read the database and do not call the
+blockchain. Keep this worker running while testing request payments locally.
+
 ## 7. Sign in and try a payment
 
 1. Click **Create your payment link** and sign in with Privy.

@@ -156,6 +156,34 @@ export async function syncPoolIndex(
   }
 
   const states = await getIndexerState();
+  let leaseError: Error | null = null;
+  let renewal = Promise.resolve();
+  let finished = false;
+  let heartbeat: ReturnType<typeof setTimeout> | undefined;
+  const renewLease = () => {
+    heartbeat = setTimeout(
+      () => {
+        renewal = states
+          .updateOne(
+            { _id: stateId, leaseOwner: owner },
+            { $set: { leaseUntil: new Date(Date.now() + LEASE_MS) } },
+          )
+          .then((result) => {
+            if (result.matchedCount === 0)
+              leaseError = new Error("Pool index lease was lost.");
+          })
+          .catch(() => {
+            leaseError = new Error("Pool index lease could not be renewed.");
+          })
+          .finally(() => {
+            if (!finished && !leaseError) renewLease();
+          });
+      },
+      Math.floor(LEASE_MS / 3),
+    );
+    heartbeat.unref?.();
+  };
+  renewLease();
   let fromBlock = startBlock(pool);
   try {
     // Each pool has its own watermark; configuring a new active pool starts a
@@ -248,7 +276,9 @@ export async function syncPoolIndex(
     }
 
     const indexedAt = new Date();
-    await states.updateOne(
+    await renewal;
+    if (leaseError) throw leaseError;
+    const published = await states.updateOne(
       { _id: stateId, leaseOwner: owner },
       {
         $set: {
@@ -262,6 +292,8 @@ export async function syncPoolIndex(
         $unset: { lastError: "" },
       },
     );
+    if (published.matchedCount === 0)
+      throw new Error("Pool index lease was lost before publication.");
 
     return {
       pool: pool.scope,
@@ -298,6 +330,9 @@ export async function syncPoolIndex(
       error: message,
     };
   } finally {
+    finished = true;
+    clearTimeout(heartbeat);
+    await renewal;
     await releaseLease(pool, owner);
   }
 }

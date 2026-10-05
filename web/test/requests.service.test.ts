@@ -7,7 +7,7 @@ vi.mock("../src/lib/pools",()=>({requestPool:()=>deps.pool}));
 import {openIsolatedRequestDb} from "./helpers/requestDb";
 import {makeRequestFixture} from "./helpers/requestFixtures";
 import {__resetRateLimit} from "../src/server/lib/rateLimit";
-import {createRequest,getRequest,cancelRequest,declineRequest} from "../src/server/modules/requests/requests.service";
+import {createRequest,getRequest,cancelRequest,declineRequest,enforceRequestLimit} from "../src/server/modules/requests/requests.service";
 describe("participant-only request service",()=>{
   let db:Awaited<ReturnType<typeof openIsolatedRequestDb>>, fixture:Awaited<ReturnType<typeof makeRequestFixture>>;
   beforeAll(async()=>{db=await openIsolatedRequestDb();fixture=await makeRequestFixture();deps.requests=db.requests;},15000);
@@ -40,4 +40,11 @@ describe("participant-only request service",()=>{
     expect((await declineRequest("payer",{id:fixture.record.id,revision:0})).status).toBe("declined");
     await expect(cancelRequest("requester",{id:fixture.record.id,revision:1})).rejects.toThrow();
   });
+  it("keeps bounded status polling separate from ordinary query limits",()=>{
+    for(let i=0;i<120;i++)enforceRequestLimit("budget","query");
+    expect(()=>enforceRequestLimit("budget","query")).toThrow();
+    for(let i=0;i<480;i++)enforceRequestLimit("budget","paymentStatus");
+    expect(()=>enforceRequestLimit("budget","paymentStatus")).toThrow();
+  });
+
 });

@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const deps = vi.hoisted(() => ({
@@ -85,19 +88,20 @@ vi.mock("../src/components/WalletProvider", () => ({
 
 import { useRequestPayment } from "../src/features/requests/hooks/useRequestPayment";
 import type {
-  MyNote,
-  ScanResult,
-} from "../src/lib/notes";
-import type {
   PaymentOperation,
   PaymentRequest,
   RequestPayload,
   SignedRequest,
   SignedSubmission,
 } from "../src/features/requests/types";
+import type { MyNote, ScanResult } from "../src/lib/notes";
 import { testPool, wireRequestFixture } from "./helpers/requestFixtures";
 
 const operationId = "00000000-0000-4000-8000-000000000099";
+let queryClient: QueryClient;
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
 const scope = testPool.scope;
 const baseRequest = {
   ...wireRequestFixture(),
@@ -159,14 +163,22 @@ const submission = (kind: "merge" | "payment"): SignedSubmission => ({
   signature: `0x${"05".repeat(65)}`,
 });
 function note(leafIndex: number, amount: bigint): MyNote {
-  return { scope, leafIndex, amount, salt: BigInt(leafIndex + 1), spent: false };
+  return {
+    scope,
+    leafIndex,
+    amount,
+    salt: BigInt(leafIndex + 1),
+    spent: false,
+  };
 }
 function scan(notes: MyNote[]): ScanResult {
   return {
     scope,
     notes,
     leaves: [1n, 2n, 3n],
-    claimable: notes.filter((n) => !n.spent).reduce((sum, n) => sum + n.amount, 0n),
+    claimable: notes
+      .filter((n) => !n.spent)
+      .reduce((sum, n) => sum + n.amount, 0n),
     mirrorAvailable: true,
     indexedAt: "2026-10-05T00:00:00.000Z",
     health: "healthy",
@@ -175,6 +187,9 @@ function scan(notes: MyNote[]): ScanResult {
 
 describe("request payment browser orchestration", () => {
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
     vi.clearAllMocks();
     deps.walletAddress = baseRequest.addressee.wallet;
     deps.unlocked = true;
@@ -200,7 +215,9 @@ describe("request payment browser orchestration", () => {
     deps.scanMyNotes
       .mockResolvedValueOnce(scan([note(0, 10_000_000n), note(1, 15_000_000n)]))
       .mockResolvedValueOnce(scan([note(2, 25_000_000n)]));
-    const { result } = renderHook(() => useRequestPayment(baseRequest));
+    const { result } = renderHook(() => useRequestPayment(baseRequest), {
+      wrapper,
+    });
 
     await act(async () => {
       await result.current.pay();
@@ -222,7 +239,9 @@ describe("request payment browser orchestration", () => {
     deps.getRequest.mockResolvedValue(request);
     deps.paymentStatus.mockResolvedValue(resumed);
     deps.scanMyNotes.mockResolvedValue(scan([note(2, 25_000_000n)]));
-    const { result } = renderHook(() => useRequestPayment(request));
+    const { result } = renderHook(() => useRequestPayment(request), {
+      wrapper,
+    });
 
     await act(async () => {
       await result.current.pay();
@@ -246,12 +265,17 @@ describe("request payment browser orchestration", () => {
         finishProof = resolve;
       }),
     );
-    const { result, rerender } = renderHook(() => useRequestPayment(baseRequest));
+    const { result, rerender } = renderHook(
+      () => useRequestPayment(baseRequest),
+      { wrapper },
+    );
     let inFlight!: Promise<PaymentOperation | null>;
     act(() => {
       inFlight = result.current.pay();
     });
-    await waitFor(() => expect(deps.buildMergeSubmission).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(deps.buildMergeSubmission).toHaveBeenCalledOnce(),
+    );
 
     act(() => {
       deps.walletAddress = "0x4444444444444444444444444444444444444444";
@@ -264,5 +288,21 @@ describe("request payment browser orchestration", () => {
 
     expect(deps.submitConsolidation).not.toHaveBeenCalled();
     expect(deps.submitPayment).not.toHaveBeenCalled();
+  });
+  it("starts a fresh attempt after a stored failure has released the request", async () => {
+    deps.paymentStatus.mockResolvedValue(pending({ phase: "failed" }));
+    deps.scanMyNotes.mockResolvedValue(scan([note(2, 25_000_000n)]));
+    const { result } = renderHook(() => useRequestPayment(baseRequest), {
+      wrapper,
+    });
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.operation?.phase).toBe("failed");
+    await act(async () => {
+      await result.current.pay();
+    });
+    expect(deps.beginPayment).toHaveBeenCalledOnce();
+    expect(result.current.operation?.phase).toBe("confirmed");
   });
 });

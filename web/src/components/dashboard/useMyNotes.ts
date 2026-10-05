@@ -67,14 +67,21 @@ export function useMyNotes(
     void (async () => {
       try {
         if (!initiallyLoaded) {
-          const cached = await scanMyNotes(account, { refresh: false, pool, includeRequestRecovery: true });
+          const cached = await scanMyNotes(account, {
+            refresh: false,
+            pool,
+            includeRequestRecovery: true,
+          });
           if (!cancelled && cached.mirrorAvailable) {
             applyResult(cached);
             setLoading(false);
             setRefreshing(true);
           }
         }
-        const result = await scanMyNotes(account, { pool, includeRequestRecovery: true });
+        const result = await scanMyNotes(account, {
+          pool,
+          includeRequestRecovery: true,
+        });
         if (!cancelled) applyResult(result);
       } catch (e) {
         if (cancelled) return;
@@ -100,10 +107,12 @@ export function useMyNotes(
       if (document.visibilityState === "visible") refresh();
     };
     window.addEventListener("focus", onFocus);
+    window.addEventListener("mawee:balance-changed", refresh);
     document.addEventListener("visibilitychange", onFocus);
     const id = window.setInterval(onFocus, 20_000);
     return () => {
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("mawee:balance-changed", refresh);
       document.removeEventListener("visibilitychange", onFocus);
       window.clearInterval(id);
     };

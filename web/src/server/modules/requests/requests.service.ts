@@ -44,6 +44,7 @@ export const REQUEST_LIMITS = {
   create: { limit: 20, windowMs: TEN_MINUTES },
   paymentStart: { limit: 10, windowMs: TEN_MINUTES },
   query: { limit: 120, windowMs: 60_000 },
+  paymentStatus: { limit: 480, windowMs: 60_000 },
 } as const;
 /** How far a signed creation time may be from the server clock. */
 const MAX_CLOCK_SKEW_MS = TEN_MINUTES;
@@ -58,7 +59,9 @@ export function enforceRequestLimit(
 }
 
 /** The caller's verified wallet, lowercase, or null if none is linked. */
-export async function callerWallet(privyUserId: string): Promise<string | null> {
+export async function callerWallet(
+  privyUserId: string,
+): Promise<string | null> {
   const wallet = await currentWallet(privyUserId);
   return wallet ? wallet.address.toLowerCase() : null;
 }
@@ -99,7 +102,8 @@ async function verifyRequesterSignature(record: SignedRequest): Promise<void> {
   } catch {
     valid = false;
   }
-  if (!valid) throw new RequestRejectedError("The request signature is invalid.");
+  if (!valid)
+    throw new RequestRejectedError("The request signature is invalid.");
 }
 
 function sameRecord(
@@ -130,7 +134,9 @@ export async function createRequest(
 
   const wallet = await callerWallet(privyUserId);
   if (!wallet)
-    throw new RequestRejectedError("No Mawee wallet is linked to this account.");
+    throw new RequestRejectedError(
+      "No Mawee wallet is linked to this account.",
+    );
   if (record.requester.wallet.toLowerCase() !== wallet)
     throw new RequestRejectedError("Sign the request with your own account.");
 
@@ -252,7 +258,9 @@ async function terminate(
   if (doc.status !== "pending")
     throw new RequestConflictError("This request is no longer pending.");
   if (doc.operationId !== null)
-    throw new RequestConflictError("A payment for this request is in progress.");
+    throw new RequestConflictError(
+      "A payment for this request is in progress.",
+    );
   throw new RequestConflictError();
 }
 

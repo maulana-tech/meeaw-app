@@ -17,7 +17,9 @@ configuration are separate operational actions.
   the checked-in migrations.
 - A dedicated relayer key funded with the target chain's native gas token,
   `CRON_SECRET`, and an authenticated scheduler calling
-  `/api/cron/request-payments` once per minute. The key and secret are server
+  `/api/cron/request-payments` every five seconds, independently of pool indexing.
+  The Compose `request-payments` service provides this sequential worker.
+  The key and secret are server
   only; never put them in a `NEXT_PUBLIC_*` variable.
 
 The scheduler reconciles the existing relay journal and submitted request

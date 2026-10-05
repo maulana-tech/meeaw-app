@@ -158,6 +158,39 @@ describe("syncPoolIndex", () => {
     );
   });
 
+  it("renews its lease while a slow RPC batch is still running", async () => {
+    vi.useFakeTimers();
+    let finish!: (result: {
+      logs: never[];
+      scannedTo: bigint;
+      latestBlock: bigint;
+    }) => void;
+    mocks.fetchPoolLogs.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    try {
+      const { syncPoolIndex } = await service();
+      const pending = syncPoolIndex();
+      await vi.advanceTimersByTimeAsync(60_000);
+      const renewals = mocks.stateUpdateOne.mock.calls.filter(
+        ([, update]) => update.$set?.leaseUntil,
+      );
+      expect(renewals.length).toBeGreaterThan(0);
+      expect(renewals.at(-1)?.[1].$set.leaseUntil.getTime()).toBeGreaterThan(
+        Date.now(),
+      );
+      finish({ logs: [], scannedTo: 12n, latestBlock: 12n });
+      expect((await pending).status).toBe("synced");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      finish?.({ logs: [], scannedTo: 12n, latestBlock: 12n });
+      vi.useRealTimers();
+    }
+  });
+
   it("mirrors deposits and spends under scoped composite ids", async () => {
     mocks.fetchPoolLogs.mockResolvedValue({
       logs: [depositLog(0, 11n), depositLog(1, 12n), spendLog(12n)],
@@ -188,6 +221,17 @@ describe("syncPoolIndex", () => {
       scope: SCOPE,
       nullifierHex: "ab".repeat(32),
     });
+  });
+
+  it("does not report success when the lease is lost before publication", async () => {
+    mocks.stateUpdateOne.mockResolvedValue({
+      acknowledged: true,
+      matchedCount: 0,
+    });
+    const { syncPoolIndex } = await service();
+    const result = await syncPoolIndex();
+    expect(result.status).toBe("degraded");
+    expect(result.error).toContain("lease was lost before publication");
   });
 
   it("keeps the published watermark unchanged on a completeness gap", async () => {

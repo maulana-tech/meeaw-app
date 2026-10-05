@@ -40,7 +40,9 @@ describe("request payment reconciliation route", () => {
   });
 
   it("rejects missing or incorrect cron credentials without running reconciliation", async () => {
-    const missing = await GET(new Request("http://localhost/api/cron/request-payments"));
+    const missing = await GET(
+      new Request("http://localhost/api/cron/request-payments"),
+    );
     const wrong = await GET(
       new Request("http://localhost/api/cron/request-payments", {
         headers: { authorization: "Bearer wrong" },
@@ -81,5 +83,26 @@ describe("request payment reconciliation route", () => {
     expect(await response.json()).toEqual({ status: "unavailable" });
     expect(reconcileAllRelays).not.toHaveBeenCalled();
     expect(reconcilePendingRequests).not.toHaveBeenCalled();
+  });
+
+  it("shares one reconciliation when worker requests overlap", async () => {
+    let finish!: (value: typeof deps.relays) => void;
+    vi.mocked(reconcileAllRelays).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const request = () =>
+      new Request("http://localhost/api/cron/request-payments", {
+        headers: { authorization: "Bearer test-cron-secret" },
+      });
+    const first = GET(request()),
+      second = GET(request());
+    finish(deps.relays);
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(reconcileAllRelays).toHaveBeenCalledOnce();
+    expect(reconcilePendingRequests).toHaveBeenCalledOnce();
   });
 });

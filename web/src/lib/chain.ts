@@ -788,7 +788,8 @@ export function parsePoolLogs(logs: Log[]): PoolLog[] {
 
 /**
  * Pool Deposit/Spend logs in (fromBlock, toBlock], fetched in `blockRange`
- * chunks because public Monad RPCs cap eth_getLogs spans. At most
+ * chunks because public Monad RPCs cap eth_getLogs spans. Four chunks are
+ * fetched concurrently, with results consumed in block order. At most
  * `maxChunks` requests run per call; `scannedTo` reports how far it got.
  */
 export async function fetchPoolLogs(options: {
@@ -808,16 +809,25 @@ export async function fetchPoolLogs(options: {
       : deployBlock;
   let scannedTo = options.afterBlock;
   const logs: PoolLog[] = [];
-  for (let i = 0; i < maxChunks && from <= latestBlock; i += 1) {
-    const to = from + step - 1n < latestBlock ? from + step - 1n : latestBlock;
-    const raw = await publicClient.getLogs({
-      address: pool.address,
-      fromBlock: from,
-      toBlock: to,
-    });
-    logs.push(...parsePoolLogs(raw));
-    scannedTo = to;
-    from = to + 1n;
+  for (let i = 0; i < maxChunks && from <= latestBlock; ) {
+    const ranges: { fromBlock: bigint; toBlock: bigint }[] = [];
+    while (ranges.length < 4 && i < maxChunks && from <= latestBlock) {
+      const to =
+        from + step - 1n < latestBlock ? from + step - 1n : latestBlock;
+      ranges.push({ fromBlock: from, toBlock: to });
+      from = to + 1n;
+      i += 1;
+    }
+    const results = await Promise.all(
+      ranges.map((range) =>
+        publicClient.getLogs({
+          address: pool.address,
+          ...range,
+        }),
+      ),
+    );
+    for (const raw of results) logs.push(...parsePoolLogs(raw));
+    scannedTo = ranges[ranges.length - 1].toBlock;
   }
   return { logs, scannedTo, latestBlock };
 }
