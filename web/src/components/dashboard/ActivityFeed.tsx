@@ -1,30 +1,22 @@
 "use client";
 
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  ChevronRight,
-  Download,
-  FileCheck,
-  ReceiptText,
-} from "lucide-react";
+import { ChevronRight, Download, FileCheck } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { HISTORY_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import type { MyNote } from "../../lib/notes";
 import { cn } from "../../lib/utils";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
-import { glassSegmentedClass } from "../ui/glass";
 import { DiscloseDialog } from "./DiscloseDialog";
+import { dashButtonSecondary, dashFocus, dashIconButton } from "./styles";
 
 type ActivityEvent = {
   id: string;
   kind: "incoming" | "outgoing";
   amount: bigint;
   leafIndex: number;
+  at?: string;
 };
 
 const TABS = ["All", "Received", "Cashed out"] as const;
@@ -38,6 +30,7 @@ function toEvents(notes: MyNote[]): ActivityEvent[] {
       kind: "incoming",
       amount: note.amount,
       leafIndex: note.leafIndex,
+      at: note.receivedAt,
     });
     if (note.spent) {
       events.push({
@@ -45,6 +38,7 @@ function toEvents(notes: MyNote[]): ActivityEvent[] {
         kind: "outgoing",
         amount: note.amount,
         leafIndex: note.leafIndex,
+        at: note.spentAt,
       });
     }
   }
@@ -52,6 +46,18 @@ function toEvents(notes: MyNote[]): ActivityEvent[] {
     if (a.leafIndex !== b.leafIndex) return b.leafIndex - a.leafIndex;
     return a.kind === "outgoing" ? -1 : 1;
   });
+}
+
+function formatWhen(value: string | undefined): string {
+  if (!value) return "Private note";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Private note";
+  const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function exportCsv(events: ActivityEvent[]) {
@@ -77,8 +83,9 @@ export function ActivityFeed({
   limit,
   showSeeAll = false,
   showExport = false,
+  showFilters = true,
   title = "History",
-  appearance = "glass",
+  emptyAction,
   className,
 }: {
   notes: MyNote[];
@@ -86,8 +93,9 @@ export function ActivityFeed({
   limit?: number;
   showSeeAll?: boolean;
   showExport?: boolean;
+  showFilters?: boolean;
   title?: string;
-  appearance?: "glass" | "linen";
+  emptyAction?: ReactNode;
   className?: string;
 }) {
   const [tab, setTab] = useState<Tab>("All");
@@ -101,76 +109,68 @@ export function ActivityFeed({
   }, [events, tab]);
   const displayed = limit === undefined ? filtered : filtered.slice(0, limit);
   const skeletonCount = limit ?? 5;
-  const scrollable = limit === undefined && filtered.length > 5;
 
   return (
     <Card
-      appearance={appearance}
-      density="comfortable"
+      appearance="linen"
       id="activity"
-      className={cn("gap-5", className)}
+      className={cn("h-full gap-4 p-6", className)}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="type-product-panel-title text-foreground">{title}</h2>
-        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          <fieldset
-            className={cn(
-              appearance === "glass"
-                ? glassSegmentedClass
-                : "rounded-xl bg-secondary ring-1 ring-border",
-              "flex w-fit items-center gap-1 p-1",
-            )}
-          >
-            <legend className="sr-only">Filter activity</legend>
-            {TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={tab === t}
-                onClick={() => setTab(t)}
-                className={`min-h-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  tab === t
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </fieldset>
+        <h2 className="dashboard-tile-title">{title}</h2>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {showFilters ? (
+            <fieldset className="flex w-fit items-center rounded-full border border-(--dash-line) p-0.5">
+              <legend className="sr-only">Filter activity</legend>
+              {TABS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={tab === t}
+                  onClick={() => setTab(t)}
+                  className={`h-8 rounded-full px-3.5 text-[11px] font-semibold tracking-[0.08em] uppercase transition-colors ${dashFocus} ${
+                    tab === t
+                      ? "bg-(--dash-fg) text-(--dash-surface)"
+                      : "text-(--dash-ash) hover:text-(--dash-fg)"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
           {showExport ? (
-            <Button
+            <button
               type="button"
-              variant={appearance === "linen" ? "default" : "glass"}
-              size="sm"
-              className="min-h-10"
+              className={`${dashButtonSecondary} h-9`}
               onClick={() => exportCsv(filtered)}
               disabled={loading || filtered.length === 0}
             >
-              <Download className="size-3.5" aria-hidden="true" />
-              Export
-            </Button>
+              <Download aria-hidden="true" />
+              Export CSV
+            </button>
+          ) : null}
+          {showSeeAll ? (
+            <Link
+              href={HISTORY_PATH}
+              className={`inline-flex items-center gap-0.5 rounded-(--dash-radius-sm) text-sm text-(--dash-ash) transition-colors hover:text-(--dash-fg) ${dashFocus}`}
+            >
+              See all
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </Link>
           ) : null}
         </div>
       </div>
 
-      <section
-        className={
-          limit === undefined
-            ? "max-h-80 overflow-y-auto overscroll-contain rounded-lg pr-1 focus-visible:ring-2 focus-visible:ring-ring/70"
-            : "rounded-lg"
-        }
-        tabIndex={!loading && scrollable ? 0 : undefined}
-        aria-label="Activity history"
-      >
-        <ul className="flex flex-col divide-y divide-border">
+      <section aria-label="Activity history">
+        <ul className="flex flex-col divide-y divide-(--dash-line)">
           {loading && (
-            <li className="grid gap-3 py-2" aria-label="Loading history">
+            <li className="grid gap-2 py-1" aria-label="Loading history">
               {Array.from({ length: skeletonCount }, (_, item) => item).map(
                 (item) => (
                   <div
                     key={item}
-                    className="h-16 rounded-lg bg-secondary motion-safe:animate-pulse"
+                    className="h-12 rounded-(--dash-radius-sm) bg-(--dash-tint) motion-safe:animate-pulse"
                   />
                 ),
               )}
@@ -178,12 +178,17 @@ export function ActivityFeed({
           )}
 
           {!loading && filtered.length === 0 && (
-            <li className="py-5 text-sm text-muted-foreground">
-              {tab === "Cashed out"
-                ? "Nothing cashed out yet."
-                : tab === "Received"
-                  ? "No payments received yet."
-                  : "No payments yet. Share your pay link to receive your first."}
+            <li className="py-10">
+              <p className="max-w-sm text-sm leading-6 text-(--dash-ash)">
+                {tab === "Cashed out"
+                  ? "Nothing cashed out yet."
+                  : tab === "Received"
+                    ? "No payments received yet."
+                    : "No payments yet. Share your pay link to receive your first."}
+              </p>
+              {tab === "All" && emptyAction ? (
+                <div className="mt-4">{emptyAction}</div>
+              ) : null}
             </li>
           )}
 
@@ -191,77 +196,48 @@ export function ActivityFeed({
             displayed.map((event) => (
               <li
                 key={event.id}
-                className="flex min-h-16 items-center gap-3 py-3"
+                className="flex min-h-14 items-center gap-3 py-3"
               >
-                <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
-                  <ReceiptText className="size-5" aria-hidden="true" />
-                  <span className="absolute -top-1 -left-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background/50">
-                    {event.kind === "incoming" ? (
-                      <ArrowDownLeft className="size-3" aria-hidden="true" />
-                    ) : (
-                      <ArrowUpRight className="size-3" aria-hidden="true" />
-                    )}
-                  </span>
-                </div>
+                <span
+                  className={`size-1.5 shrink-0 rounded-full ${
+                    event.kind === "incoming"
+                      ? "bg-(--dash-accent)"
+                      : "border border-(--dash-fg)/50"
+                  }`}
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-sm font-medium">
                     {event.kind === "incoming"
                       ? "Payment received"
                       : "Cashed out"}
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <Badge
-                      appearance={appearance === "glass" ? "glass" : "default"}
-                      variant="outline"
-                      className="text-[10px] text-muted-foreground"
-                    >
-                      private note
-                    </Badge>
+                  <div className="mt-0.5 text-xs text-(--dash-ash)">
+                    {formatWhen(event.at)}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <div
-                    className={`text-right font-mono text-sm font-semibold ${
-                      event.kind === "incoming"
-                        ? "rounded-md bg-ok px-2 py-1 text-brand-linen ring-1 ring-border"
-                        : "text-foreground"
-                    }`}
+                <div className="shrink-0 text-right text-sm font-medium tabular-nums">
+                  {event.kind === "incoming" ? "+" : "−"}
+                  {fromBaseUnits(event.amount)}
+                  <span className="ml-1 text-(--dash-ash)">USDC</span>
+                </div>
+                {event.kind === "incoming" ? (
+                  <button
+                    type="button"
+                    className={dashIconButton}
+                    onClick={() => setDiscloseLeaf(event.leafIndex)}
+                    aria-label="Prove payment"
+                    title="Download a proof of this payment (PDF)"
                   >
-                    {event.kind === "incoming" ? "+" : "−"}
-                    {fromBaseUnits(event.amount)} USDC
-                  </div>
-                  {event.kind === "incoming" && (
-                    <Button
-                      variant={appearance === "linen" ? "default" : "glass"}
-                      size="icon"
-                      className="size-10"
-                      onClick={() => setDiscloseLeaf(event.leafIndex)}
-                      aria-label={`Prove payment`}
-                      title="Generate a per-payment proof (PDF)"
-                    >
-                      <FileCheck className="size-3.5" aria-hidden="true" />
-                    </Button>
-                  )}
-                </div>
+                    <FileCheck aria-hidden="true" />
+                  </button>
+                ) : (
+                  <span className="size-9 shrink-0" aria-hidden="true" />
+                )}
               </li>
             ))}
         </ul>
       </section>
-
-      {showSeeAll ? (
-        <div className="mt-auto flex justify-end">
-          <Button
-            variant={appearance === "linen" ? "default" : "glass"}
-            size="sm"
-            className="min-h-10"
-            nativeButton={false}
-            render={<Link href={HISTORY_PATH} />}
-          >
-            See all
-            <ChevronRight className="size-3.5" aria-hidden="true" />
-          </Button>
-        </div>
-      ) : null}
 
       <DiscloseDialog
         open={discloseLeaf !== null}

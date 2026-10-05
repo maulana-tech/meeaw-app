@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  Check,
-  KeyRound,
-  Loader,
-  LockKeyhole,
-  LogOut,
-  UserRound,
-} from "lucide-react";
+import { Loader, LockKeyhole, LogOut } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { useChangeRecoveryPin } from "../../features/recovery/hooks/useChangeRecoveryPin";
-import { cn } from "../../lib/utils";
 import { trpc } from "../../trpc/react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -27,10 +19,11 @@ import {
 import { useWallet } from "../WalletProvider";
 import { ChangeRecoveryPinDialog } from "./ChangeRecoveryPinDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
-import { DashboardTile } from "./DashboardTile";
+import { dashButtonPrimary, dashCell, dashLedger } from "./styles";
 
 export function SettingsDashboard() {
-  const { username, disconnect, recoveryMethod } = useWallet();
+  const { username, disconnect, recoveryMethod, openUsernameModal } =
+    useWallet();
   const [changePinOpen, setChangePinOpen] = useState(false);
   const { changeRecoveryPin, validateCurrentPin, isChanging } =
     useChangeRecoveryPin();
@@ -46,8 +39,8 @@ export function SettingsDashboard() {
         description="The essentials for your Mawee account, explained without the crypto jargon."
       />
 
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 pb-16 md:grid-cols-2 lg:grid-cols-12 lg:gap-5">
-        <IdentityTile username={username} />
+      <div className={`${dashLedger} max-w-3xl`}>
+        <IdentityTile username={username} onClaim={openUsernameModal} />
         <RecoveryTile
           method={passkeyProtected ? "passkey" : "pin"}
           protectedRecovery={passkeyProtected || Boolean(escrowQuery.data)}
@@ -72,37 +65,59 @@ export function SettingsDashboard() {
   );
 }
 
-function IdentityTile({ username }: { username: string | null }) {
+function SettingsRow({
+  title,
+  description,
+  aside,
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  aside?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
-    <section className="min-w-0 lg:col-span-5">
-      <DashboardTile
-        appearance="linen"
-        className="min-h-[19rem]"
-        header={
-          <TileHeading
-            icon={<UserRound className="size-5" aria-hidden="true" />}
-            title="Account handle"
-          />
-        }
-        content={
-          <div className="mt-8">
-            <p className="truncate font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-              {username ? `@${username}` : "No handle yet"}
-            </p>
-            <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">
-              This is the public name people use to pay you. It does not reveal
-              your balance or payment history.
-            </p>
-          </div>
-        }
-        footer={
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <LockKeyhole className="size-3.5" aria-hidden="true" />
-            Your handle is permanent and cannot be renamed.
-          </div>
-        }
-      />
+    <section className={`${dashCell} p-6`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 className="dashboard-tile-title">{title}</h2>
+        {aside}
+      </div>
+      <div className="mt-3 max-w-xl text-sm leading-6 text-(--dash-ash)">
+        {description}
+      </div>
+      {children ? <div className="mt-5">{children}</div> : null}
     </section>
+  );
+}
+
+function IdentityTile({
+  username,
+  onClaim,
+}: {
+  username: string | null;
+  onClaim: () => void;
+}) {
+  return (
+    <SettingsRow
+      title="Account handle"
+      description="The public name people use to pay you. It does not reveal your balance or payment history."
+    >
+      {username ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-(--dash-radius-sm) border border-(--dash-line) px-3 py-1.5 font-mono text-sm">
+            @{username}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-brand-linen/50">
+            <LockKeyhole className="size-3.5" aria-hidden="true" />
+            Permanent, cannot be renamed
+          </span>
+        </div>
+      ) : (
+        <button type="button" className={dashButtonPrimary} onClick={onClaim}>
+          Claim username
+        </button>
+      )}
+    </SettingsRow>
   );
 }
 
@@ -118,68 +133,55 @@ function RecoveryTile({
   onChangePin: () => void;
 }) {
   return (
-    <section className="min-w-0 lg:col-span-7">
-      <DashboardTile
-        appearance="glass"
-        className="min-h-[19rem] text-brand-linen"
-        header={
-          <div className="flex items-start justify-between gap-4">
-            <TileHeading
-              inverse
-              icon={<KeyRound className="size-5" aria-hidden="true" />}
-              title={method === "passkey" ? "Recovery passkey" : "Recovery PIN"}
+    <SettingsRow
+      title={method === "passkey" ? "Recovery passkey" : "Recovery PIN"}
+      aside={
+        loading ? (
+          <Badge appearance="glass" className="gap-1.5">
+            <Loader className="size-3 animate-spin" aria-hidden="true" />
+            Checking
+          </Badge>
+        ) : protectedRecovery ? (
+          <Badge className="gap-1.5 border border-(--dash-line) bg-transparent text-(--dash-fg)">
+            <span
+              className="size-1.5 rounded-full bg-(--dash-accent)"
+              aria-hidden="true"
             />
-            {loading ? (
-              <Badge appearance="glass" className="gap-1.5">
-                <Loader className="size-3 animate-spin" aria-hidden="true" />
-                Checking
-              </Badge>
-            ) : protectedRecovery ? (
-              <Badge className="gap-1.5 bg-brand-linen text-brand-obsidian">
-                <Check className="size-3" aria-hidden="true" />
-                Ready
-              </Badge>
-            ) : (
-              <Badge
-                variant="destructive"
-                className="bg-red-300/15 text-red-100"
-              >
-                Needs attention
-              </Badge>
-            )}
-          </div>
-        }
-        content={
-          <div className="mt-8 max-w-xl">
-            <p className="font-heading text-3xl font-semibold tracking-tight">
-              {loading
-                ? "Checking your recovery setup…"
-                : method === "passkey"
-                  ? "Protected by your passkey"
-                  : protectedRecovery
-                    ? "Protected by your recovery PIN"
-                    : "Set up your recovery PIN"}
-            </p>
-            <p className="mt-4 text-sm leading-6 text-brand-linen/70">
-              {method === "passkey"
-                ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Mawee stores nothing secret."
+            Ready
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="bg-red-300/15 text-red-100">
+            Needs attention
+          </Badge>
+        )
+      }
+      description={
+        <>
+          <p className="font-medium text-(--dash-fg)">
+            {loading
+              ? "Checking your recovery setup…"
+              : method === "passkey"
+                ? "Protected by your passkey"
                 : protectedRecovery
-                  ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
-                  : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
-            </p>
-          </div>
-        }
-        footer={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {method === "pin" && protectedRecovery && !loading ? (
-              <Button variant="glass" onClick={onChangePin}>
-                Change PIN
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
-    </section>
+                  ? "Protected by your recovery PIN"
+                  : "Set up your recovery PIN"}
+          </p>
+          <p>
+            {method === "passkey"
+              ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Mawee stores nothing secret."
+              : protectedRecovery
+                ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
+                : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
+          </p>
+        </>
+      }
+    >
+      {method === "pin" && protectedRecovery && !loading ? (
+        <Button variant="glass" onClick={onChangePin}>
+          Change PIN
+        </Button>
+      ) : null}
+    </SettingsRow>
   );
 }
 
@@ -198,30 +200,16 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
   }
 
   return (
-    <section className="min-w-0 lg:col-span-5">
-      <DashboardTile
-        appearance="glass"
-        className="min-h-[19rem] text-brand-linen"
-        header={
-          <TileHeading
-            inverse
-            icon={<LogOut className="size-5" aria-hidden="true" />}
-            title="Your session"
-          />
-        }
-        content={
-          <p className="mt-8 max-w-md text-sm leading-6 text-brand-linen/70">
-            Signing out removes access from this device. It does not delete your
-            account, payment history, or funds.
-          </p>
-        }
-        footer={
-          <Button variant="glass" onClick={() => setSignOutOpen(true)}>
-            <LogOut className="size-4" aria-hidden="true" />
-            Sign out on this device
-          </Button>
-        }
-      />
+    <>
+      <SettingsRow
+        title="Your session"
+        description="Signing out removes access from this device. It does not delete your account, payment history, or funds."
+      >
+        <Button variant="glass" onClick={() => setSignOutOpen(true)}>
+          <LogOut className="size-4" aria-hidden="true" />
+          Sign out on this device
+        </Button>
+      </SettingsRow>
 
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent appearance="linen" size="sm">
@@ -229,7 +217,7 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
             <DialogTitle>Sign out of Mawee?</DialogTitle>
             <DialogDescription>
               This removes access from this device. Your account and funds stay
-              safe, and you can return with your recovery PIN.
+              safe, and you can return with your passkey or recovery PIN.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -254,36 +242,6 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
-  );
-}
-
-function TileHeading({
-  icon,
-  title,
-  inverse = false,
-}: {
-  icon: ReactNode;
-  title: string;
-  inverse?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <span
-        className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1",
-          inverse
-            ? "bg-brand-linen/10 text-brand-linen ring-brand-linen/15"
-            : "bg-foreground/8 text-foreground ring-foreground/10",
-        )}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
-          {title}
-        </h2>
-      </div>
-    </div>
+    </>
   );
 }

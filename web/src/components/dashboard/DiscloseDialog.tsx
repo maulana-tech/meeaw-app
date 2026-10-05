@@ -111,7 +111,7 @@ export function DiscloseDialog({
 
         {step === "ready" && bundle && (
           <div className="grid gap-4">
-            <div className={cn(linenInsetClass, "rounded-2xl p-4")}>
+            <div className={cn(linenInsetClass, "rounded-(--dash-radius) p-4")}>
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-foreground/65">
                   Payment received

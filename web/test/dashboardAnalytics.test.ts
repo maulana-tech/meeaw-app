@@ -31,6 +31,8 @@ describe("weeklyActivity", () => {
       buckets: [1, 0, 0, 0, 1, 1, 1],
       received: 3,
       cashedOut: 1,
+      receivedAmount: 3n,
+      cashedOutAmount: 1n,
     });
   });
 
@@ -50,6 +52,8 @@ describe("weeklyActivity", () => {
       buckets: [0, 0, 0, 0, 0, 0, 0],
       received: 0,
       cashedOut: 0,
+      receivedAmount: 0n,
+      cashedOutAmount: 0n,
     });
   });
 });

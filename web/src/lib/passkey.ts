@@ -125,3 +125,8 @@ export function passkeyErrorMessage(error: unknown): string {
   }
   return error instanceof Error ? error.message : "The passkey request failed.";
 }
+
+/** Mirrors WalletProvider.promptUnlock: passkey accounts re-derive, others use PIN. */
+export function unlockLabel(method: "passkey" | "pin" | null): string {
+  return method === "passkey" ? "Unlock with passkey" : "Unlock with PIN";
+}

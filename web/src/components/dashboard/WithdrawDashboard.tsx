@@ -1,14 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Banknote,
-  Loader,
-  LockKeyhole,
-  X,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Banknote, Loader, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,6 +11,7 @@ import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import { unlockLabel } from "../../lib/passkey";
 import { useGasless } from "../../lib/useGasless";
 import {
   claimableNotes,
@@ -41,7 +35,9 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { ToastFeedback } from "../ui/toast-feedback";
 import { useWallet } from "../WalletProvider";
+import { DashboardNotice } from "./DashboardNotice";
 import { DashboardPageHeader } from "./DashboardPageHeader";
+import { dashButtonPrimary, dashButtonSecondary } from "./styles";
 import { useMyNotes } from "./useMyNotes";
 
 type WalletStep = "form" | "review" | "proving";
@@ -88,7 +84,8 @@ function targetTotal(target: WithdrawalTarget | null): bigint {
 }
 
 export function WithdrawDashboard() {
-  const { address, accountUnlocked, promptUnlock, getSigner } = useWallet();
+  const { address, accountUnlocked, promptUnlock, getSigner, recoveryMethod } =
+    useWallet();
   const {
     notes,
     claimable,
@@ -247,7 +244,7 @@ export function WithdrawDashboard() {
   return (
     <>
       <DashboardPageHeader
-        title="Withdraw"
+        title="Cash out"
         description={
           <>
             Choose a private payment, then send it to any Monad wallet without
@@ -257,7 +254,10 @@ export function WithdrawDashboard() {
       />
 
       {!accountUnlocked ? (
-        <LockedState onUnlock={promptUnlock} />
+        <LockedState
+          label={unlockLabel(recoveryMethod ?? null)}
+          onUnlock={promptUnlock}
+        />
       ) : loading ? (
         <LoadingState />
       ) : notesError ? (
@@ -280,7 +280,7 @@ export function WithdrawDashboard() {
               </p>
             </div>
             <div className="text-right">
-              <p className="font-mono text-lg font-semibold text-brand-linen tabular-nums">
+              <p className="text-lg font-semibold text-brand-linen tabular-nums">
                 {formatUsd(claimable)}
               </p>
               <p className="text-xs text-brand-linen/65">
@@ -411,14 +411,14 @@ function PaymentCard({
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Private payment
             </p>
-            <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-foreground tabular-nums">
+            <p className="mt-2 text-3xl font-normal tracking-tight text-foreground tabular-nums">
               ${fromBaseUnits(note.amount)}
             </p>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
               USDC
             </p>
           </div>
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-foreground ring-1 ring-border">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-secondary text-foreground ring-1 ring-border">
             <Banknote className="size-5" aria-hidden="true" />
           </div>
         </div>
@@ -468,7 +468,7 @@ function AllPaymentsCard({
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             All payments
           </p>
-          <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-foreground tabular-nums">
+          <p className="mt-2 text-3xl font-normal tracking-tight text-foreground tabular-nums">
             ${fromBaseUnits(total)}
           </p>
           <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -637,7 +637,7 @@ function WalletWithdrawal({
         <div className={`${linenInsetClass} p-4`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-sm text-foreground/60">Cashing out</span>
-            <span className="font-mono text-xl font-semibold text-foreground tabular-nums">
+            <span className="text-xl font-semibold text-foreground tabular-nums">
               {fromBaseUnits(amount)} USDC
             </span>
           </div>
@@ -700,7 +700,7 @@ function BackButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-10 w-fit items-center gap-2 rounded-lg px-2 text-sm font-semibold text-foreground/70 hover:bg-foreground/8 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/70"
+      className="flex min-h-10 w-fit items-center gap-2 rounded-(--dash-radius-sm) px-2 text-sm font-semibold text-foreground/70 hover:bg-foreground/8 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/70"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
       {label}
@@ -708,51 +708,43 @@ function BackButton({
   );
 }
 
-function LockedState({ onUnlock }: { onUnlock: () => void }) {
+function LockedState({
+  label,
+  onUnlock,
+}: {
+  label: string;
+  onUnlock: () => void;
+}) {
   return (
-    <div className="grid place-items-center gap-4 py-10 text-center">
-      <div className="flex size-12 items-center justify-center rounded-lg bg-brand-linen/10 text-brand-linen ring-1 ring-brand-linen/15">
-        <LockKeyhole className="size-6" aria-hidden="true" />
-      </div>
-      <div className="space-y-1">
-        <h2 className="font-heading text-lg font-semibold text-brand-linen">
-          Unlock to cash out
-        </h2>
-        <p className="max-w-sm text-sm text-brand-linen/65">
-          Your PIN unlocks the private notes stored on this device.
-        </p>
-      </div>
-      <Button variant="glass" size="lg" onClick={onUnlock}>
-        Unlock with PIN
-      </Button>
-    </div>
+    <DashboardNotice
+      label="Locked"
+      title="Unlock to cash out"
+      action={
+        <button type="button" onClick={onUnlock} className={dashButtonPrimary}>
+          {label}
+        </button>
+      }
+    >
+      Your private payments are encrypted on this device. Unlock to choose which
+      ones to send.
+    </DashboardNotice>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="grid place-items-center gap-4 py-10 text-center">
-      <div className="flex size-12 items-center justify-center rounded-lg bg-brand-linen/10 text-brand-linen ring-1 ring-brand-linen/15">
-        <Banknote className="size-6" aria-hidden="true" />
-      </div>
-      <div className="space-y-1">
-        <h2 className="font-heading text-lg font-semibold text-brand-linen">
-          No payments to cash out
-        </h2>
-        <p className="max-w-sm text-sm text-brand-linen/65">
-          Share a payment link first. Private payments you receive will appear
-          here.
-        </p>
-      </div>
-      <Button
-        variant="glass"
-        nativeButton={false}
-        render={<Link href={LINKS_PATH} />}
-      >
-        View payment links
-        <ArrowRight className="size-4" aria-hidden="true" />
-      </Button>
-    </div>
+    <DashboardNotice
+      label="Nothing yet"
+      title="No payments to cash out"
+      action={
+        <Link href={LINKS_PATH} className={dashButtonSecondary}>
+          View payment links
+          <ArrowRight aria-hidden="true" />
+        </Link>
+      }
+    >
+      Share a payment link first. Private payments you receive will appear here.
+    </DashboardNotice>
   );
 }
 
@@ -766,7 +758,7 @@ function LoadingState() {
       {["first", "second", "third"].map((key) => (
         <div
           key={key}
-          className="min-h-64 rounded-xl bg-brand-linen/8 ring-1 ring-brand-linen/15 backdrop-blur-xl"
+          className="min-h-64 rounded-(--dash-radius) bg-(--dash-tint) ring-1 ring-(--dash-line)"
           aria-hidden="true"
         />
       ))}

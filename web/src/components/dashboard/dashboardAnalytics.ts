@@ -4,6 +4,9 @@ export type WeeklyActivity = {
   buckets: number[];
   received: number;
   cashedOut: number;
+  /** USDC base units received / cashed out over the same seven days. */
+  receivedAmount: bigint;
+  cashedOutAmount: bigint;
 };
 
 function validDate(value: string | undefined): Date | null {
@@ -24,8 +27,14 @@ export function weeklyActivity(
   const buckets = Array.from({ length: 7 }, () => 0);
   let received = 0;
   let cashedOut = 0;
+  let receivedAmount = 0n;
+  let cashedOutAmount = 0n;
 
-  function add(value: string | undefined, kind: "received" | "cashedOut") {
+  function add(
+    value: string | undefined,
+    kind: "received" | "cashedOut",
+    amount: bigint,
+  ) {
     const date = validDate(value);
     if (!date || date < firstDay || date > now) return;
     const localDay = new Date(
@@ -38,14 +47,25 @@ export function weeklyActivity(
     );
     if (index < 0 || index > 6) return;
     buckets[index] += 1;
-    if (kind === "received") received += 1;
-    else cashedOut += 1;
+    if (kind === "received") {
+      received += 1;
+      receivedAmount += amount;
+    } else {
+      cashedOut += 1;
+      cashedOutAmount += amount;
+    }
   }
 
   for (const note of notes) {
-    add(note.receivedAt, "received");
-    add(note.spentAt, "cashedOut");
+    add(note.receivedAt, "received", note.amount);
+    add(note.spentAt, "cashedOut", note.amount);
   }
 
-  return { buckets, received, cashedOut };
+  return {
+    buckets,
+    received,
+    cashedOut,
+    receivedAmount,
+    cashedOutAmount,
+  };
 }

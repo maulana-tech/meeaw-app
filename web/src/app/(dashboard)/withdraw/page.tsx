@@ -26,8 +26,8 @@ export default function DashboardWithdrawPage() {
           <div className="h-4 w-96 max-w-full rounded-full bg-brand-linen/8" />
         </div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
-          <div className="h-96 rounded-xl bg-brand-linen/8 ring-1 ring-brand-linen/15" />
-          <div className="h-64 rounded-xl bg-brand-linen/8 ring-1 ring-brand-linen/15" />
+          <div className="h-96 rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line)" />
+          <div className="h-64 rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line)" />
         </div>
       </div>
     );

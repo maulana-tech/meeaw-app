@@ -109,7 +109,7 @@ export function LinksDashboard({
           <PersonalLinkCard username={username} payLink={payLink} />
           {loading ? (
             <div
-              className="min-h-64 rounded-[1.625rem] bg-brand-linen ring-1 ring-brand-obsidian/10 motion-safe:animate-pulse"
+              className="min-h-64 rounded-(--dash-radius) bg-(--dash-tint) ring-1 ring-(--dash-line) motion-safe:animate-pulse"
               aria-hidden="true"
             />
           ) : null}
@@ -266,7 +266,7 @@ function GeneratedLinkCard({
               {link.slug}
             </h3>
             {archived ? (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+              <span className="rounded-[4px] bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                 Archived
               </span>
             ) : null}
@@ -355,7 +355,7 @@ function GeneratedLinkCard({
         </div>
       </div>
 
-      <div className="truncate rounded-xl bg-secondary px-3 py-2 font-mono text-sm text-foreground ring-1 ring-border">
+      <div className="truncate rounded-(--dash-radius-sm) bg-secondary px-3 py-2 font-mono text-sm text-foreground ring-1 ring-border">
         {url.replace(/^https?:\/\//, "")}
       </div>
 

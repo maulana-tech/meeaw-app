@@ -56,7 +56,7 @@ describe("dashboard glass modals", () => {
       name: /Request from a username/,
     });
 
-    expect(primaryOption).toHaveClass("rounded-2xl");
+    expect(primaryOption).toHaveClass("rounded-(--dash-radius)");
     expect(within(primaryOption).getByText("Create a link or QR")).toHaveClass(
       "text-foreground",
     );
@@ -66,10 +66,15 @@ describe("dashboard glass modals", () => {
       ),
     ).toHaveClass("text-foreground/60");
     expect(disabledOption).toBeDisabled();
-    expect(disabledOption).toHaveClass("rounded-2xl", "text-foreground/45");
+    expect(disabledOption).toHaveClass(
+      "rounded-(--dash-radius)",
+      "text-foreground/45",
+    );
 
     fireEvent.click(primaryOption);
-    expect(screen.getByLabelText(/Description/)).toHaveClass("rounded-xl");
+    expect(screen.getByLabelText(/Description/)).toHaveClass(
+      "rounded-(--dash-radius-sm)",
+    );
     expect(screen.getByText("Link name")).toHaveClass("text-foreground/70");
   });
 
@@ -109,6 +114,6 @@ describe("dashboard glass modals", () => {
       "text-foreground/65",
     );
     expect(screen.getByText("Recipient")).toHaveClass("text-foreground/65");
-    expect(card).toHaveClass("rounded-2xl");
+    expect(card).toHaveClass("rounded-(--dash-radius)");
   });
 });

@@ -64,7 +64,7 @@ export function RecoveryDialog({
               onClick={() => onChoose("passkey")}
               className={`${linenInsetClass} flex min-h-20 items-center gap-4 border border-foreground/18 p-4 text-left transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-foreground/70 disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-foreground/10 ring-1 ring-foreground/15">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-foreground/10 ring-1 ring-foreground/15">
                 {busy ? (
                   <Loader
                     className="size-5 motion-safe:animate-spin"
@@ -94,7 +94,7 @@ export function RecoveryDialog({
               onClick={() => onChoose("pin")}
               className={`${linenInsetClass} flex min-h-20 items-center gap-4 border border-foreground/18 p-4 text-left transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-foreground/70 disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-foreground/10 ring-1 ring-foreground/15">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-foreground/10 ring-1 ring-foreground/15">
                 <KeyRound className="size-5" aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
