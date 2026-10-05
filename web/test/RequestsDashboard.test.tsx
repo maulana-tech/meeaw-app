@@ -28,7 +28,8 @@ describe("payment requests page",()=>{
   it("keeps payment progress visible on the request row",()=>{
     const row=received("pending");row.record.operationId="op-123";state.rows=[row];
     render(<RequestsDashboard onCreate={()=>{}}/>);
-    expect(screen.getByText("Payment is being checked")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Confirming payment");
+    expect(screen.getByRole("button",{name:/View payment/})).toBeInTheDocument();
     expect(screen.queryByRole("button",{name:/Review/})).not.toBeInTheDocument();
   });
 });

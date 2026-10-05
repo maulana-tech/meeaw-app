@@ -1,5 +1,11 @@
 "use client";
-import { ArrowRight, CheckCircle2, Loader, LockKeyhole } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  CircleAlert,
+  Loader,
+  LockKeyhole,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RequestRow } from "../../features/requests/hooks/useRequests";
 import type { PaymentOperation } from "../../features/requests/types";
@@ -71,15 +77,58 @@ export function PayRequestDialog({
     const timer = setTimeout(() => setSlow(true), 30000);
     return () => clearTimeout(timer);
   }, [record?.id, waiting]);
+  const progress = operation
+    ? operation.phase === "preparing"
+      ? {
+          title: "Preparing payment",
+          detail: `${operation.completedMerges} balance merge${operation.completedMerges === 1 ? "" : "s"} complete. Keep this window open.`,
+        }
+      : operation.phase === "confirmed"
+        ? { title: "Payment confirmed", detail: "Settled on Monad." }
+        : operation.phase === "failed"
+          ? {
+              title: "This attempt failed",
+              detail: "Your funds remain available. You can try again.",
+            }
+          : operation.txHash
+            ? {
+                title: "Payment sent",
+                detail: "Waiting for confirmation on Monad.",
+              }
+            : {
+                title: "Submitting payment",
+                detail: "Checking the submission.",
+              }
+    : record?.operationId
+      ? {
+          title: "Checking your earlier payment",
+          detail:
+            "Checking the existing private payment before allowing another attempt.",
+        }
+      : null;
+  const followUp = waiting
+    ? slow
+      ? "This is taking longer than usual. We are still checking, so do not pay again."
+      : "You can close this window. The request updates automatically."
+    : null;
+  const showBalance = !waiting && !confirmed;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent appearance="linen" size="sm">
         <DialogHeader>
           <DialogTitle>
-            {confirmed ? "Payment confirmed" : "Pay this request"}
+            {confirmed
+              ? "Payment confirmed"
+              : waiting
+                ? "Payment in progress"
+                : "Pay this request"}
           </DialogTitle>
           <DialogDescription>
-            Review the payment before you confirm.
+            {confirmed
+              ? "This request has been paid."
+              : waiting
+                ? "Your payment is on its way. No further action is needed."
+                : "Review the payment before you confirm."}
           </DialogDescription>
         </DialogHeader>
         {request && record && amount !== null ? (
@@ -95,89 +144,90 @@ export function PayRequestDialog({
                 {request.note || "Payment request"}
               </p>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-sm">
-              <span className="text-muted-foreground">Pay from</span>
-              <span className="font-medium">Private Mawee balance</span>
+            <div className="grid gap-2 border-t border-border pt-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Pay from</span>
+                <span className="font-medium">Private Mawee balance</span>
+              </div>
+              {showBalance ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Available in this pool
+                  </span>
+                  <span className="tabular-nums">
+                    {balanceReady
+                      ? `${fromBaseUnits(balance)} USDC`
+                      : notes.loading || notes.refreshing
+                        ? "Checking private balance…"
+                        : pool?.role === "legacy"
+                          ? "Previous pool balance"
+                          : "Balance unavailable"}
+                  </span>
+                </div>
+              ) : null}
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Available in this pool
-              </span>
-              <span>
-                {balanceReady
-                  ? `${fromBaseUnits(balance)} USDC`
-                  : notes.loading || notes.refreshing
-                    ? "Checking private balance…"
-                    : pool?.role === "legacy"
-                      ? "Previous pool balance"
-                      : "Balance unavailable"}
-              </span>
-            </div>
-            {balanceReady && balance < amount ? (
+            {showBalance && balanceReady && balance < amount ? (
               <p className="text-sm text-muted-foreground">
                 Add or receive at least {fromBaseUnits(amount - balance)} USDC
                 in this pool before paying.
               </p>
             ) : null}
-            {operation ? (
+            {progress ? (
               <div
-                className="flex items-center justify-center gap-3 rounded-xl bg-foreground/5 p-3 text-sm"
+                className="flex items-start gap-3 rounded-xl bg-foreground/5 p-3.5 text-sm"
                 role="status"
                 aria-live="polite"
               >
-                {operation.phase === "confirmed" ? (
-                  <CheckCircle2 className="size-4" aria-hidden="true" />
-                ) : operation.phase !== "failed" ? (
-                  <Loader className="size-4 animate-spin" aria-hidden="true" />
-                ) : null}
-                {operation.phase === "preparing"
-                  ? `Preparing payment · ${operation.completedMerges} balance merge${operation.completedMerges === 1 ? "" : "s"} complete`
-                  : operation.phase === "confirmed"
-                    ? "Payment confirmed on Monad"
-                    : operation.phase === "failed"
-                      ? "This attempt failed; your funds remain available"
-                      : operation.txHash
-                        ? "Payment sent · waiting for confirmation"
-                        : "Checking payment submission…"}
-              </div>
-            ) : null}
-            {record.operationId && !operation ? (
-              <div
-                className="flex items-center justify-center gap-3 rounded-xl bg-foreground/5 p-3 text-sm"
-                role="status"
-                aria-live="polite"
-              >
-                <Loader className="size-4 animate-spin" aria-hidden="true" />
-                Checking the existing private payment before allowing another
-                attempt.
+                <span className="mt-0.5 shrink-0" aria-hidden="true">
+                  {operation?.phase === "confirmed" ? (
+                    <CheckCircle2 className="size-4" />
+                  ) : operation?.phase === "failed" ? (
+                    <CircleAlert className="size-4 text-destructive" />
+                  ) : (
+                    <Loader className="size-4 animate-spin" />
+                  )}
+                </span>
+                <div className="grid gap-1">
+                  <p className="font-medium">{progress.title}</p>
+                  <p className="text-muted-foreground">{progress.detail}</p>
+                  {followUp ? (
+                    <p className="text-muted-foreground">{followUp}</p>
+                  ) : null}
+                  {waiting && statusError ? (
+                    <p className="text-muted-foreground">{statusError}</p>
+                  ) : null}
+                </div>
               </div>
             ) : null}
             {waiting ? (
-              <div className="grid gap-3 text-sm">
-                <p className="text-muted-foreground">
-                  {slow
-                    ? "Confirmation is taking longer than usual. We are still checking; do not pay again."
-                    : "You can close this window. The request status will update automatically."}
-                </p>
-                {statusError ? (
-                  <p className="text-muted-foreground" role="status">
-                    {statusError}
-                  </p>
-                ) : null}
-                <div className="flex gap-2">
-                  {slow || statusError ? (
-                    <Button
-                      variant="secondary"
-                      disabled={checking}
-                      onClick={() => void onCheck().catch(() => {})}
-                    >
-                      {checking ? "Checking…" : "Check status"}
-                    </Button>
-                  ) : null}
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
-                    Close
+              <div
+                className={
+                  slow || statusError ? "grid grid-cols-2 gap-2" : "grid"
+                }
+              >
+                {slow || statusError ? (
+                  <Button
+                    variant="secondary"
+                    className="min-h-11"
+                    disabled={checking}
+                    onClick={() => void onCheck().catch(() => {})}
+                  >
+                    {checking ? (
+                      <Loader
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {checking ? "Checking…" : "Check status"}
                   </Button>
-                </div>
+                ) : null}
+                <Button
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
               </div>
             ) : null}
             {error ? (

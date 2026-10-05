@@ -2,24 +2,20 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Inbox,
   Loader,
   LockKeyhole,
   Plus,
   RefreshCw,
 } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useRequestPayment } from "../../features/requests/hooks/useRequestPayment";
 import type { RequestRow } from "../../features/requests/hooks/useRequests";
 import { useRequests } from "../../features/requests/hooks/useRequests";
 import type { PaymentRequest } from "../../features/requests/types";
-import { REQUESTS_PATH } from "../../lib/auth-routes";
 import { requestPool } from "../../lib/pools";
-import { cn } from "../../lib/utils";
 import { api } from "../../trpc/client";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +28,7 @@ import { useWallet } from "../WalletProvider";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { PayRequestDialog } from "./PayRequestDialog";
 import { RequestPaymentStatus } from "./RequestPaymentStatus";
+import { dashButtonPrimary, dashButtonSecondary, dashFocus } from "./styles";
 
 export function RequestsDashboard({
   onCreate = () => {},
@@ -62,6 +59,9 @@ export function RequestsDashboard({
       if (action === "decline") await api.requests.decline.mutate(input);
       else await api.requests.cancel.mutate(input);
       list.refresh();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("mawee:request-changed"));
+      }
       setTransition(null);
     } catch (e) {
       setTransitionError(
@@ -73,133 +73,135 @@ export function RequestsDashboard({
       setTransitionBusy(false);
     }
   }
+  const selectDirection = (next: "received" | "sent") => {
+    setSelected(null);
+    setDirection(next);
+  };
   return (
     <>
-      <div className="mb-4 flex items-center gap-3">
-        <Link
-          href="/dashboard"
-          aria-label="Back to dashboard"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full text-(--dash-ash) transition-colors hover:bg-(--dash-tint) hover:text-(--dash-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-        </Link>
-        <DashboardPageHeader
-          title="Requests"
-          description="A simple way to ask, pay, and keep track."
-        />
-      </div>
-      <div className="dashboard-bento mx-auto max-w-6xl pb-16">
-        <div
-          role="tablist"
-          aria-label="Request direction"
-          className="flex gap-1 border-b border-(--dash-line-solid)"
-        >
+      <DashboardPageHeader
+        title="Requests"
+        description="Ask someone to pay you, and pay what you have been asked for. Amounts and notes stay encrypted."
+        action={
           <button
-            id="requests-received-tab"
             type="button"
-            role="tab"
-            aria-selected={direction === "received"}
-            aria-controls="requests-list"
-            onClick={() => {
-              setSelected(null);
-              setDirection("received");
-            }}
-            className={cn(
-              "min-h-11 border-b-2 px-4 text-sm",
-              direction === "received"
-                ? "border-brand-linen text-(--dash-fg)"
-                : "border-transparent text-(--dash-ash) hover:text-(--dash-fg)",
-            )}
+            onClick={onCreate}
+            disabled={!address}
+            className={dashButtonPrimary}
           >
-            Received <span className="ml-1 tabular-nums">{list.count}</span>
+            <Plus aria-hidden="true" />
+            New request
           </button>
-          <button
-            id="requests-sent-tab"
-            type="button"
-            role="tab"
-            aria-selected={direction === "sent"}
-            aria-controls="requests-list"
-            onClick={() => {
-              setSelected(null);
-              setDirection("sent");
-            }}
-            className={cn(
-              "min-h-11 border-b-2 px-4 text-sm",
-              direction === "sent"
-                ? "border-brand-linen text-(--dash-fg)"
-                : "border-transparent text-(--dash-ash) hover:text-(--dash-fg)",
-            )}
-          >
-            Sent
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 py-5">
-          <p className="text-sm text-(--dash-ash)">
+        }
+      />
+      <Card appearance="linen" className="gap-4 p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="dashboard-tile-title">
             {direction === "received"
               ? "People asking you to pay"
               : "Requests you have sent"}
-          </p>
-          <Button onClick={onCreate} variant="secondary" disabled={!address}>
-            <Plus className="size-4" aria-hidden="true" />
-            New request
-          </Button>
+          </h2>
+          <div
+            role="tablist"
+            aria-label="Request direction"
+            className="flex w-fit items-center rounded-full border border-(--dash-line) p-0.5"
+          >
+            <DirectionTab
+              id="requests-received-tab"
+              selected={direction === "received"}
+              onSelect={() => selectDirection("received")}
+            >
+              Received
+              {list.count > 0 ? (
+                <span className="ml-1.5 tabular-nums">{list.count}</span>
+              ) : null}
+            </DirectionTab>
+            <DirectionTab
+              id="requests-sent-tab"
+              selected={direction === "sent"}
+              onSelect={() => selectDirection("sent")}
+            >
+              Sent
+            </DirectionTab>
+          </div>
         </div>
-        <div
+        <section
           id="requests-list"
           role="tabpanel"
           aria-labelledby={`requests-${direction}-tab`}
         >
           {list.isLoading ? (
             <div
-              className="flex min-h-24 items-center gap-3 text-sm text-(--dash-ash)"
+              className="grid gap-2 py-1"
               role="status"
+              aria-busy="true"
+              aria-label="Loading requests"
             >
-              <Loader className="size-4 animate-spin" aria-hidden="true" />
-              Loading your requests…
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="h-16 bg-(--dash-tint) motion-safe:animate-pulse"
+                />
+              ))}
             </div>
           ) : list.error ? (
-            <div className="flex items-center justify-between gap-4 py-7">
-              <p className="text-sm">Your requests could not be loaded.</p>
-              <Button variant="secondary" onClick={list.refresh}>
-                <RefreshCw className="size-4" />
-                Try again
-              </Button>
-            </div>
+            <ListMessage
+              action={
+                <button
+                  type="button"
+                  className={dashButtonSecondary}
+                  onClick={list.refresh}
+                >
+                  <RefreshCw aria-hidden="true" />
+                  Try again
+                </button>
+              }
+            >
+              Your requests could not be loaded. Check your connection and try
+              again.
+            </ListMessage>
           ) : list.rows.length === 0 &&
             !accountUnlocked &&
             direction === "received" &&
             list.count > 0 ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-3 py-10 text-center">
-              <LockKeyhole
-                className="size-6 text-(--dash-ash)"
-                aria-hidden="true"
-              />
-              <p className="text-sm text-(--dash-ash)">
-                {list.count} incoming request{list.count === 1 ? "" : "s"}.
-                Unlock to view them privately.
-              </p>
-              <Button variant="secondary" onClick={promptUnlock}>
-                Unlock Mawee
-              </Button>
-            </div>
+            <ListMessage
+              action={
+                <button
+                  type="button"
+                  className={dashButtonPrimary}
+                  onClick={promptUnlock}
+                >
+                  <LockKeyhole aria-hidden="true" />
+                  Unlock Mawee
+                </button>
+              }
+            >
+              {list.count} incoming request{list.count === 1 ? " is" : "s are"}{" "}
+              encrypted to your account. Unlock to see who is asking and how
+              much.
+            </ListMessage>
           ) : list.rows.length === 0 ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-3 py-10 text-center">
-              <Inbox
-                className="size-6 text-(--dash-ash)"
-                aria-hidden="true"
-              />
-              <p className="text-sm text-(--dash-ash)">
-                {direction === "received"
-                  ? "No payment requests yet."
-                  : "You haven't sent any requests yet."}
-              </p>
-              <Button variant="secondary" onClick={onCreate}>
-                <Plus className="size-4" />
-                New request
-              </Button>
-            </div>
+            <ListMessage
+              action={
+                direction === "sent" ? (
+                  <button
+                    type="button"
+                    className={dashButtonSecondary}
+                    onClick={onCreate}
+                    disabled={!address}
+                  >
+                    <Plus aria-hidden="true" />
+                    New request
+                  </button>
+                ) : null
+              }
+            >
+              {direction === "received"
+                ? "Nobody has asked you to pay yet. Requests sent to your username show up here."
+                : "You have not sent any requests yet. Ask someone to pay you by their username."}
+            </ListMessage>
           ) : (
-            <div className="grid gap-3">
+            <ul className="flex flex-col divide-y divide-(--dash-line)">
               {list.rows.map((row) => (
                 <RequestRowView
                   key={row.record.id}
@@ -212,26 +214,34 @@ export function RequestsDashboard({
                   onTransition={() => setTransition(row)}
                 />
               ))}
-            </div>
+            </ul>
           )}
-        </div>
+        </section>
         {list.hasNext || list.hasPrevious ? (
-          <div className="flex justify-end gap-2 pt-5">
-            {list.hasPrevious && (
-              <Button variant="secondary" onClick={list.previousPage}>
-                <ArrowLeft className="size-4" />
+          <div className="flex justify-end gap-2 border-t border-(--dash-line) pt-4">
+            {list.hasPrevious ? (
+              <button
+                type="button"
+                className={`${dashButtonSecondary} h-9`}
+                onClick={list.previousPage}
+              >
+                <ArrowLeft aria-hidden="true" />
                 Previous
-              </Button>
-            )}
-            {list.hasNext && (
-              <Button variant="secondary" onClick={list.loadMore}>
-                More requests
-                <ArrowRight className="size-4" />
-              </Button>
-            )}
+              </button>
+            ) : null}
+            {list.hasNext ? (
+              <button
+                type="button"
+                className={`${dashButtonSecondary} h-9`}
+                onClick={list.loadMore}
+              >
+                Next
+                <ArrowRight aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
         ) : null}
-      </div>
+      </Card>
       <PayRequestDialog
         request={
           list.rows.find((row) => row.record.id === selected?.id) ?? null
@@ -324,84 +334,132 @@ function RequestRowView({
       ? `From @${other.username}`
       : `To @${other.username}`;
   const pending = record.status === "pending";
+  const action =
+    pending && direction === "received" ? (
+      record.operationId ? (
+        <button
+          type="button"
+          className={`${dashButtonSecondary} h-9`}
+          onClick={accountUnlocked ? onReview : onUnlock}
+          aria-label={`View payment to @${other.username}`}
+        >
+          View payment
+        </button>
+      ) : accountUnlocked && row.amount !== null && !row.unreadable ? (
+        <button
+          type="button"
+          className={`${dashButtonPrimary} h-9`}
+          onClick={onReview}
+          aria-label={`Review request from @${other.username}`}
+        >
+          Review
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`${dashButtonSecondary} h-9`}
+          onClick={onUnlock}
+        >
+          Unlock to review
+        </button>
+      )
+    ) : pending && direction === "sent" && !record.operationId ? (
+      <button
+        type="button"
+        className={`${dashButtonSecondary} h-9`}
+        onClick={onTransition}
+        aria-label={`Cancel request to @${other.username}`}
+      >
+        Cancel
+      </button>
+    ) : null;
   return (
-    <article className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border theme-linen border-border bg-card text-card-foreground px-4 py-4 shadow-sm transition-colors hover:border-foreground/25 sm:px-5 sm:py-5">
-      <div className="min-w-[12rem] flex-1">
-        <p className="font-medium text-card-foreground">{label}</p>
-        {row.note !== null ? (
-          <p className="mt-1 break-words text-sm text-muted-foreground">
-            {row.note || "Payment request"}
-          </p>
-        ) : (
-          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <LockKeyhole className="size-3.5" aria-hidden="true" />
-            {accountUnlocked
-              ? "This request cannot be opened on this device."
-              : "Unlock to view request details."}
-          </p>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-32 text-left sm:text-right">
-          {row.amount !== null ? (
-            <p className="font-medium tabular-nums">
-              {formatAmount(row.amount)} USDC
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4">
+      <div className="flex min-w-[12rem] flex-1 items-start gap-3">
+        <span
+          className={`mt-2 size-1.5 shrink-0 rounded-full ${
+            pending ? "bg-(--dash-accent)" : "border border-(--dash-fg)/50"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          {row.note !== null ? (
+            <p className="mt-0.5 break-words text-xs text-(--dash-ash)">
+              {row.note || "Payment request"}
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Unlock to view amount
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-(--dash-ash)">
+              <LockKeyhole className="size-3" aria-hidden="true" />
+              {accountUnlocked
+                ? "This request cannot be opened on this device."
+                : "Unlock to view request details."}
             </p>
+          )}
+        </div>
+      </div>
+      <div className="ml-[1.125rem] flex items-center gap-4 sm:ml-0">
+        <div className="min-w-28 text-left sm:text-right">
+          {row.amount !== null ? (
+            <p className="text-sm font-medium tabular-nums">
+              {formatAmount(row.amount)}
+              <span className="ml-1 text-(--dash-ash)">USDC</span>
+            </p>
+          ) : (
+            <p className="text-sm text-(--dash-ash)">Unlock to view amount</p>
           )}
           <RequestPaymentStatus
             status={record.status}
             operation={record.operationId === operation?.id ? operation : null}
+            inFlight={Boolean(record.operationId)}
           />
         </div>
-        {pending &&
-          direction === "received" &&
-          (record.operationId ? (
-            <>
-              <span className="text-sm text-muted-foreground">
-                Payment is being checked
-              </span>
-              <Button
-                variant="secondary"
-                className="rounded-full"
-                onClick={accountUnlocked ? onReview : onUnlock}
-              >
-                Check status
-              </Button>
-            </>
-          ) : accountUnlocked && row.amount !== null && !row.unreadable ? (
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onClick={onReview}
-              aria-label={`Review request from @${other.username}`}
-            >
-              Review
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onClick={onUnlock}
-            >
-              Unlock before reviewing
-            </Button>
-          ))}
-        {pending && direction === "sent" && !record.operationId ? (
-          <Button
-            variant="secondary"
-            className="rounded-full"
-            onClick={onTransition}
-            aria-label={`Cancel request to @${other.username}`}
-          >
-            Cancel
-          </Button>
-        ) : null}
+        {action}
       </div>
-    </article>
+    </li>
+  );
+}
+function DirectionTab({
+  id,
+  selected,
+  onSelect,
+  children,
+}: {
+  id: string;
+  selected: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      aria-controls="requests-list"
+      onClick={onSelect}
+      className={`h-8 rounded-full px-3.5 text-[11px] font-semibold tracking-[0.08em] uppercase transition-colors ${dashFocus} ${
+        selected
+          ? "bg-(--dash-fg) text-(--dash-surface)"
+          : "text-(--dash-ash) hover:text-(--dash-fg)"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+function ListMessage({
+  children,
+  action,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="py-10">
+      <p className="max-w-sm text-sm leading-6 text-(--dash-ash)">{children}</p>
+      {action ? <div className="mt-4">{action}</div> : null}
+    </div>
   );
 }
 function formatAmount(amount: bigint) {

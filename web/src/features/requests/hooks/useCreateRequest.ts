@@ -25,6 +25,6 @@ export function useCreateRequest(){
     if(!addressee)throw new Error("That @username is not registered on Mawee.");
     const record=await createSignedRequest({id:crypto.randomUUID(),pool,requester:{username:me.toLowerCase(),wallet:requester.owner as `0x${string}`,notePubkey:publicKey(requester.notePubkeyHex) as `0x${string}`,viewPubkey:publicKey(requester.viewPubkeyHex) as `0x${string}`},addressee:{username,wallet:addressee.owner as `0x${string}`,notePubkey:publicKey(addressee.notePubkeyHex) as `0x${string}`,viewPubkey:publicKey(addressee.viewPubkeyHex) as `0x${string}`},amount:parseRequestAmount(input.amount,pool.tokenDecimals),note:validateRequestNote(input.note),createdAt:new Date().toISOString()},signer);
     return api.requests.create.mutate(record.record) as unknown as Promise<PaymentRequest>;
-  },onSuccess:()=>{void cache.requests.pendingCount.invalidate();void cache.requests.listReceived.invalidate();void cache.requests.listSent.invalidate();}});
+  },onSuccess:()=>{void cache.requests.pendingCount.invalidate();void cache.requests.listReceived.invalidate();void cache.requests.listSent.invalidate();if(typeof window!=="undefined"){window.dispatchEvent(new Event("mawee:request-changed"));}}});
   return {create:mutation.mutateAsync,isCreating:mutation.isPending,error:mutation.error,clearError:mutation.reset};
 }
