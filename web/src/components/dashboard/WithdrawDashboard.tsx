@@ -453,8 +453,8 @@ function PoolSelector({
               onClick={() => onSelect(pool.scope)}
               className={`min-h-10 rounded-lg px-3 text-sm font-semibold ring-1 transition-colors focus-visible:ring-2 focus-visible:ring-brand-linen ${
                 checked
-                  ? "bg-brand-linen text-foreground ring-brand-linen"
-                  : "bg-brand-linen/8 text-brand-linen ring-brand-linen/20 hover:bg-brand-linen/15"
+                  ? "bg-(--dash-fg) text-(--dash-surface) ring-(--dash-fg)"
+                  : "bg-(--dash-tint) text-(--dash-fg) ring-(--dash-line-strong) hover:bg-(--dash-line-solid)"
               }`}
             >
               {label}

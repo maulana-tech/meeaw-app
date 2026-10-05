@@ -213,7 +213,7 @@ function RailLink({
 function MobileTabs({ pathname }: { pathname: string }) {
   return (
     <nav aria-label="Dashboard tabs">
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-6">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
