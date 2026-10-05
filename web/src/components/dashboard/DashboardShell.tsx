@@ -11,6 +11,7 @@ import {
   LINKS_PATH,
   SETTINGS_PATH,
   WITHDRAW_PATH,
+  REQUESTS_PATH,
 } from "../../lib/auth-routes";
 import { cn } from "../../lib/utils";
 import {
@@ -28,6 +29,7 @@ const PAGE_LABELS: Record<string, string> = {
   [WITHDRAW_PATH]: "Cash out",
   [HISTORY_PATH]: "History",
   [SETTINGS_PATH]: "Settings",
+  [REQUESTS_PATH]: "Requests",
 };
 
 export function DashboardShell({

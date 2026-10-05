@@ -27,6 +27,8 @@ import { DashboardTile } from "./DashboardTile";
 import { weeklyActivity } from "./dashboardAnalytics";
 import { LinkEditorDialog } from "./LinkEditorDialog";
 import { PaymentQrDialog } from "./PaymentQrDialog";
+import {RequestsTile} from "./RequestsTile";
+import {CreateRequestDialog} from "./CreateRequestDialog";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { useMyNotes } from "./useMyNotes";
 
@@ -39,6 +41,7 @@ export function Dashboard() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addCashOpen, setAddCashOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [requestOpen,setRequestOpen]=useState(false);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
   );
@@ -56,7 +59,7 @@ export function Dashboard() {
     <>
       <h1 className="sr-only">Dashboard: Hi, {username || "there"}.</h1>
 
-      <div className="dashboard-bento mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:grid-rows-2 lg:gap-5 pb-16">
+      <div className="dashboard-bento mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:grid-rows-[repeat(2,minmax(300px,1fr))_minmax(160px,auto)] lg:gap-5 pb-16">
         <section
           aria-label="Account summary"
           className="order-1 min-w-0 lg:col-span-3 lg:col-start-1 lg:row-start-1"
@@ -108,6 +111,10 @@ export function Dashboard() {
             footer={<ChainBadge tone="glass" />}
           />
         </button>
+
+        <section className="order-8 min-w-0 md:col-span-2 lg:col-span-6 lg:col-start-7 lg:row-start-3">
+          <RequestsTile/>
+        </section>
 
         <section className="order-3 min-w-0 md:col-span-2 lg:col-span-6 lg:col-start-7 lg:row-start-1">
           <PayMeTile payLink={payLink} onCreate={() => setCreateOpen(true)} />
@@ -223,6 +230,7 @@ export function Dashboard() {
         onClose={() => setReceiveOpen(false)}
         username={username ?? ""}
         origin={origin}
+        onRequest={()=>{setReceiveOpen(false);setRequestOpen(true);}}
       />
       <AddFundsDialog
         open={addCashOpen}
@@ -236,6 +244,7 @@ export function Dashboard() {
         onOpenChange={setCreateOpen}
         onSaved={() => setCreateOpen(false)}
       />
+      <CreateRequestDialog open={requestOpen} onOpenChange={setRequestOpen}/>
     </>
   );
 }

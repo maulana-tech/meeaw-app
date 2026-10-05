@@ -36,11 +36,13 @@ export function ReceiveDialog({
   onClose,
   username,
   origin,
+  onRequest,
 }: {
   open: boolean;
   onClose: () => void;
   username: string;
   origin: string;
+  onRequest?:()=>void;
 }) {
   const [step, setStep] = useState<Step>("method");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -177,7 +179,8 @@ export function ReceiveDialog({
             </button>
             <button
               type="button"
-              disabled
+              disabled={!onRequest || !username}
+              onClick={onRequest}
               className={cn(
                 linenInsetClass,
                 "flex cursor-not-allowed items-center gap-3 rounded-2xl px-4 py-3 text-left text-foreground/45",
@@ -186,9 +189,9 @@ export function ReceiveDialog({
               <AtSign className="size-5" aria-hidden="true" />
               <div>
                 <div className="text-sm font-medium">
-                  Request from a username
+                  {username ? "Request from a username" : "Claim a username first"}
                 </div>
-                <div className="text-xs">Coming soon</div>
+                <div className="text-xs">{username ? "Request a fixed amount from @username" : "Claim a handle before requesting payment"}</div>
               </div>
             </button>
           </div>
