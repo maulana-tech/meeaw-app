@@ -41,6 +41,7 @@ const STALE_AFTER_MS = 120_000;
 const MAX_CHUNKS_PER_RUN = 400;
 
 const scope = () => `${network}:${poolAddress.toLowerCase()}`;
+const poolConfigured = () => BigInt(poolAddress) !== 0n;
 const startBlock = () =>
   Number(poolDeployBlock > 0n ? poolDeployBlock - 1n : 0n);
 
@@ -131,7 +132,9 @@ export async function syncPoolIndex(): Promise<PoolSyncResult> {
   const startedAt = Date.now();
   const owner = randomUUID();
   // With Envio HyperIndex configured, Envio is the mirror; nothing to poll.
-  if (envioConfigured() || !(await acquireLease(owner))) {
+  // Without a deployed pool there is nothing to index either, and scanning
+  // eth_getLogs from block 0 would tie up the request for minutes.
+  if (envioConfigured() || !poolConfigured() || !(await acquireLease(owner))) {
     return {
       status: "skipped",
       fromBlock: 0,
