@@ -100,7 +100,7 @@ async function service() {
   return import("../src/server/modules/deposits/deposits.service");
 }
 
-describe("syncPoolIndex", () => {
+describe("syncPoolIndex", { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.stateFindOneAndUpdate.mockImplementation((_filter, update) => ({

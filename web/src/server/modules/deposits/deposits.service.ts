@@ -164,9 +164,18 @@ export async function syncPoolIndex(
   let renewal = Promise.resolve();
   let finished = false;
   let heartbeat: ReturnType<typeof setTimeout> | undefined;
+  const stopLeaseRenewal = () => {
+    finished = true;
+    if (heartbeat !== undefined) {
+      clearTimeout(heartbeat);
+      heartbeat = undefined;
+    }
+  };
   const renewLease = () => {
+    if (finished || leaseError) return;
     heartbeat = setTimeout(
       () => {
+        if (finished || leaseError) return;
         renewal = states
           .updateOne(
             { _id: stateId, leaseOwner: owner },
@@ -280,6 +289,7 @@ export async function syncPoolIndex(
     }
 
     const indexedAt = new Date();
+    stopLeaseRenewal();
     await renewal;
     if (leaseError) throw leaseError;
     const published = await states.updateOne(
@@ -334,9 +344,9 @@ export async function syncPoolIndex(
       error: message,
     };
   } finally {
-    finished = true;
-    clearTimeout(heartbeat);
+    stopLeaseRenewal();
     await renewal;
+    stopLeaseRenewal();
     await releaseLease(pool, owner);
   }
 }

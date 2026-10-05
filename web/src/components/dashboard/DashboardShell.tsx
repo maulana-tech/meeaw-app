@@ -35,6 +35,7 @@ import {
 } from "../ui/dropdown-menu";
 import { useWallet } from "../WalletProvider";
 import { useDashboardMode } from "./DashboardBackground";
+import { usePendingRequestsCount } from "../../features/requests/hooks/usePendingRequestsCount";
 import { dashFocus, dashIconButton } from "./styles";
 
 const NAV_ITEMS = [
@@ -101,6 +102,27 @@ export function DashboardShell({
     );
   }
 
+  return (
+    <DashboardNavLayout
+      pathname={pathname}
+      contentClassName={contentClassName}
+    >
+      {children}
+    </DashboardNavLayout>
+  );
+}
+
+function DashboardNavLayout({
+  children,
+  pathname,
+  contentClassName,
+}: {
+  children: ReactNode;
+  pathname: string;
+  contentClassName?: string;
+}) {
+  const { count: pendingRequestsCount } = usePendingRequestsCount();
+
   const current =
     NAV_ITEMS.find((item) => isActive(pathname, item.href))?.label ??
     "Overview";
@@ -122,7 +144,16 @@ export function DashboardShell({
           >
             <ul className="my-auto grid gap-2">
               {MAIN_ITEMS.map((item) => (
-                <RailLink key={item.href} item={item} pathname={pathname} />
+                <RailLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  badge={
+                    item.href === REQUESTS_PATH
+                      ? pendingRequestsCount
+                      : undefined
+                  }
+                />
               ))}
             </ul>
             <ul className="grid gap-2">
@@ -164,7 +195,10 @@ export function DashboardShell({
       </div>
 
       <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) lg:hidden">
-        <MobileTabs pathname={pathname} />
+        <MobileTabs
+          pathname={pathname}
+          pendingRequestsCount={pendingRequestsCount}
+        />
       </div>
     </div>
   );
@@ -173,11 +207,14 @@ export function DashboardShell({
 function RailLink({
   item: { href, label, icon: Icon },
   pathname,
+  badge,
 }: {
   item: (typeof NAV_ITEMS)[number];
   pathname: string;
+  badge?: number;
 }) {
   const active = isActive(pathname, href);
+  const showBadge = typeof badge === "number" && badge > 0;
   return (
     <li>
       <Link
@@ -196,6 +233,19 @@ function RailLink({
           strokeWidth={1.6}
           aria-hidden="true"
         />
+        {showBadge ? (
+          <span
+            className={cn(
+              "absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none tabular-nums",
+              active
+                ? "bg-(--dash-surface) text-(--dash-fg) ring-2 ring-(--dash-fg)"
+                : "bg-(--dash-fg) text-(--dash-surface) ring-2 ring-(--dash-surface)",
+            )}
+            aria-hidden="true"
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : null}
         {active ? (
           <span
             className="absolute -left-[9px] h-4 w-0.5 rounded-full bg-(--dash-accent)"
@@ -204,18 +254,31 @@ function RailLink({
         ) : null}
         <span className="pointer-events-none absolute left-full z-50 ml-4 rounded-(--dash-radius-sm) bg-(--dash-fg) px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] whitespace-nowrap text-(--dash-surface) uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           {label}
+          {showBadge ? ` (${badge})` : null}
         </span>
+        {showBadge ? (
+          <span className="sr-only"> ({badge} pending)</span>
+        ) : null}
       </Link>
     </li>
   );
 }
 
-function MobileTabs({ pathname }: { pathname: string }) {
+function MobileTabs({
+  pathname,
+  pendingRequestsCount,
+}: {
+  pathname: string;
+  pendingRequestsCount?: number;
+}) {
   return (
     <nav aria-label="Dashboard tabs">
       <ul className="grid grid-cols-6">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
+          const badge =
+            href === REQUESTS_PATH ? pendingRequestsCount : undefined;
+          const showBadge = typeof badge === "number" && badge > 0;
           return (
             <li key={href}>
               <Link
@@ -235,12 +298,25 @@ function MobileTabs({ pathname }: { pathname: string }) {
                     aria-hidden="true"
                   />
                 ) : null}
-                <Icon
-                  className="size-[1.125rem]"
-                  strokeWidth={1.6}
-                  aria-hidden="true"
-                />
+                <div className="relative">
+                  <Icon
+                    className="size-[1.125rem]"
+                    strokeWidth={1.6}
+                    aria-hidden="true"
+                  />
+                  {showBadge ? (
+                    <span
+                      className="absolute -top-1.5 -right-2.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-(--dash-fg) px-1 text-[9px] font-bold leading-none text-(--dash-surface) ring-2 ring-(--dash-surface) tabular-nums"
+                      aria-hidden="true"
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  ) : null}
+                </div>
                 {label}
+                {showBadge ? (
+                  <span className="sr-only"> ({badge} pending)</span>
+                ) : null}
               </Link>
             </li>
           );
