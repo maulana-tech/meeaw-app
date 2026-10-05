@@ -134,7 +134,7 @@ export function ReceiveDialog({
                   setSubmitError(null);
                   setStep("method");
                 }}
-                className="-ml-2 shrink-0 rounded-full text-foreground/65 hover:bg-foreground/10 hover:text-foreground"
+                className="-ml-2 shrink-0 rounded-(--dash-radius-sm) text-foreground/65 hover:bg-foreground/10 hover:text-foreground"
                 aria-label="Back"
               >
                 <ArrowLeft className="size-4" aria-hidden="true" />
@@ -162,7 +162,7 @@ export function ReceiveDialog({
               }}
               className={cn(
                 linenInsetClass,
-                "flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-foreground/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
+                "flex items-center gap-3 rounded-(--dash-radius) px-4 py-3 text-left transition-colors hover:bg-foreground/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
               )}
             >
               <Link2 className="size-5 text-foreground/70" aria-hidden="true" />
@@ -180,7 +180,7 @@ export function ReceiveDialog({
               disabled
               className={cn(
                 linenInsetClass,
-                "flex cursor-not-allowed items-center gap-3 rounded-2xl px-4 py-3 text-left text-foreground/45",
+                "flex cursor-not-allowed items-center gap-3 rounded-(--dash-radius) px-4 py-3 text-left text-foreground/45",
               )}
             >
               <AtSign className="size-5" aria-hidden="true" />
@@ -239,7 +239,7 @@ export function ReceiveDialog({
               id="receive-description"
               className={cn(
                 linenFieldClass,
-                "min-h-24 rounded-xl border px-3 py-3 text-sm outline-none focus-visible:ring-2",
+                "min-h-24 rounded-(--dash-radius-sm) border px-3 py-3 text-sm outline-none focus-visible:ring-2",
               )}
               placeholder="What's it for? (e.g. Invoice #12)"
               autoComplete="off"
@@ -302,7 +302,7 @@ export function ReceiveDialog({
               {link.description ? ` · ${link.description}` : ""}
             </div>
 
-            <div className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-foreground/15 bg-foreground/8 px-3 py-2.5">
+            <div className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-(--dash-radius-sm) border border-foreground/15 bg-foreground/8 px-3 py-2.5">
               <div className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">
                 {url.replace(/^https?:\/\//, "")}
               </div>
@@ -324,12 +324,12 @@ export function ReceiveDialog({
               </Button>
             </div>
 
-            <div className="flex max-w-full justify-center overflow-hidden rounded-xl border border-foreground/20 bg-brand-linen p-4">
+            <div className="flex max-w-full justify-center overflow-hidden rounded-(--dash-radius-sm) border border-foreground/20 bg-[#fff] p-4">
               <QRCodeSVG
                 value={url}
                 size={168}
-                fgColor="#1A1F12"
-                bgColor="#F5F3EA"
+                fgColor="#0D0C14"
+                bgColor="#FFFFFF"
                 className="h-auto max-w-full"
               />
             </div>

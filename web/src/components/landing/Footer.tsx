@@ -40,15 +40,10 @@ export function Footer() {
         <div>
           <a
             href="#top"
-            className="inline-flex items-center gap-2.5"
+            className="inline-flex items-center gap-2.5 text-starlight hover:text-starlight"
             aria-label="Mawee home"
           >
-            <Image
-              src="/assets/mawee-white.svg"
-              alt=""
-              width={28}
-              height={28}
-            />
+            <Image src="/assets/mawee.svg" alt="" width={28} height={28} />
             <span className="text-xl font-medium tracking-tight">Mawee</span>
           </a>
           <p className="mt-4 max-w-[36ch] text-sm leading-relaxed text-starlight/55">

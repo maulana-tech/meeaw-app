@@ -1,79 +1,72 @@
 "use client";
 
-import Image from "next/image";
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import dashboardBackground from "../../../public/assets/dashboard.jpg";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { DitherField } from "../landing/DitherField";
 
-type DashboardTheme = "painting" | "dark";
-const STORAGE_KEY = "mawee.dashboard.theme";
+type DashboardMode = "light" | "dark";
+const STORAGE_KEY = "mawee.dashboard.mode";
 
-const DashboardThemeContext = createContext<{
-  theme: DashboardTheme;
-  toggleTheme: () => void;
-}>({ theme: "painting", toggleTheme: () => {} });
+// Dither colours per mode: paper + signal blue, or ink + a deep blue that
+// stays quiet behind light text.
+const DITHER = {
+  light: { light: "#faf7f0", dark: "#5ea6e5" },
+  dark: { light: "#151310", dark: "#1c5f94" },
+} as const;
 
-export function useDashboardTheme() {
-  return useContext(DashboardThemeContext);
+// Runs before hydration so the saved (or system) mode paints without a flash.
+const applyStoredMode = `try{var m=localStorage.getItem("${STORAGE_KEY}");if(m!=="light"&&m!=="dark")m=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.dashMode=m}catch(e){}`;
+
+function readMode(): DashboardMode {
+  return document.documentElement.dataset.dashMode === "dark"
+    ? "dark"
+    : "light";
 }
 
 export function DashboardBackground({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<DashboardTheme>("painting");
+  const [mode, setMode] = useState<DashboardMode>("light");
 
+  // Follow the toggle wherever it lives: it writes data-dash-mode on <html>.
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "dark" || stored === "painting") setTheme(stored);
+    setMode(readMode());
+    const observer = new MutationObserver(() => setMode(readMode()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-dash-mode"],
+    });
+    return () => observer.disconnect();
   }, []);
 
-  const value = useMemo(
-    () => ({
-      theme,
-      toggleTheme: () =>
-        setTheme((current) => {
-          const next = current === "painting" ? "dark" : "painting";
-          window.localStorage.setItem(STORAGE_KEY, next);
-          return next;
-        }),
-    }),
-    [theme],
-  );
-
   return (
-    <DashboardThemeContext.Provider value={value}>
-      <div
-        className="theme-product relative isolate min-h-svh overflow-x-clip bg-brand-obsidian text-white"
-        data-dashboard-theme={theme}
-      >
-        <div
-          className="pointer-events-none fixed inset-0 z-0"
-          aria-hidden="true"
-        >
-          <Image
-            src={dashboardBackground}
-            alt=""
-            fill
-            priority
-            placeholder="blur"
-            sizes="100vw"
-            className="object-cover object-center"
-          />
-          <div
-            className={`absolute inset-0 bg-brand-obsidian transition-opacity duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-              theme === "painting" ? "opacity-30" : "opacity-75"
-            }`}
-          />
-          {theme === "painting" ? (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,transparent_0%,rgb(26_31_18_/_0.08)_54%,rgb(26_31_18_/_0.34)_100%)]" />
-          ) : null}
-        </div>
-        <div className="relative z-10 min-h-svh">{children}</div>
+    <div className="theme-product dashboard-app relative isolate min-h-svh overflow-x-clip">
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, no user input */}
+      <script dangerouslySetInnerHTML={{ __html: applyStoredMode }} />
+      <div aria-hidden="true" className="fixed inset-0 -z-10">
+        <DitherField {...DITHER[mode]} />
       </div>
-    </DashboardThemeContext.Provider>
+      {children}
+    </div>
   );
+}
+
+export function useDashboardMode() {
+  const [mode, setMode] = useState<DashboardMode>("light");
+
+  useEffect(() => {
+    setMode(readMode());
+  }, []);
+
+  const toggleMode = useCallback(() => {
+    setMode((current) => {
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.dataset.dashMode = next;
+      try {
+        window.localStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // Private mode: the choice just won't persist.
+      }
+      return next;
+    });
+  }, []);
+
+  return { mode, toggleMode };
 }

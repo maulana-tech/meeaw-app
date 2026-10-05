@@ -37,12 +37,12 @@ export function PaymentQrDialog({
             Scan this code to open the payment link on another device.
           </DialogDescription>
         </DialogHeader>
-        <div className="aspect-square w-full rounded-xl bg-brand-linen p-4">
+        <div className="aspect-square w-full rounded-(--dash-radius-sm) bg-[#fff] p-4">
           <QRCodeSVG
             value={url}
             size={320}
-            fgColor="#1A1F12"
-            bgColor="#F5F3EA"
+            fgColor="#0D0C14"
+            bgColor="#FFFFFF"
             className="size-full"
           />
         </div>

@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DashboardNotice } from "@/components/dashboard/DashboardNotice";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { LinksDashboard } from "@/components/dashboard/LinksDashboard";
+import { dashButtonPrimary } from "@/components/dashboard/styles";
 import { useWallet } from "@/components/WalletProvider";
 import { SIGN_IN_PATH } from "@/lib/auth-routes";
 
 export default function DashboardLinksPage() {
-  const { address, username, sessionReady } = useWallet();
+  const {
+    address,
+    username,
+    usernameResolved,
+    openUsernameModal,
+    sessionReady,
+  } = useWallet();
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
@@ -17,6 +26,32 @@ export default function DashboardLinksPage() {
     if (!sessionReady || address) return;
     window.location.replace(SIGN_IN_PATH);
   }, [address, sessionReady]);
+
+  if (sessionReady && address && usernameResolved && !username) {
+    return (
+      <>
+        <DashboardPageHeader
+          title="Payment links"
+          description="Share links that let anyone pay you privately in USDC."
+        />
+        <DashboardNotice
+          label="Username needed"
+          title="Claim a username first"
+          action={
+            <button
+              type="button"
+              onClick={openUsernameModal}
+              className={dashButtonPrimary}
+            >
+              Claim username
+            </button>
+          }
+        >
+          Your username is the address of every payment link you create.
+        </DashboardNotice>
+      </>
+    );
+  }
 
   if (!sessionReady || !address || !username) {
     return (
@@ -31,8 +66,8 @@ export default function DashboardLinksPage() {
           <div className="h-4 w-96 max-w-full rounded-full bg-brand-linen/8" />
         </div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
-          <div className="h-96 rounded-xl bg-brand-linen/8 ring-1 ring-brand-linen/15" />
-          <div className="h-64 rounded-xl bg-brand-linen/8 ring-1 ring-brand-linen/15" />
+          <div className="h-96 rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line)" />
+          <div className="h-64 rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line)" />
         </div>
       </div>
     );

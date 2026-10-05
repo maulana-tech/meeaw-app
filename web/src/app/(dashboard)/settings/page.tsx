@@ -26,11 +26,11 @@ export default function DashboardSettingsPage() {
           <div className="h-4 w-96 max-w-full rounded-full bg-brand-linen/8" />
         </div>
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:gap-5">
-          <div className="h-[19rem] rounded-[2.25rem] bg-brand-linen/12 ring-1 ring-brand-linen/15 lg:col-span-5" />
+          <div className="h-[19rem] rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line) lg:col-span-5" />
           <div className="h-[19rem] rounded-[2.25rem] bg-brand-linen/8 ring-1 ring-brand-linen/15 lg:col-span-7" />
-          <div className="h-[19rem] rounded-[2.25rem] bg-brand-linen/12 ring-1 ring-brand-linen/15 lg:col-span-7" />
+          <div className="h-[19rem] rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line) lg:col-span-7" />
           <div className="h-[19rem] rounded-[2.25rem] bg-brand-linen/8 ring-1 ring-brand-linen/15 lg:col-span-5" />
-          <div className="h-28 rounded-[2.25rem] bg-brand-linen/12 ring-1 ring-brand-linen/15 lg:col-span-12" />
+          <div className="h-28 rounded-(--dash-radius) bg-(--dash-surface) ring-1 ring-(--dash-line) lg:col-span-12" />
         </div>
       </div>
     );

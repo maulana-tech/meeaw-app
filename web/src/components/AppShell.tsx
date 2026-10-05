@@ -83,7 +83,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           {usernameModal}
           {pinModal}
           {recoveryDialog}
-          {recoveryDialog}
         </div>
       );
     }

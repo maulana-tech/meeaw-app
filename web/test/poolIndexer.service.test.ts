@@ -4,6 +4,7 @@ const POOL = "0x00000000000000000000000000000000000000B0";
 const SCOPE = `eip155:10143:${POOL.toLowerCase()}`;
 
 const mocks = vi.hoisted(() => ({
+  poolAddress: "0x00000000000000000000000000000000000000B0",
   fetchPoolLogs: vi.fn(),
   readContract: vi.fn(),
   getBlock: vi.fn(),
@@ -20,7 +21,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/lib/chain", () => ({
   fetchPoolLogs: mocks.fetchPoolLogs,
   network: "eip155:10143",
-  poolAddress: "0x00000000000000000000000000000000000000B0",
+  get poolAddress() {
+    return mocks.poolAddress;
+  },
   poolDeployBlock: 0n,
   publicClient: {
     readContract: mocks.readContract,
@@ -61,6 +64,7 @@ const depositLog = (leafIndex: number, block: bigint) => ({
 describe("syncPoolIndex", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.poolAddress = POOL;
     mocks.stateFindOneAndUpdate.mockImplementation((_filter, update) => ({
       leaseOwner: update.$set.leaseOwner,
     }));
@@ -173,6 +177,18 @@ describe("syncPoolIndex", () => {
     expect(mocks.fetchPoolLogs).toHaveBeenCalledWith(
       expect.objectContaining({ afterBlock: 0n }),
     );
+  });
+
+  it("skips work when no pool is deployed instead of scanning from block 0", async () => {
+    mocks.poolAddress = "0x0000000000000000000000000000000000000000";
+    const { syncPoolIndex } = await import(
+      "../src/server/modules/deposits/deposits.service"
+    );
+    const result = await syncPoolIndex();
+
+    expect(result.status).toBe("skipped");
+    expect(mocks.stateFindOneAndUpdate).not.toHaveBeenCalled();
+    expect(mocks.fetchPoolLogs).not.toHaveBeenCalled();
   });
 
   it("skips work when another worker owns the lease", async () => {

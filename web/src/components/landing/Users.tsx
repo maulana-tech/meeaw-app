@@ -59,17 +59,17 @@ export function Users() {
       id="who"
       data-ed-section
       aria-labelledby="who-title"
-      className="relative bg-mist pb-24 text-graphite sm:pb-32"
+      className="relative pb-24 text-graphite sm:pb-32"
     >
       <Frame>
         <div className="grid gap-6 border-t border-graphite/10 pt-24 sm:pt-28 lg:grid-cols-[1fr_1fr]">
           <div>
             <MonoLabel className="text-graphite/60">
-              {"/// Who it's for"}
+              Who it&rsquo;s for
             </MonoLabel>
             <h2
               id="who-title"
-              className="mt-4 text-[clamp(1.9rem,3vw,2.8rem)] font-light tracking-tight"
+              className="mt-4 text-[clamp(1.9rem,3vw,2.8rem)] font-normal tracking-tight"
             >
               Built for people who get paid online
             </h2>
@@ -82,17 +82,17 @@ export function Users() {
         </div>
 
         {/* 1px gaps over a tinted background draw the hairline grid. */}
-        <ul className="mt-16 grid list-none gap-px overflow-hidden rounded-2xl border border-graphite/10 bg-graphite/10 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-16 grid list-none gap-px overflow-hidden rounded-none border border-graphite/10 bg-graphite/10 sm:grid-cols-2 lg:grid-cols-3">
           {AUDIENCES.map(({ icon: Icon, title, body, keepsPrivate }, index) => (
             <li
               key={title}
               data-ed-article
-              className="group flex flex-col bg-mist p-7 transition-colors duration-200 hover:bg-white sm:p-8"
+              className="group flex flex-col bg-void-2 p-7 sm:p-8"
             >
               <div className="flex items-center justify-between">
                 <span
                   aria-hidden="true"
-                  className="flex size-11 items-center justify-center rounded-xl border border-graphite/15 bg-white text-graphite transition-colors duration-200 group-hover:border-violet group-hover:bg-violet group-hover:text-white"
+                  className="flex size-11 items-center justify-center rounded-none border border-graphite/15 bg-white text-graphite transition-colors duration-200 group-hover:border-graphite group-hover:bg-graphite group-hover:text-mist"
                 >
                   <Icon className="size-5" strokeWidth={1.6} />
                 </span>
@@ -111,7 +111,7 @@ export function Users() {
                 {body}
               </p>
 
-              <dl className="mt-8 flex items-center justify-between gap-4 border-t border-dashed border-graphite/15 pt-5">
+              <dl className="mt-8 flex items-center justify-between gap-4 border-t border-graphite/15 pt-5">
                 <dt>
                   <MonoLabel className="text-[11px] text-graphite/50">
                     Stays private

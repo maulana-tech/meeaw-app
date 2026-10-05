@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mocks = vi.hoisted(() => ({
@@ -137,6 +137,11 @@ describe("Home get-started gating", () => {
 });
 
 describe("Dashboard route", () => {
+  const unlockedAccount = {
+    ownerSecret: 1n,
+    viewSk: new Uint8Array(32),
+  };
+
   it("renders the dashboard while username lookup is pending", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
@@ -146,18 +151,40 @@ describe("Dashboard route", () => {
         username: null,
       }),
     );
-    mocks.getAccount.mockReturnValue({
-      ownerSecret: 1n,
-      viewSk: new Uint8Array(32),
-    });
+    mocks.getAccount.mockReturnValue(unlockedAccount);
 
     renderWithTRPC(<DashboardPage />);
 
     expect(
       await screen.findByRole("heading", {
-        name: /dashboard: hi, there/i,
+        level: 1,
+        name: "Welcome to Mawee",
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Claim username" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks a signed-in user without a username to claim one", async () => {
+    mocks.useWallet.mockReturnValue(
+      wallet({
+        address: "0x00000000000000000000000000000000000000E1",
+        usernameResolved: true,
+        username: null,
+      }),
+    );
+    mocks.getAccount.mockReturnValue(unlockedAccount);
+    renderWithTRPC(<DashboardPage />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Claim username" }),
+    );
+    expect(mocks.openUsernameModal).toHaveBeenCalledOnce();
+    // Receiving needs a username, so the action is hidden until then.
+    expect(
+      screen.queryByRole("button", { name: "Receive payment" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the private dashboard once connected with a claimed username", async () => {
@@ -169,63 +196,65 @@ describe("Dashboard route", () => {
         username: "alice",
       }),
     );
-    mocks.getAccount.mockReturnValue({
-      ownerSecret: 1n,
-      viewSk: new Uint8Array(32),
-    });
+    mocks.getAccount.mockReturnValue(unlockedAccount);
     renderWithTRPC(<DashboardPage />);
 
     expect(
-      await screen.findByRole("heading", {
-        name: /dashboard: hi, alice/i,
-      }),
+      await screen.findByRole("heading", { level: 1, name: "Hi, @alice" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("My Balance")).toBeInTheDocument();
-    const withdrawCard = screen.getByRole("link", { name: "Open Withdraw" });
-    const proofsCard = screen.getByRole("link", {
-      name: "Open Payment proofs",
-    });
-    expect(withdrawCard).toHaveAttribute("href", "/withdraw");
-    expect(proofsCard).toHaveAttribute("href", "/history");
-    for (const card of [withdrawCard, proofsCard]) {
-      expect(card.querySelector("a, button")).toBeNull();
-    }
+    expect(screen.getByText("Private balance")).toBeInTheDocument();
     expect(
-      screen.getAllByRole("button", { name: "Create a payment link" }),
-    ).toHaveLength(2);
-    const depositCard = screen.getByRole("button", {
-      name: "Open deposit funds",
-    });
-    expect(depositCard).toBeEnabled();
-    expect(
-      within(depositCard).getByText(
-        "Add money to your Mawee balance. Use it for payments, or withdraw it whenever you need it.",
-      ),
-    ).toBeInTheDocument();
-    expect(within(depositCard).getByText("USDC on Monad")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Add cash" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Manage your account here"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", {
-        name: "Account settings, coming soon",
-      }),
-    ).not.toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Open link" })).toHaveClass(
-      "bg-primary",
-      "!text-primary-foreground",
+      screen.getByRole("button", { name: "Receive payment" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("link", { name: "Cash out" })).toHaveAttribute(
+      "href",
+      "/withdraw",
     );
-    expect(screen.queryByText("DEPOSIT_FORM")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute(
+      "href",
+      "/links",
+    );
+    expect(screen.getByRole("link", { name: "See all" })).toHaveAttribute(
+      "href",
+      "/history",
+    );
     expect(
-      screen.queryByRole("button", { name: /claim your username/i }),
+      (await screen.findByRole("link", { name: "Open link" })).getAttribute(
+        "href",
+      ),
+    ).toMatch(/\/pay\/alice$/);
+    expect(
+      screen.queryByRole("button", { name: "Claim username" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(/connect your wallet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("DEPOSIT_FORM")).not.toBeInTheDocument();
   });
 
-  it("opens the Add funds dialog from the Deposit fund tile", async () => {
+  it("keeps balance and activity private until the account is unlocked", async () => {
+    const promptUnlock = vi.fn();
+    mocks.useWallet.mockReturnValue(
+      wallet({
+        address: "0x00000000000000000000000000000000000000E1",
+        usernameResolved: true,
+        username: "alice",
+        accountUnlocked: false,
+        promptUnlock,
+      }),
+    );
+    renderWithTRPC(<DashboardPage />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Unlock with PIN" }),
+    );
+    expect(promptUnlock).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("button", { name: "Add funds" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/your payment history is private/i),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the Add funds dialog from the balance card", async () => {
     mocks.useWallet.mockReturnValue(
       wallet({
         address: "0x00000000000000000000000000000000000000E1",
@@ -234,17 +263,12 @@ describe("Dashboard route", () => {
         username: "alice",
       }),
     );
-    mocks.getAccount.mockReturnValue({
-      ownerSecret: 1n,
-      viewSk: new Uint8Array(32),
-    });
+    mocks.getAccount.mockReturnValue(unlockedAccount);
     renderWithTRPC(<DashboardPage />);
 
-    const depositCard = await screen.findByRole("button", {
-      name: "Open deposit funds",
-    });
-    expect(depositCard).toBeEnabled();
-    await userEvent.click(depositCard);
+    const addFunds = await screen.findByRole("button", { name: "Add funds" });
+    await vi.waitFor(() => expect(addFunds).toBeEnabled());
+    await userEvent.click(addFunds);
 
     expect(
       await screen.findByRole("heading", { name: "Add funds" }),

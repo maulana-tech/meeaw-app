@@ -22,8 +22,8 @@ describe("personal payment link actions", () => {
     const dialog = screen.getByRole("dialog", {
       name: "Payment link QR code",
     });
-    expect(dialog.querySelector('path[fill="#1A1F12"]')).toBeInTheDocument();
-    expect(dialog.querySelector('path[fill="#F5F3EA"]')).toBeInTheDocument();
+    expect(dialog.querySelector('path[fill="#0D0C14"]')).toBeInTheDocument();
+    expect(dialog.querySelector('path[fill="#FFFFFF"]')).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 

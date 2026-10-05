@@ -295,6 +295,11 @@
   --radius-modal: var(--radius-xl);
   --page-gutter: clamp(1.25rem, 5vw, 4.5rem);
   --dashboard-gutter: clamp(1rem, 3vw, 2rem);
+  --dash-radius: 10px;
+  --dash-radius-sm: 6px;
+  /* Signal accent (toMaker): #5EA6E5 marks, #1C5F94 when it must be a word. */
+  --signal: rgb(94 166 229);
+  --signal-ink: rgb(28 95 148);
   --section-space: clamp(5rem, 9vw, 7rem);
   --section-space-compact: clamp(3.5rem, 7vw, 6rem);
   --motion-product: cubic-bezier(0.23, 1, 0.32, 1);
@@ -364,9 +369,12 @@ body:has(.theme-product) {
   color: var(--color-brand-linen);
 }
 
-:where(body:has(.theme-product)) a,
-:where(body:has(.theme-product)) a:hover {
-  color: inherit;
+/* In the base layer so text-* utilities on links still apply. */
+@layer base {
+  :where(body:has(.theme-product)) a,
+  :where(body:has(.theme-product)) a:hover {
+    color: inherit;
+  }
 }
 
 body:has(.theme-product) [data-sonner-toast] {
@@ -603,79 +611,14 @@ body:has(.theme-product) [data-slot="dialog-content"][data-appearance="glass"] {
       0 18px 48px rgb(26 31 18 / 0.06);
   }
 
-  .dashboard-bento {
-    grid-auto-rows: minmax(18rem, auto);
-  }
-
+  /* Section label: toMaker's "label-data" voice (uppercase, tracked, ash). */
   .dashboard-tile-title {
-    font-family: var(--font-heading);
-    font-size: 1.65rem;
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.025em;
-  }
-
-  @media (min-width: 64rem) {
-    .dashboard-bento {
-      grid-template-rows: repeat(2, 20rem);
-    }
-  }
-
-  .dashboard-nav-card {
-    transition:
-      transform 300ms var(--motion-product),
-      box-shadow 300ms var(--motion-product),
-      border-color 180ms var(--motion-product);
-  }
-
-  .dashboard-nav-card:hover {
-    transform: translateY(-3px);
-  }
-
-  .dashboard-nav-card:active {
-    transform: translateY(-1px);
-    transition-duration: 160ms;
-  }
-
-  @supports not (
-      (-webkit-backdrop-filter: blur(1px)) or
-      (backdrop-filter: blur(1px))
-    ) {
-    .surface-glass-control,
-    .surface-glass-panel,
-    .surface-glass-inset,
-    .surface-glass-field {
-      background: var(--glass-fallback-panel);
-    }
-
-    .surface-glass-popover {
-      background: var(--glass-fallback-popover);
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .surface-glass-control,
-    .surface-glass-panel,
-    .surface-glass-inset,
-    .surface-glass-field {
-      background: var(--glass-fallback-panel-opaque);
-    }
-
-    .surface-glass-popover {
-      background: var(--glass-fallback-popover-opaque);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .surface-glass-control,
-    .dashboard-nav-card {
-      transition: none;
-    }
-
-    .dashboard-nav-card:hover,
-    .dashboard-nav-card:active {
-      transform: none;
-    }
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dash-ash, currentColor);
   }
 
   .type-landing-display {
@@ -737,24 +680,161 @@ body:has(.theme-product) [data-slot="dialog-content"][data-appearance="glass"] {
   --card-foreground: var(--color-brand-linen);
   --primary: var(--color-brand-linen);
   --primary-foreground: var(--color-brand-obsidian);
-  --secondary: rgb(245 243 234 / 0.1);
+  --secondary: rgb(244 242 255 / 0.1);
   --secondary-foreground: var(--color-brand-linen);
-  --muted: rgb(245 243 234 / 0.08);
-  --muted-foreground: rgb(245 243 234 / 0.68);
-  --accent: rgb(245 243 234 / 0.14);
+  --muted: rgb(244 242 255 / 0.08);
+  --muted-foreground: rgb(244 242 255 / 0.68);
+  --accent: rgb(244 242 255 / 0.14);
   --accent-foreground: var(--color-brand-linen);
-  --border: rgb(245 243 234 / 0.16);
-  --input: rgb(245 243 234 / 0.2);
+  --border: rgb(244 242 255 / 0.16);
+  --input: rgb(244 242 255 / 0.2);
   --ring: var(--color-brand-linen);
 }
 
 [data-dashboard-theme="dark"] .surface-linen-panel {
-  border-color: rgb(245 243 234 / 0.12);
+  border-color: rgb(244 242 255 / 0.12);
   background: var(--color-brand-obsidian-secondary);
   color: var(--color-brand-linen);
   box-shadow:
-    inset 0 1px 0 rgb(245 243 234 / 0.08),
+    inset 0 1px 0 rgb(244 242 255 / 0.08),
     0 18px 48px rgb(8 10 8 / 0.12);
+}
+
+/* Dashboard "daylight paper" (style adapted from toMaker): ink on warm paper,
+   one accent (signal blue) for marks only, binary shape (sharp panels, pill
+   controls), no shadows. Light by default; html[data-dash-mode="dark"] flips to
+   paper on ink. Tokens live on <body> so dialogs and menus, which portal
+   outside the wrapper, follow too. */
+body:has(.dashboard-app) {
+  --dash-bg: rgb(250 247 240);
+  --dash-surface: rgb(255 253 248);
+  --dash-fg: rgb(21 19 16);
+  --dash-ash: rgb(107 101 90);
+  --dash-line: rgb(21 19 16 / 0.1);
+  /* The same hairline flattened onto the surface, for edges that sit over the
+     dither field, where a translucent line would show the pattern through. */
+  --dash-line-solid: rgb(232 230 225);
+  --dash-line-strong: rgb(21 19 16 / 0.2);
+  --dash-tint: rgb(21 19 16 / 0.04);
+  /* #5EA6E5 is 2.5:1 on paper: right for a dot or rule, wrong for a word. */
+  /* No blue in the dashboard: marks (dots, active rail, chart bars) are ink. */
+  --dash-accent: var(--dash-fg);
+  --dash-accent-ink: var(--dash-fg);
+  --dash-radius: 0px;
+  --dash-radius-sm: 0px;
+  color-scheme: light;
+}
+
+html[data-dash-mode="dark"] body:has(.dashboard-app) {
+  --dash-bg: rgb(21 19 16);
+  --dash-surface: rgb(29 27 22);
+  --dash-fg: rgb(250 247 240);
+  --dash-ash: rgb(168 160 146);
+  --dash-line: rgb(250 247 240 / 0.1);
+  --dash-line-solid: rgb(51 49 44);
+  --dash-line-strong: rgb(250 247 240 / 0.2);
+  --dash-tint: rgb(250 247 240 / 0.05);
+  color-scheme: dark;
+}
+
+body:has(.dashboard-app),
+body:has(.dashboard-app) :is(.theme-product, .theme-linen, .theme-glass) {
+  --color-brand-linen: var(--dash-fg);
+  --color-brand-obsidian: var(--dash-bg);
+  --color-brand-obsidian-secondary: var(--dash-surface);
+  --dash-panel: var(--dash-surface);
+  --dash-positive: var(--dash-fg);
+  --background: var(--dash-bg);
+  --foreground: var(--dash-fg);
+  --card: var(--dash-surface);
+  --card-foreground: var(--dash-fg);
+  --popover: var(--dash-surface);
+  --popover-foreground: var(--dash-fg);
+  --primary: var(--dash-fg);
+  --primary-foreground: var(--dash-surface);
+  --secondary: var(--dash-tint);
+  --secondary-foreground: var(--dash-fg);
+  --muted: var(--dash-tint);
+  --muted-foreground: color-mix(in srgb, var(--dash-fg) 62%, transparent);
+  --accent: var(--dash-tint);
+  --accent-foreground: var(--dash-fg);
+  --border: var(--dash-line);
+  --input: var(--dash-line-strong);
+  --ring: var(--dash-fg);
+  --surface-elevated: var(--dash-surface);
+  --text-primary: var(--dash-fg);
+  --text-secondary: color-mix(in srgb, var(--dash-fg) 76%, transparent);
+  --text-muted: color-mix(in srgb, var(--dash-fg) 62%, transparent);
+  --border-subtle: var(--dash-line);
+  --border-default: var(--dash-line);
+  --border-strong: var(--dash-line-strong);
+  --focus-ring: var(--dash-fg);
+  --font-heading: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  color-scheme: inherit;
+}
+
+body:has(.dashboard-app) {
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+  font-family: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+}
+
+.dashboard-app {
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+}
+
+body:has(.dashboard-app) :is(.surface-glass-panel, .surface-linen-panel),
+body:has(.dashboard-app) .surface-glass-popover {
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  color: var(--dash-fg);
+  box-shadow: 0 0 0 1px var(--dash-line-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app) .surface-glass-popover {
+  box-shadow: 0 0 0 1px var(--dash-line-strong);
+}
+
+body:has(.dashboard-app) :is(.surface-glass-inset, .surface-glass-field) {
+  border-radius: var(--dash-radius-sm);
+  background: var(--dash-tint);
+  box-shadow: inset 0 0 0 1px var(--dash-line);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app) .surface-glass-control {
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dash-fg);
+  box-shadow: inset 0 0 0 1px var(--dash-line-strong);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app)
+  :is(
+    .surface-glass-control:hover,
+    .surface-glass-control[aria-expanded="true"],
+    .surface-glass-control[data-popup-open]
+  ) {
+  background: var(--dash-tint);
+  box-shadow: inset 0 0 0 1px var(--dash-line-strong);
+}
+
+/* Cards placed in a ledger become flat cells; the frame draws the lines. */
+body:has(.dashboard-app) .dash-ledger [data-slot="card"] {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body:has(.dashboard-app) :is([data-slot="button"], [data-slot="badge"]) {
+  border-radius: 999px;
 }
 
 .dark {
@@ -789,4 +869,43 @@ body:has(.theme-product) [data-slot="dialog-content"][data-appearance="glass"] {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Logo variant per dashboard mode. */
+.dash-logo-dark {
+  display: none;
+}
+html[data-dash-mode="dark"] .dash-logo-light {
+  display: none;
+}
+html[data-dash-mode="dark"] .dash-logo-dark {
+  display: block;
+}
+
+/* Dialogs portal outside the dashboard; give them the same surface. */
+body:has(.dashboard-app) [data-slot="dialog-content"] {
+  border-radius: 0;
+  background: var(--dash-surface);
+  color: var(--dash-fg);
+  box-shadow: 0 0 0 1px var(--dash-line-strong);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Landing "daylight paper" (same system as the dashboard, adapted from
+   toMaker): the landing's own colour names are remapped onto ink on warm
+   paper, with the signal accent: `violet` now marks in signal blue, and the
+   few places it was a word use --signal-ink instead. No gradients. */
+body:has(.landing-paper) {
+  --color-void: rgb(250 247 240);
+  --color-void-2: rgb(255 253 248);
+  --color-mist: rgb(250 247 240);
+  --color-starlight: rgb(21 19 16);
+  --color-graphite: rgb(21 19 16);
+  --color-violet: var(--signal);
+  --color-magenta: var(--signal);
+  --color-indigo-glow: rgb(21 19 16);
+  --color-white: rgb(255 253 248);
+  color-scheme: light;
+  background: rgb(250 247 240);
 }

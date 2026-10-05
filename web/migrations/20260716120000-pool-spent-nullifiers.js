@@ -29,7 +29,11 @@ export const up = async (db) => {
   }
   for (const collectionName of ["spent_nullifiers", "deposits"]) {
     const collection = db.collection(collectionName);
-    const indexes = await collection.indexes();
+    // `deposits` doesn't exist on a fresh database; createIndex creates it.
+    const indexes = await collection.indexes().catch((error) => {
+      if (error?.codeName === "NamespaceNotFound") return [];
+      throw error;
+    });
     const hasBlockIndex = indexes.some(
       (index) => Object.keys(index.key).length === 1 && index.key.block === 1,
     );

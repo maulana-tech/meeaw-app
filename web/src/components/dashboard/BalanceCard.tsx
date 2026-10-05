@@ -1,15 +1,18 @@
 "use client";
 
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   Eye,
   EyeOff,
   LockKeyhole,
+  Plus,
   QrCode,
   RotateCw,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { fromBaseUnits } from "../../lib/crypto";
 import {
@@ -21,7 +24,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { DashboardTile } from "./DashboardTile";
+import {
+  dashButtonPrimary,
+  dashButtonSecondary,
+  dashIconButton,
+} from "./styles";
 
 const UPCOMING_STABLECOINS = ["EURC", "GYEN", "ZUSD", "AUDD"] as const;
 const STABLECOIN_ASSETS = {
@@ -40,15 +47,15 @@ function formatUsd(units: bigint): string {
   });
 }
 
-const controlClass =
-  "flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/45 text-primary-foreground ring-1 ring-border transition-colors hover:bg-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-45";
-
 export function BalanceCard({
   claimable,
   loading,
   locked = false,
+  unlockLabel = "Unlock",
   onUnlock,
   onReceive,
+  onAddFunds,
+  cashOutHref,
   onRefresh,
   refreshing = false,
   stale = false,
@@ -56,8 +63,11 @@ export function BalanceCard({
   claimable: bigint;
   loading: boolean;
   locked?: boolean;
+  unlockLabel?: string;
   onUnlock?: () => void;
   onReceive?: () => void;
+  onAddFunds?: () => void;
+  cashOutHref?: string;
   onRefresh?: () => void;
   refreshing?: boolean;
   stale?: boolean;
@@ -66,44 +76,53 @@ export function BalanceCard({
 
   if (locked) {
     return (
-      <DashboardTile
-        appearance="linen"
-        header={
-          <div className="flex items-start justify-between gap-3">
-            <h2 className="dashboard-tile-title">My Balance</h2>
-            <LockKeyhole className="size-5 text-muted-foreground" />
-          </div>
-        }
-        content={
-          <p className="mt-5 text-sm leading-5 text-muted-foreground">
-            Unlock your private notes to view this balance.
-          </p>
-        }
-        footer={
+      <div className="flex h-full flex-col p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="dashboard-tile-title">Private balance</h2>
+          <span className="flex items-center gap-2 text-xs text-(--dash-ash) tabular-nums">
+            <LockKeyhole
+              className="size-3.5"
+              strokeWidth={1.6}
+              aria-hidden="true"
+            />
+            01
+          </span>
+        </div>
+        <p
+          className="mt-6 text-6xl font-normal tracking-tight text-(--dash-fg)/15 select-none"
+          aria-hidden="true"
+        >
+          $ –––.––
+        </p>
+        <p className="mt-3 max-w-md text-sm leading-6 text-(--dash-ash)">
+          Your balance is encrypted on this device. Unlock to see it and move
+          funds.
+        </p>
+        <div className="mt-auto pt-8">
           <button
             type="button"
             onClick={onUnlock}
             disabled={!onUnlock}
-            className="rounded-full bg-brand-obsidian px-4 py-2 text-sm font-semibold text-brand-linen focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-obsidian focus-visible:ring-offset-2"
+            className={dashButtonPrimary}
           >
-            Unlock with PIN
+            <LockKeyhole aria-hidden="true" />
+            {unlockLabel}
           </button>
-        }
-      />
+        </div>
+      </div>
     );
   }
 
   return (
-    <DashboardTile
-      appearance="linen"
-      header={
-        <div className="flex items-center gap-2">
-          <h2 className="dashboard-tile-title">My Balance</h2>
+    <div className="flex h-full flex-col p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1">
+          <h2 className="dashboard-tile-title">Private balance</h2>
           <button
             type="button"
             onClick={onRefresh}
             disabled={!onRefresh || refreshing}
-            className="rounded-full p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-obsidian"
+            className={dashIconButton}
             aria-label={
               refreshing
                 ? "Updating balance"
@@ -114,52 +133,81 @@ export function BalanceCard({
             title={refreshing ? "Updating balance…" : "Refresh balance"}
           >
             <RotateCw
-              className={`size-4 ${refreshing ? "motion-safe:animate-spin" : ""}`}
+              className={`!size-3.5 ${refreshing ? "motion-safe:animate-spin" : ""}`}
               aria-hidden="true"
             />
           </button>
         </div>
-      }
-      content={
-        loading ? (
-          <div className="mt-6 h-14 w-40 rounded-xl bg-brand-obsidian/8 motion-safe:animate-pulse" />
-        ) : (
-          <p className="mt-5 font-mono text-5xl font-semibold tracking-[-0.055em] text-foreground tabular-nums lg:text-[3.4rem]">
-            {balanceVisible ? formatUsd(claimable) : "••••"}
-          </p>
-        )
-      }
-      footer={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <CurrencySelector />
-          {onReceive ? (
-            <button
-              type="button"
-              className={controlClass}
-              onClick={onReceive}
-              aria-label="Receive payment"
-              title="Receive payment"
-            >
-              <QrCode className="size-5" aria-hidden="true" />
-            </button>
-          ) : null}
           <button
             type="button"
-            className={controlClass}
+            className={dashIconButton}
             onClick={() => setBalanceVisible((visible) => !visible)}
             aria-label={balanceVisible ? "Hide balance" : "Show balance"}
             aria-pressed={!balanceVisible}
             title={balanceVisible ? "Hide balance" : "Show balance"}
           >
             {balanceVisible ? (
-              <Eye className="size-5" aria-hidden="true" />
+              <Eye aria-hidden="true" />
             ) : (
-              <EyeOff className="size-5" aria-hidden="true" />
+              <EyeOff aria-hidden="true" />
             )}
           </button>
         </div>
-      }
-    />
+      </div>
+
+      {loading ? (
+        <div className="mt-6 h-16 w-64 max-w-full rounded-(--dash-radius-sm) bg-(--dash-tint) motion-safe:animate-pulse" />
+      ) : (
+        <p className="mt-6 text-6xl font-normal tracking-tight tabular-nums sm:text-7xl">
+          {balanceVisible ? formatUsd(claimable) : "$ –––.––"}
+        </p>
+      )}
+      <p
+        className="mt-3 flex items-center gap-2 text-sm text-(--dash-ash)"
+        role={stale ? "status" : undefined}
+      >
+        <span
+          className={`size-1.5 shrink-0 rounded-full ${stale ? "bg-amber-500" : "bg-(--dash-accent)"}`}
+          aria-hidden="true"
+        />
+        {stale
+          ? "Balance may be a few minutes behind. Refresh to try again."
+          : "USDC on Monad, held as private notes only you can read."}
+      </p>
+
+      <div className="mt-auto flex flex-wrap gap-2 pt-8">
+        {onReceive ? (
+          <button
+            type="button"
+            className={dashButtonPrimary}
+            onClick={onReceive}
+            aria-label="Receive payment"
+          >
+            <QrCode aria-hidden="true" />
+            Receive
+          </button>
+        ) : null}
+        {onAddFunds ? (
+          <button
+            type="button"
+            className={dashButtonSecondary}
+            onClick={onAddFunds}
+            disabled={loading}
+          >
+            <Plus aria-hidden="true" />
+            Add funds
+          </button>
+        ) : null}
+        {cashOutHref ? (
+          <Link href={cashOutHref} className={dashButtonSecondary}>
+            <ArrowUpRight aria-hidden="true" />
+            Cash out
+          </Link>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -167,18 +215,18 @@ function CurrencySelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="group relative flex size-11 shrink-0 items-center justify-center rounded-full bg-background text-foreground ring-2 ring-border transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group relative flex size-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--dash-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)"
         aria-label="Choose balance currency"
         title="Choose currency"
       >
         <Image
           src={STABLECOIN_ASSETS.USDC}
           alt=""
-          width={30}
-          height={30}
-          className="size-8"
+          width={22}
+          height={22}
+          className="size-5.5"
         />
-        <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground ring-1 ring-background">
+        <span className="absolute right-0 bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-(--dash-fg) text-(--dash-surface)">
           <ChevronDown
             className="size-3 transition-transform group-data-[popup-open]:rotate-180"
             aria-hidden="true"
@@ -196,7 +244,7 @@ function CurrencySelector() {
             Stablecoins on Monad
           </DropdownMenuLabel>
           <DropdownMenuItem className="min-h-12 gap-3 rounded-lg bg-brand-linen/12 px-3 py-2 text-brand-linen focus:bg-brand-linen/18 focus:text-brand-linen [&_svg]:text-brand-linen">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-linen">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
               <Image
                 src={STABLECOIN_ASSETS.USDC}
                 alt=""
@@ -217,7 +265,7 @@ function CurrencySelector() {
               disabled
               className="min-h-11 gap-3 rounded-lg px-3 py-2 text-brand-linen/55 opacity-100 data-disabled:pointer-events-none data-disabled:opacity-55"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-linen/90">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
                 <Image
                   src={STABLECOIN_ASSETS[currency]}
                   alt=""
