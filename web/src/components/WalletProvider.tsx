@@ -608,6 +608,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
+export function useOptionalWallet(): WalletState | null {
+  return useContext(WalletContext);
+}
+
 export function useWallet(): WalletState {
   const context = useContext(WalletContext);
   if (!context) throw new Error("useWallet must be used within WalletProvider");

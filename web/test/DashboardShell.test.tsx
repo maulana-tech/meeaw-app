@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 const mocks = vi.hoisted(() => ({
   disconnect: vi.fn(),
   usePathname: vi.fn(() => "/dashboard"),
+  pendingRequestsCount: 0,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -13,12 +14,21 @@ vi.mock("next/navigation", () => ({
 vi.mock("../src/components/WalletProvider", () => ({
   useWallet: () => ({ username: "toreno", disconnect: mocks.disconnect }),
 }));
+vi.mock("../src/features/requests/hooks/usePendingRequestsCount", () => ({
+  usePendingRequestsCount: () => ({
+    count: mocks.pendingRequestsCount,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 
 import { DashboardShell } from "../src/components/dashboard/DashboardShell";
 
 describe("DashboardShell", () => {
   beforeEach(() => {
     mocks.usePathname.mockReturnValue("/dashboard");
+    mocks.pendingRequestsCount = 0;
   });
 
   it("provides the page's main-content landmark", () => {
@@ -98,5 +108,18 @@ describe("DashboardShell", () => {
       accountMenu,
     );
     expect(screen.getByText("History content")).toBeInTheDocument();
+  });
+
+  it("renders a badge with the number of pending requests on the Requests navigation item", () => {
+    mocks.pendingRequestsCount = 5;
+    render(
+      <DashboardShell navigation>
+        <div>Requests content</div>
+      </DashboardShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Dashboard" });
+    const requestsLink = within(nav).getByRole("link", { name: /Requests/i });
+    expect(within(requestsLink).getByText("5")).toBeInTheDocument();
   });
 });

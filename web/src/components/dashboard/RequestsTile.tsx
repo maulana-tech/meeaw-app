@@ -1,19 +1,11 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Inbox } from "lucide-react";
 import Link from "next/link";
+import { usePendingRequestsCount } from "../../features/requests/hooks/usePendingRequestsCount";
 import { REQUESTS_PATH } from "../../lib/auth-routes";
-import { api } from "../../trpc/client";
-import { useWallet } from "../WalletProvider";
 import { dashFocus } from "./styles";
 export function RequestsTile() {
-  const { address } = useWallet();
-  const query = useQuery({
-    queryKey: ["requests-dashboard-count", address.toLowerCase()],
-    enabled: Boolean(address),
-    refetchInterval: 30_000,
-    queryFn: () => api.requests.pendingCount.query(),
-  });
+  const { count, isLoading, isError } = usePendingRequestsCount();
   return (
     <Link
       href={REQUESTS_PATH}
@@ -26,7 +18,7 @@ export function RequestsTile() {
       </div>
       <div className="mt-4 flex items-baseline gap-2">
         <span className="font-mono text-4xl tabular-nums">
-          {query.isLoading || query.isError ? "—" : (query.data ?? 0)}
+          {isLoading || isError ? "—" : count}
         </span>
         <span className="text-sm text-(--dash-ash)">waiting for you</span>
       </div>
