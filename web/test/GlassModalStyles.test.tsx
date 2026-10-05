@@ -73,6 +73,37 @@ describe("dashboard glass modals", () => {
     expect(screen.getByText("Link name")).toHaveClass("text-foreground/70");
   });
 
+  it("uses active styling on request option when onRequest is provided and user has username", () => {
+    const onRequest = vi.fn();
+    render(
+      <ReceiveDialog
+        open
+        onClose={vi.fn()}
+        username="olive"
+        origin="https://example.test"
+        onRequest={onRequest}
+      />,
+    );
+
+    const requestOption = screen.getByRole("button", {
+      name: /Request from a username/,
+    });
+
+    expect(requestOption).not.toBeDisabled();
+    expect(requestOption).toHaveClass("rounded-2xl", "cursor-pointer");
+    expect(within(requestOption).getByText("Request from a username")).toHaveClass(
+      "text-foreground",
+    );
+    expect(
+      within(requestOption).getByText(
+        "Request a fixed amount from @username",
+      ),
+    ).toHaveClass("text-foreground/60");
+
+    fireEvent.click(requestOption);
+    expect(onRequest).toHaveBeenCalledTimes(1);
+  });
+
   it("uses glass receipt roles and a nested-card radius when ready", async () => {
     const bundle = {
       version: 1,

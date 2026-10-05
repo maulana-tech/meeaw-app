@@ -122,6 +122,8 @@ export function ReceiveDialog({
     setTimeout(() => setCopied(false), 1500);
   }
 
+  const canRequest = Boolean(onRequest && username);
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && handleClose()}>
       <DialogContent appearance="linen" size="md">
@@ -179,19 +181,42 @@ export function ReceiveDialog({
             </button>
             <button
               type="button"
-              disabled={!onRequest || !username}
+              disabled={!canRequest}
               onClick={onRequest}
               className={cn(
                 linenInsetClass,
-                "flex cursor-not-allowed items-center gap-3 rounded-2xl px-4 py-3 text-left text-foreground/45",
+                "flex items-center gap-3 rounded-2xl px-4 py-3 text-left",
+                canRequest
+                  ? "cursor-pointer transition-colors hover:bg-foreground/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70"
+                  : "cursor-not-allowed text-foreground/45",
               )}
             >
-              <AtSign className="size-5" aria-hidden="true" />
+              <AtSign
+                className={cn(
+                  "size-5",
+                  canRequest ? "text-foreground/70" : "text-foreground/45",
+                )}
+                aria-hidden="true"
+              />
               <div>
-                <div className="text-sm font-medium">
+                <div
+                  className={cn(
+                    "text-sm font-medium",
+                    canRequest ? "text-foreground" : "text-foreground/45",
+                  )}
+                >
                   {username ? "Request from a username" : "Claim a username first"}
                 </div>
-                <div className="text-xs">{username ? "Request a fixed amount from @username" : "Claim a handle before requesting payment"}</div>
+                <div
+                  className={cn(
+                    "text-xs",
+                    canRequest ? "text-foreground/60" : "text-foreground/45",
+                  )}
+                >
+                  {username
+                    ? "Request a fixed amount from @username"
+                    : "Claim a handle before requesting payment"}
+                </div>
               </div>
             </button>
           </div>
