@@ -16,7 +16,6 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
 } from "react";
@@ -56,7 +55,8 @@ export function Steps() {
   const [paused, setPaused] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const baseId = useId();
+  // One Steps per page, so a fixed id; useId drifted between SSR and client.
+  const baseId = "how-steps";
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -115,17 +115,15 @@ export function Steps() {
       id="how"
       data-ed-section
       aria-labelledby="how-title"
-      className="relative bg-mist py-24 text-graphite sm:py-32"
+      className="relative py-24 text-graphite sm:py-32"
     >
       <Frame>
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <MonoLabel className="text-graphite/60">
-              {"/// How it works"}
-            </MonoLabel>
+            <MonoLabel className="text-graphite/60">How it works</MonoLabel>
             <h2
               id="how-title"
-              className="mt-4 text-[clamp(1.9rem,3vw,2.8rem)] font-light tracking-tight"
+              className="mt-4 text-[clamp(1.9rem,3vw,2.8rem)] font-normal tracking-tight"
             >
               From link to private balance in three steps
             </h2>
@@ -136,7 +134,7 @@ export function Steps() {
           </p>
         </div>
 
-        <div className="mt-14 grid overflow-hidden rounded-[28px] border border-graphite/10 bg-white lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="mt-14 grid overflow-hidden rounded-none border border-graphite/10 bg-white lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
@@ -171,9 +169,9 @@ export function Steps() {
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "flex size-12 shrink-0 items-center justify-center rounded-2xl transition-all",
+                      "flex size-12 shrink-0 items-center justify-center rounded-none transition-all",
                       selected
-                        ? "bg-[linear-gradient(135deg,#3d2bff_0%,#836ef9_50%,#e24c9b_100%)] text-white shadow-[0_12px_28px_-12px_rgba(91,43,255,0.7)]"
+                        ? "bg-starlight text-void"
                         : "border border-graphite/15 text-graphite/55",
                     )}
                   >
@@ -183,7 +181,7 @@ export function Steps() {
                     <MonoLabel
                       className={cn(
                         "block",
-                        selected ? "text-violet" : "text-graphite/45",
+                        selected ? "text-(--signal-ink)" : "text-graphite/45",
                       )}
                     >
                       Step 0{index + 1}
@@ -243,7 +241,7 @@ export function Steps() {
           >
             <div
               aria-hidden="true"
-              className="grain pointer-events-none absolute inset-0 -z-10 [background-image:radial-gradient(55%_60%_at_25%_85%,rgba(91,43,255,0.75),transparent_65%),radial-gradient(45%_50%_at_90%_10%,rgba(226,76,155,0.55),transparent_60%)]"
+              className="pointer-events-none absolute inset-0 -z-10 bg-void-2"
             />
             <div
               key={active}
@@ -268,12 +266,12 @@ function MockWindow({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-starlight/12 bg-void-2/90 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] backdrop-blur">
+    <div className="border border-starlight/15 bg-void">
       <div className="flex items-center gap-2 border-b border-starlight/10 px-4 py-3">
         <span className="size-2.5 rounded-full bg-starlight/20" />
         <span className="size-2.5 rounded-full bg-starlight/20" />
         <span className="size-2.5 rounded-full bg-starlight/20" />
-        <span className="ml-2 truncate font-landing-mono text-[11px] text-starlight/50">
+        <span className="ml-2 truncate font-landing text-[11px] text-starlight/50">
           {title}
         </span>
       </div>
@@ -294,7 +292,7 @@ function Row({
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-lg border px-3.5 py-2.5 text-sm",
+        "flex items-center justify-between rounded-none border px-3.5 py-2.5 text-sm",
         accent
           ? "border-violet/50 bg-violet/10"
           : "border-starlight/10 bg-void/60",
@@ -313,7 +311,7 @@ function ClaimMock() {
       <p className="mt-1 text-sm text-starlight/55">
         This becomes your payment link.
       </p>
-      <div className="mt-5 flex items-center rounded-xl border border-violet/60 bg-void px-3.5 py-3 font-landing-mono text-sm">
+      <div className="mt-5 flex items-center rounded-none border border-violet/60 bg-void px-3.5 py-3 font-landing text-sm">
         <span className="text-starlight/45">mawee.xyz/pay/</span>
         <span className="text-starlight">dinar</span>
         <span className="ml-0.5 h-4 w-px bg-violet motion-safe:animate-pulse" />
@@ -321,10 +319,10 @@ function ClaimMock() {
       <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-300">
         <Check className="size-3.5" /> Available
       </p>
-      <div className="mt-5 rounded-xl bg-indigo-glow py-3 text-center text-sm font-medium">
+      <div className="mt-5 rounded-none bg-indigo-glow py-3 text-center text-sm font-medium">
         Claim @dinar
       </div>
-      <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-starlight/10 px-3.5 py-3 text-sm">
+      <div className="mt-4 flex items-center gap-2.5 rounded-none border border-starlight/10 px-3.5 py-3 text-sm">
         <Fingerprint className="size-4 text-violet" />
         <span className="text-starlight/75">
           Keys protected by your passkey
@@ -398,10 +396,10 @@ function PayMock() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-starlight/55">Pay @dinar</p>
-          <p className="mt-1 text-3xl font-light">300.00 USDC</p>
+          <p className="mt-1 text-3xl font-normal">300.00 USDC</p>
           <p className="mt-1 text-sm text-starlight/55">Logo design</p>
         </div>
-        <div className="rounded-xl bg-white p-2">
+        <div className="rounded-none bg-white p-2">
           <FauxQr />
         </div>
       </div>
@@ -424,7 +422,7 @@ function PayMock() {
           }
         />
       </div>
-      <div className="mt-5 rounded-xl bg-indigo-glow py-3 text-center text-sm font-medium">
+      <div className="mt-5 rounded-none bg-indigo-glow py-3 text-center text-sm font-medium">
         Pay 300 USDC
       </div>
     </MockWindow>
@@ -435,7 +433,7 @@ function WithdrawMock() {
   return (
     <MockWindow title="Mawee · Withdraw">
       <p className="text-sm text-starlight/55">Private balance</p>
-      <p className="mt-1 text-3xl font-light">$1,240.50</p>
+      <p className="mt-1 text-3xl font-normal">$1,240.50</p>
       <ul className="mt-4 grid gap-1.5">
         {[
           { id: "note-a", label: "Private payment", amount: "$300.00" },
@@ -444,7 +442,7 @@ function WithdrawMock() {
         ].map(({ id, label, amount }) => (
           <li
             key={id}
-            className="flex items-center justify-between rounded-lg bg-void/60 px-3.5 py-2 text-sm"
+            className="flex items-center justify-between rounded-none bg-void/60 px-3.5 py-2 text-sm"
           >
             <span className="flex items-center gap-2 text-starlight/70">
               <Lock className="size-3.5 text-violet" /> {label}
@@ -465,7 +463,7 @@ function WithdrawMock() {
           }
         />
       </div>
-      <p className="mt-4 text-center font-landing-mono text-[11px] uppercase tracking-[0.18em] text-starlight/50">
+      <p className="mt-4 text-center font-landing text-[11px] uppercase tracking-[0.18em] text-starlight/50">
         Not linked to any deposit
       </p>
     </MockWindow>

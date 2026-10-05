@@ -47,13 +47,14 @@ describe("EditionsTopNav", () => {
       screen.queryByRole("button", { name: /claim username/i }),
     ).not.toBeInTheDocument();
 
-    // The bar turns solid and blurred once the page scrolls (Chrome sets
-    // data-scrolled), so content never shows through the links.
+    // The bar turns solid paper with a hairline once the page scrolls (Chrome
+    // sets data-scrolled): no glass, so content never shows through the links.
     const nav = document.querySelector("[data-ed-topnav]");
     expect(nav).toHaveClass(
-      "data-[scrolled=true]:bg-void/70",
-      "data-[scrolled=true]:backdrop-blur-md",
+      "data-[scrolled=true]:bg-void",
+      "data-[scrolled=true]:border-starlight/10",
     );
+    expect(nav?.className).not.toMatch(/backdrop-blur/);
   });
 
   it("links every landing section from the section pill", () => {

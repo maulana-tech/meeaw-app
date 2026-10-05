@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useWallet } from "../WalletProvider";
-import { Frame, Nebula, pillOutlineLight } from "./primitives";
+import { Frame, pillSolidViolet } from "./primitives";
 
 export function FinalCta() {
   const { address, signIn } = useWallet();
@@ -11,7 +11,6 @@ export function FinalCta() {
       aria-labelledby="cta-title"
       className="relative isolate overflow-hidden text-graphite"
     >
-      <Nebula variant="light" className="-z-10" />
       <Frame className="flex min-h-[78svh] flex-col justify-center py-24">
         <h2
           id="cta-title"
@@ -24,13 +23,13 @@ export function FinalCta() {
         </p>
         <div className="mt-9">
           {address ? (
-            <Link href="/dashboard" className={pillOutlineLight}>
+            <Link href="/dashboard" className={pillSolidViolet}>
               Open your dashboard
             </Link>
           ) : (
             <button
               type="button"
-              className={pillOutlineLight}
+              className={pillSolidViolet}
               onClick={() => signIn()}
             >
               Create your payment link

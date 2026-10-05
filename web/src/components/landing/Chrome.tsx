@@ -5,8 +5,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { type ReactNode, useRef } from "react";
-import { cn } from "@/lib/utils";
-import { jetbrainsMono, urbanist } from "./fonts";
+import { DitherField } from "./DitherField";
 import { EditionsTopNav } from "./Nav";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -111,12 +110,12 @@ export function Chrome({ children }: { children: ReactNode }) {
     <div
       ref={rootRef}
       data-side="dark"
-      className={cn(
-        urbanist.variable,
-        jetbrainsMono.variable,
-        "relative isolate min-h-svh bg-void font-landing text-starlight antialiased selection:bg-violet/40",
-      )}
+      className="landing-paper relative isolate min-h-svh bg-void font-landing text-starlight antialiased selection:bg-violet/25"
     >
+      {/* Page field: the two-colour dither sits fixed behind every section. */}
+      <div aria-hidden="true" className="fixed inset-0 -z-10">
+        <DitherField />
+      </div>
       <EditionsTopNav />
       {children}
     </div>
