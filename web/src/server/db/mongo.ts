@@ -102,6 +102,11 @@ function getClient(): Promise<MongoClient> {
   } else {
     clientPromise = new MongoClient(uri).connect();
   }
+  // Don't cache a failed connect, or one Mongo outage breaks every later request.
+  clientPromise.catch(() => {
+    clientPromise = undefined;
+    global._maweeMongoClientPromise = undefined;
+  });
   return clientPromise;
 }
 
