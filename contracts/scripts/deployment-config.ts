@@ -303,6 +303,7 @@ export function renderIndexerCandidate(
   const lines = source.split("\n");
   const configuredPools: string[] = [];
   const poolLines: number[] = [];
+  const zeroPoolLines: number[] = [];
   const registryLines: number[] = [];
   let activeChain: number | null = null;
   let targetChains = 0;
@@ -334,7 +335,9 @@ export function renderIndexerCandidate(
     const address = line.match(/^(\s*-\s*)"(0x[0-9a-fA-F]{40})"\s*$/);
     if (!address) continue;
     if (name === "Pool") {
-      configuredPools.push(address[2].toLowerCase());
+      const pool = address[2].toLowerCase();
+      if (pool === ZERO) zeroPoolLines.push(index);
+      else configuredPools.push(pool);
       poolLines.push(index);
     } else if (name === "Registry") {
       registryLines.push(index);
@@ -365,6 +368,9 @@ export function renderIndexerCandidate(
     0,
     ...missing.map((address) => `${indentation}"${address}"`),
   );
+  // Template placeholders sit before the insertion point, so removing them
+  // last-first keeps the other indices valid.
+  for (const line of zeroPoolLines.reverse()) lines.splice(line, 1);
   return lines.join("\n");
 }
 

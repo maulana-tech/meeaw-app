@@ -134,7 +134,11 @@ async function main() {
     throw new Error("indexer/config.yaml is required to produce a candidate.");
   }
   const sourceIndexer = fs.readFileSync(SOURCE_INDEXER, "utf8");
-  const indexedPools = configuredIndexerAddresses(sourceIndexer, chainId, "Pool");
+  // The checked-in config is a template with 0x0 placeholders; those mean
+  // "nothing indexed yet", not a pool.
+  const indexedPools = configuredIndexerAddresses(sourceIndexer, chainId, "Pool").filter(
+    (address) => address !== ZERO,
+  );
   const indexedRegistries = configuredIndexerAddresses(
     sourceIndexer,
     chainId,
@@ -178,6 +182,7 @@ async function main() {
     oldPool = previousPool(chainId, indexedPools, sameConfiguredChain);
     if (
       oldPool &&
+      indexedPools.length > 0 &&
       !indexedPools.some((address) => address.toLowerCase() === oldPool!.address.toLowerCase())
     ) {
       throw new Error("The configured previous pool is missing from the indexer.");

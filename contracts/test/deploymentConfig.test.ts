@@ -34,6 +34,15 @@ describe("reviewable pool deployment candidates",()=>{
     expect(rendered).to.contain("start_block: 90");
     expect(rendered).to.contain(a("3"));
   });
+  it("replaces the 0x0 template placeholder instead of indexing it",()=>{
+    const zero="0x0000000000000000000000000000000000000000";
+    const yaml=`chains:\n  - id: 10143\n    start_block: 0\n    contracts:\n      - name: Pool\n        address:\n          - "${zero}"\n      - name: Registry\n        address:\n          - "${zero}"\n`;
+    const rendered=renderIndexerCandidate(yaml,10143,null,{Pool:[a("3"),a("1")],Registry:a("4")});
+    expect(rendered).to.not.contain(`- "${zero}"`);
+    expect(rendered).to.contain(`- "${a("1")}"`);
+    expect(rendered).to.contain(`- "${a("3")}"`);
+    expect(rendered).to.contain(`- "${a("4")}"`);
+  });
   it("preserves Pool and Registry addresses while emitting candidate files only",()=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),"mawee-candidate-"));
     try{
