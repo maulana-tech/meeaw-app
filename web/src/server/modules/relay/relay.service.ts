@@ -12,7 +12,10 @@ import {
 import { USDC_DECIMALS } from "../../../lib/crypto";
 import { activePool, findPool } from "../../../lib/pools";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
-import { currentWallet } from "../wallets/wallets.service";
+import {
+  currentWallet,
+  verifiedPrivyWallets,
+} from "../wallets/wallets.service";
 import { RelayerUnavailableError, RelayRejectedError } from "./relay.errors";
 import type {
   DepositInput,
@@ -182,14 +185,24 @@ export async function relayTransfer(
   };
 }
 
-/** Testnet only: mint MockUSDC straight into the user's Mawee wallet. */
+/** Testnet only: mint MockUSDC into the user's Mawee wallet, or a payer's
+ *  Privy wallet when they have no Mawee account. */
 export async function relayMintTestUsdc(
   privyUserId: string,
 ): Promise<{ txHash: string }> {
   if (!usdcMintable) {
     throw new RelayRejectedError("Test USDC is not available on this network.");
   }
-  const to = await boundWallet(privyUserId);
+  // A payer with no Mawee account mints into the Privy embedded wallet they
+  // pay from, verified against Privy rather than taken from the client.
+  const to =
+    (await currentWallet(privyUserId))?.address ??
+    ((await verifiedPrivyWallets(privyUserId))[0]?.address as
+      | `0x${string}`
+      | undefined);
+  if (!to) {
+    throw new RelayRejectedError("No wallet is linked to this account.");
+  }
   const { hash } = await relay(() =>
     relayWrite({
       address: usdcAddress,

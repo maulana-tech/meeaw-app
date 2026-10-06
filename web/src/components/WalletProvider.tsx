@@ -6,7 +6,7 @@ import {
   usePrivy,
   useWallets,
 } from "@privy-io/react-auth";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   type ReactNode,
@@ -90,6 +90,9 @@ const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  // On a pay link, a Privy session belongs to the payer: it only supplies the
+  // wallet that pays, so it must not become a Mawee account or leave checkout.
+  const payerRoute = usePathname()?.startsWith("/pay") ?? false;
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const { createWallet } = useCreateWallet();
@@ -205,6 +208,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSessionReady(true);
       return;
     }
+    if (payerRoute) {
+      setConnecting(false);
+      setSessionReady(true);
+      return;
+    }
 
     sessionAbortedRef.current = false;
     let cancelled = false;
@@ -265,6 +273,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     activateMapping,
     routeToDashboard,
     bootstrapRevision,
+    payerRoute,
   ]);
 
   useEffect(() => {

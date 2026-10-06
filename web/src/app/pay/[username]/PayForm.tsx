@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "../../../components/ui/button";
@@ -10,15 +10,16 @@ import { Card } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
-import { payerSigner } from "../../../features/payerWallet/injected";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
 import {
   chain,
   explorerTxUrl,
   type MaweeAccount,
+  mintTestUsdc,
   usdcBalance,
+  usdcMintable,
 } from "../../../lib/chain";
-import { fromBaseUnits, toBaseUnits } from "../../../lib/crypto";
+import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../../lib/crypto";
 import { payIntoNote } from "../../../lib/deposit";
 import { useGasless } from "../../../lib/useGasless";
 
@@ -30,6 +31,8 @@ const payInput = z.object({
 });
 type PayInput = z.infer<typeof payInput>;
 
+const TEST_MINT_UNITS = 100n * 10n ** BigInt(USDC_DECIMALS);
+
 export function PayForm({
   account,
   username,
@@ -39,7 +42,19 @@ export function PayForm({
   username: string;
   link?: PaymentLink | null;
 }) {
-  const { address, connecting, error: walletError, connect } = usePayerWallet();
+  const {
+    address,
+    source,
+    connecting,
+    preparing,
+    privyReady,
+    error: walletError,
+    connect,
+    signInWithEmail,
+    getSigner,
+  } = usePayerWallet();
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [minting, setMinting] = useState(false);
   const gasless = useGasless();
   const [status, setStatus] = useState<{
     kind: "ok" | "err";
@@ -66,6 +81,32 @@ export function PayForm({
     reset({ amount: lockedAmount ?? "" });
   }, [lockedAmount, reset]);
 
+  const refreshBalance = useCallback(async () => {
+    if (!address) return setBalance(null);
+    setBalance(await usdcBalance(address).catch(() => null));
+  }, [address]);
+
+  useEffect(() => {
+    void refreshBalance();
+  }, [refreshBalance]);
+
+  async function getTestUsdc() {
+    setStatus(null);
+    setMinting(true);
+    try {
+      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS);
+      await refreshBalance();
+      setStatus({ kind: "ok", msg: "Added 100 test USDC to your wallet." });
+    } catch (e) {
+      setStatus({
+        kind: "err",
+        msg: e instanceof Error ? e.message : "Could not get test USDC.",
+      });
+    } finally {
+      setMinting(false);
+    }
+  }
+
   const onSubmit = handleSubmit(async ({ amount }) => {
     setStatus(null);
     if (!address) {
@@ -74,7 +115,7 @@ export function PayForm({
     }
     try {
       const units = toBaseUnits(amount);
-      const signer = await payerSigner(address);
+      const signer = await getSigner();
       if ((await usdcBalance(signer.address)) < units) {
         setStatus({
           kind: "err",
@@ -94,6 +135,7 @@ export function PayForm({
         url: explorerTxUrl(txHash),
       });
       reset({ amount: lockedAmount ?? "" });
+      void refreshBalance();
     } catch (e) {
       setStatus({
         kind: "err",
@@ -152,24 +194,56 @@ export function PayForm({
             <Button
               className="min-h-11"
               type="button"
-              onClick={connect}
-              disabled={connecting}
+              onClick={signInWithEmail}
+              disabled={!privyReady || preparing}
             >
-              {connecting && (
+              {preparing && (
                 <Loader
                   className="size-4 motion-safe:animate-spin"
                   aria-hidden="true"
                 />
               )}
-              {connecting ? "Connecting…" : "Connect wallet"}
+              {preparing ? "Setting up wallet…" : "Continue with email"}
             </Button>
           )}
         </div>
         <span className="text-xs text-brand-linen/55">
           {address
-            ? `Paying from ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : "You need USDC plus a little MON for gas."}`
-            : `Pay with any EVM wallet (MetaMask, Rabby…) on ${chain.name}.`}
+            ? `Paying from ${source === "privy" ? "your email wallet" : "your browser wallet"} ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : "You need USDC plus a little MON for gas."}`
+            : "No crypto wallet? Continue with email and we create one for you."}
+          {address && balance !== null
+            ? ` Balance: ${fromBaseUnits(balance)} USDC.`
+            : ""}
         </span>
+        {!address && !preparing ? (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={connecting}
+            className="w-fit text-xs font-medium text-brand-linen underline underline-offset-4 disabled:opacity-50"
+          >
+            {connecting
+              ? "Connecting…"
+              : "Already have a wallet? Use MetaMask, Rabby or another EVM wallet"}
+          </button>
+        ) : null}
+        {address && usdcMintable && balance !== null && balance === 0n ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-10 w-fit"
+            onClick={getTestUsdc}
+            disabled={minting}
+          >
+            {minting && (
+              <Loader
+                className="size-4 motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+            )}
+            {minting ? "Adding test USDC…" : "Get 100 test USDC"}
+          </Button>
+        ) : null}
         <ToastFeedback
           message={walletError}
           variant="error"

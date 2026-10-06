@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   relayWrite: vi.fn(),
   configured: true,
   currentWallet: vi.fn(),
+  verifiedPrivyWallets: vi.fn(),
 }));
 
 vi.mock("../src/server/lib/relayer", () => ({
@@ -19,6 +20,7 @@ vi.mock("../src/server/lib/relayer", () => ({
 }));
 vi.mock("../src/server/modules/wallets/wallets.service", () => ({
   currentWallet: mocks.currentWallet,
+  verifiedPrivyWallets: mocks.verifiedPrivyWallets,
 }));
 vi.mock("../src/lib/chain", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/chain")>();
@@ -249,5 +251,20 @@ describe("relay router", () => {
     const request = mocks.relayWrite.mock.calls[0][0];
     expect(request.functionName).toBe("mint");
     expect(request.args[0]).toBe(OWNER);
+  });
+
+  it("mints to a payer's verified Privy wallet when there is no Mawee wallet", async () => {
+    const PAYER = "0x00000000000000000000000000000000000000Fa";
+    mocks.currentWallet.mockResolvedValue(null);
+    mocks.verifiedPrivyWallets.mockResolvedValue([{ address: PAYER }]);
+    await caller().mintTestUsdc();
+    expect(mocks.relayWrite.mock.calls[0][0].args[0]).toBe(PAYER);
+  });
+
+  it("refuses to mint when the identity has no wallet at all", async () => {
+    mocks.currentWallet.mockResolvedValue(null);
+    mocks.verifiedPrivyWallets.mockResolvedValue([]);
+    await expect(caller().mintTestUsdc()).rejects.toBeTruthy();
+    expect(mocks.relayWrite).not.toHaveBeenCalled();
   });
 });
