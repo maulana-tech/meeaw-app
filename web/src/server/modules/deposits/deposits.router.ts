@@ -1,4 +1,7 @@
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { poolScopeSchema } from "../../../features/requests/validation";
+import { publicPoolActivity } from "./activityEvidence";
 import { createTRPCRouter, publicProcedure } from "../../trpc";
 import { DepositIndexGapError, UnknownPoolError } from "./deposits.errors";
 import {
@@ -26,6 +29,7 @@ function mapError(e: unknown): never {
 }
 
 export const depositsRouter = createTRPCRouter({
+  activity:publicProcedure.input(z.strictObject({pool:poolScopeSchema,cursor:z.string().max(200).optional()})).query(({input})=>publicPoolActivity(input).catch(mapError)),
   snapshot: publicProcedure
     .input(poolSnapshotInput)
     .output(poolSnapshotOutput)

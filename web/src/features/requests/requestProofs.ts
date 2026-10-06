@@ -1,12 +1,13 @@
-import {fromBE,commitment,encryptNote,merkleProof,nullifier,ownerPk,randomFieldElement,toBE32,viewPubkey,hexToBytes} from "../../lib/crypto";
+import {fromBE,merkleProof,nullifier,ownerPk,randomFieldElement,toBE32,viewPubkey,hexToBytes} from "../../lib/crypto";
 import {toHex} from "viem";
 import type {Signer} from "../../lib/chain";
 import type {LocalAccount,MyNote,ScanResult} from "../../lib/notes";
 import {resolvePool} from "../../lib/pools";
-import {proveMerge,proveTransfer,type EvmProof} from "../../lib/prover";
+import {proveMerge,proveTransfer} from "../../lib/prover";
+import {createNoteOutput as output,proofWire} from "../payments/proofOutputs";
 import {localParticipantKeys,openRequest} from "./requestCrypto";
 import {submissionTypedData} from "./requestTypedData";
-import type {Hex,NoteOutput,PaymentOperation,PoolDescriptor,RequestPayload,SignedRequest,SignedSubmission,SubmissionBody} from "./types";
+import type {Hex,PaymentOperation,PoolDescriptor,RequestPayload,SignedRequest,SignedSubmission,SubmissionBody} from "./types";
 
 export function signedRecordOf(r:SignedRequest):SignedRequest{return {version:r.version,id:r.id,pool:r.pool,requester:r.requester,addressee:r.addressee,createdAt:r.createdAt,recipientCommitment:r.recipientCommitment,requesterEnvelope:r.requesterEnvelope,addresseeEnvelope:r.addresseeEnvelope,signature:r.signature};}
 type Context={record:SignedRequest;operation:PaymentOperation;account:LocalAccount;scan:ScanResult;signer:Signer;artifactRoot?:string;pool?:PoolDescriptor};
@@ -16,11 +17,6 @@ async function assertContext(c:Context){
 }
 function owned(c:Context,index:number){
   const n=c.scan.notes.find(n=>n.scope===c.record.pool&&n.leafIndex===index&&!n.spent&&n.amount>0n);if(!n)throw new Error("This payment balance changed. Refresh and try again.");return n;
-}
-function proofWire(p:EvmProof){return {a:p.a.map(String) as [string,string],b:p.b.map(row=>row.map(String)) as [[string,string],[string,string]],c:p.c.map(String) as [string,string]};}
-async function output(amount:bigint,pk:bigint,view:Uint8Array,salt:bigint):Promise<NoteOutput>{
-  const encrypted=encryptNote(view,amount,salt);
-  return {commitment:toHex(toBE32(await commitment(amount,pk,salt))),ephemeralPk:toHex(encrypted.ephemeralPk),ciphertext:toHex(encrypted.ciphertext)};
 }
 async function sign(c:Context,body:SubmissionBody):Promise<SignedSubmission>{
   return {...body,signature:await c.signer.walletClient.signTypedData({account:c.signer.walletClient.account??c.signer.address,...submissionTypedData(body)})};

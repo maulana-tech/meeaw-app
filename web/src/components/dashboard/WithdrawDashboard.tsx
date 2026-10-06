@@ -171,7 +171,7 @@ export function WithdrawDashboard() {
       const account = getAccount();
       if (!account) throw new Error("Unlock your private account to continue.");
       // Scan the pool the selected payments live in; never mix pools.
-      const scan = await scanMyNotes(account, { pool });
+      const scan = await scanMyNotes(account, { pool,includeRequestRecovery:true,includeTransferRecovery:true });
 
       if (target.kind === "all") {
         const batch = await withdrawAll({

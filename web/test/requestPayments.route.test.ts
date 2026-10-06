@@ -5,6 +5,8 @@ const deps = vi.hoisted(() => ({
   configured: true,
   relays: { examined: 0, confirmed: 0, unresolved: 0 },
   requests: { examined: 0, confirmed: 0, unresolved: 0 },
+  transfers: { examined: 0, confirmed: 0, unresolved: 0 },
+  spends:{examined:0,released:0,unresolved:0},
 }));
 
 vi.mock("../src/env.server", () => ({
@@ -27,6 +29,9 @@ vi.mock("../src/server/modules/requests/requestOperations", () => ({
 }));
 
 import { GET } from "../src/app/api/cron/request-payments/route";
+vi.mock("../src/server/modules/transfers/transferOperations",()=>({reconcilePendingTransfers:vi.fn(async()=>deps.transfers)}));
+vi.mock("../src/server/db/mongo",()=>({getDb:async()=>({})}));
+vi.mock("../src/server/lib/spendReservations",()=>({SpendReservations:class {async reconcile(){return deps.spends;}}}));
 import { reconcileAllRelays } from "../src/server/lib/durableRelayer";
 import { reconcilePendingRequests } from "../src/server/modules/requests/requestOperations";
 
@@ -67,6 +72,8 @@ describe("request payment reconciliation route", () => {
       status: "checked",
       relays: deps.relays,
       requests: deps.requests,
+      transfers: deps.transfers,
+      spends:deps.spends,
     });
     expect(reconcileAllRelays).toHaveBeenCalledOnce();
     expect(reconcilePendingRequests).toHaveBeenCalledOnce();

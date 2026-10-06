@@ -177,6 +177,7 @@ export function useRequestPayment(request: PaymentRequest | null) {
       let scan = await scanMyNotes(account, {
         pool,
         includeRequestRecovery: true,
+        includeTransferRecovery: true,
       });
       if (run.current !== seq) return null;
       if (scan.health !== "healthy")
@@ -318,6 +319,7 @@ export function useRequestPayment(request: PaymentRequest | null) {
           scan = await scanMyNotes(account, {
             pool,
             includeRequestRecovery: true,
+            includeTransferRecovery: true,
           });
           if (scan.health !== "healthy") break;
           continue;

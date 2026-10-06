@@ -34,6 +34,12 @@ import {
   dashLedger,
 } from "./styles";
 import { useMyNotes } from "./useMyNotes";
+import { SendTransferDialog } from "./SendTransferDialog";
+import { TransferProgress } from "./TransferProgress";
+import { PendingTransfersNotice } from "./PendingTransfersNotice";
+import { useTransfers } from "../../features/transfers/hooks/useTransfers";
+import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
+import type { TransferRecord } from "../../features/transfers/types";
 import { assetLabel, useSelectedPool } from "./useSelectedPool";
 export function Dashboard() {
   const {
@@ -50,11 +56,20 @@ export function Dashboard() {
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const pool = useSelectedPool();
+  const [sendOpen,setSendOpen]=useState(false),[selectedTransfer,setSelectedTransfer]=useState<TransferRecord|null>(null),[progressOpen,setProgressOpen]=useState(false),[startTransfer,setStartTransfer]=useState(false);
+  const transfers=useTransfers("sent");
+  useEffect(()=>{setSelectedTransfer(null);setProgressOpen(false);setSendOpen(false);},[address]);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
     pool,
   );
-  const insight = useMemo(() => weeklyActivity(notes), [notes]);
+  const activity=usePaymentActivity(notes);
+  // Activity spans every pool; keep the selected asset's rows only.
+  const rows = useMemo(
+    () => activity.rows.filter((r) => r.scope === pool.scope),
+    [activity.rows, pool.scope],
+  );
+  const insight = useMemo(() => weeklyActivity(rows), [rows]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -71,6 +86,7 @@ export function Dashboard() {
         description="Your private balance, payment link and recent activity."
       />
 
+      <PendingTransfersNotice record={transfers.pending} onOpen={record=>{setSelectedTransfer(record);setStartTransfer(false);setProgressOpen(true);}}/>
       {needsUsername ? (
         <div className="mb-4 flex flex-col gap-4 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -107,6 +123,7 @@ export function Dashboard() {
             unlockLabel={unlockLabel(recoveryMethod)}
             onUnlock={promptUnlock}
             onReceive={username ? () => setReceiveOpen(true) : undefined}
+            onSend={username ? ()=>{if(transfers.pending){setSelectedTransfer(transfers.pending);setStartTransfer(false);setProgressOpen(true);}else setSendOpen(true);} : undefined}
             onAddFunds={() => setAddFundsOpen(true)}
             cashOutHref={WITHDRAW_PATH}
             onRefresh={refresh}
@@ -129,6 +146,7 @@ export function Dashboard() {
           ) : (
             <ActivityFeed
               notes={notes}
+              rows={rows}
               loading={loading}
               limit={5}
               showSeeAll
@@ -153,6 +171,8 @@ export function Dashboard() {
         <RequestsTile />
       </section>
       <CreateRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
+      <SendTransferDialog open={sendOpen} onOpenChange={setSendOpen} onCreated={record=>{setSelectedTransfer(record);setStartTransfer(true);setProgressOpen(true);}}/>
+      {selectedTransfer&&<TransferProgress record={selectedTransfer} open={progressOpen} autoStart={startTransfer} onClose={()=>setProgressOpen(false)}/>}
       <ReceiveDialog
         open={receiveOpen}
         onClose={() => setReceiveOpen(false)}

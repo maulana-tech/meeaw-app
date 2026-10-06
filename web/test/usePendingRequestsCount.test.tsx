@@ -10,8 +10,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/components/WalletProvider", () => ({
-  useWallet: () => ({ address: mocks.address }),
-  useOptionalWallet: () => ({ address: mocks.address }),
+  useOptionalWallet:()=>({address:mocks.address}),
+  useWallet: () => ({
+    address: mocks.address,
+  }),
 }));
 
 vi.mock("../src/trpc/client", () => ({
