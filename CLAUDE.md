@@ -21,7 +21,8 @@ pnpm --filter web migrate:up              # migrate-mongo, reads web/.env.local 
 
 pnpm contract:test                        # Hardhat tests — generate real proofs from web/public/zk
 pnpm --filter contracts abis              # compile + regenerate web/src/lib/abi.ts
-DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet   # deploys all contracts, writes web/.env.local
+DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet   # deploys a pool, writes review candidates to .deploy-candidates/
+ASSET=AUSD pnpm deploy:testnet            # adds a pool for AUSD/USDT0/MUSD next to USDC (TOKEN_ADDRESS, else a mock on testnet)
 
 circuits/build.sh                         # needs circom 2 + snarkjs; dev-only trusted setup
 cd indexer && pnpm codegen && pnpm dev     # Envio HyperIndex (Node >= 22); pnpm test / pnpm typecheck

@@ -186,10 +186,15 @@ describe("MaweeRegistry gasless", () => {
 });
 
 describe("MaweePool gasless deposit", () => {
-  async function deploy() {
+  // `asset` swaps MockUSDC for another 6-decimal permit stablecoin.
+  async function deploy(asset?: [name: string, symbol: string]) {
     const [admin, relayer, payer] = await hre.viem.getWalletClients();
     const poseidon = await hre.viem.deployContract("poseidon-solidity/PoseidonT3.sol:PoseidonT3");
-    const usdc = await hre.viem.deployContract("MockUSDC");
+    const usdc = asset
+      ? ((await hre.viem.deployContract("MockStablecoin", asset)) as unknown as Awaited<
+          ReturnType<typeof hre.viem.deployContract<"MockUSDC">>
+        >)
+      : await hre.viem.deployContract("MockUSDC");
     const dv = await hre.viem.deployContract("DepositVerifier");
     const wv = await hre.viem.deployContract("WithdrawVerifier");
     const tv = await hre.viem.deployContract("TransferVerifier");
@@ -287,6 +292,21 @@ describe("MaweePool gasless deposit", () => {
     expect(payerGasAfter).to.equal(payerGasBefore); // the payer spent no gas
     const [event] = await pool.getEvents.Deposit();
     expect(event.args.ciphertext).to.equal(ciphertext);
+  });
+
+  it("takes any 6-decimal permit stablecoin the same way (mock AUSD)", async () => {
+    const ctx = await deploy(["Mock Agora USD", "AUSD"]);
+    const { relayer, payer, usdc: ausd, pool } = ctx;
+    expect(await ausd.read.symbol()).to.equal("AUSD");
+    const n = await note(7_000_000n);
+    const ciphertext = "0xa1a2" as Hex;
+    const s = await signAll(ctx, n.commitment, 7_000_000n, ciphertext);
+    await pool.write.depositWithAuthorization(
+      [payer.account.address, n.commitment, 7_000_000n, n.proof, s.ephemeralPk, ciphertext, s.dl, s.signature, s.permit],
+      { account: relayer.account },
+    );
+    expect(await ausd.read.balanceOf([pool.address])).to.equal(7_000_000n);
+    expect((await pool.read.token()).toLowerCase()).to.equal(ausd.address.toLowerCase());
   });
 
   it("rejects a relayer that swaps the commitment for its own note", async () => {

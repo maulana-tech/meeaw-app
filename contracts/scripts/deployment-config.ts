@@ -12,7 +12,23 @@ export type CandidatePool = Readonly<{
   confirmations?: number;
   role?: "active" | "legacy";
   requestCapable?: boolean;
+  /** Stablecoin the pool holds; absent means USDC (pre multi-asset). */
+  asset?: string;
+  /** Testnet mock token anyone can mint. */
+  mintable?: boolean;
 }>;
+
+// Must match ASSET_SYMBOLS in web/src/lib/assets.ts.
+export const ASSETS = ["USDC", "AUSD", "USDT0", "MUSD"] as const;
+export type AssetSymbol = (typeof ASSETS)[number];
+export const MAINNET_TOKENS: Record<AssetSymbol, Hex> = {
+  USDC: "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+  AUSD: "0x00000000efe302beaa2b3e6e1b18d08d69a9012a",
+  USDT0: "0xe7cd86e13ac4309349f30b3435a9d337750fc82d",
+  MUSD: "0xaca92e438df0b2401ff60da7e4337b687a2435da",
+};
+const assetOf = (pool: { asset?: unknown }) =>
+  (pool.asset ?? "USDC") as string;
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -32,7 +48,8 @@ function validatePool(pool: CandidatePool, chainId: number): void {
     pool.deployBlock < 0 ||
     !Number.isSafeInteger(pool.tokenDecimals) ||
     pool.tokenDecimals < 0 ||
-    pool.tokenDecimals > 18
+    pool.tokenDecimals > 18 ||
+    !(ASSETS as readonly string[]).includes(assetOf(pool))
   ) {
     throw new Error("Deployment pool descriptor is invalid.");
   }
@@ -61,6 +78,9 @@ export function candidateManifest(input: {
   }
   validatePool(input.newPool, input.chainId);
   const activeConfirmations = confirmations(input.confirmations);
+  // Only pools holding the same asset are replaced; other assets keep their
+  // active pool and request setting untouched.
+  const newAsset = assetOf(input.newPool);
 
   let prior: unknown = [];
   if (input.priorManifest) {
@@ -91,6 +111,8 @@ export function candidateManifest(input: {
       "confirmations",
       "role",
       "requestCapable",
+      "asset",
+      "mintable",
     ]);
     if (Object.keys(pool).some((key) => !allowed.has(key))) {
       throw new Error("Existing pool manifest contains unsupported data.");
@@ -107,7 +129,9 @@ export function candidateManifest(input: {
       (pool.tokenDecimals as number) > 18 ||
       pool.depth !== 20 ||
       !["active", "legacy"].includes(pool.role as string) ||
-      typeof pool.requestCapable !== "boolean"
+      typeof pool.requestCapable !== "boolean" ||
+      !(ASSETS as readonly string[]).includes(assetOf(pool)) ||
+      (pool.mintable !== undefined && typeof pool.mintable !== "boolean")
     ) {
       throw new Error(
         "Existing public pool manifest cannot be retained safely.",
@@ -121,8 +145,14 @@ export function candidateManifest(input: {
       tokenDecimals: pool.tokenDecimals as number,
       depth: 20,
       confirmations: confirmations(pool.confirmations ?? 1),
-      role: "legacy",
-      requestCapable: false,
+      ...(assetOf(pool) === newAsset
+        ? { role: "legacy" as const, requestCapable: false }
+        : {
+            role: pool.role as "active" | "legacy",
+            requestCapable: pool.requestCapable as boolean,
+          }),
+      asset: assetOf(pool),
+      ...(pool.mintable === undefined ? {} : { mintable: pool.mintable as boolean }),
     };
   });
 
@@ -140,8 +170,12 @@ export function candidateManifest(input: {
         token: input.previousPool.token.toLowerCase() as Hex,
         depth: 20,
         confirmations: confirmations(input.previousPool.confirmations ?? 1),
-        role: "legacy",
-        requestCapable: false,
+        // Without a manifest the env pool is the live USDC pool; it only steps
+        // down when the new pool holds the same asset.
+        ...(assetOf(input.previousPool) === newAsset
+          ? { role: "legacy" as const, requestCapable: false }
+          : { role: "active" as const, requestCapable: true }),
+        asset: assetOf(input.previousPool),
       });
     }
   }
@@ -153,7 +187,9 @@ export function candidateManifest(input: {
     depth: 20,
     confirmations: activeConfirmations,
     role: "active",
-    requestCapable: true,
+    // Payment requests are USDC-only for now.
+    requestCapable: input.newPool.requestCapable ?? newAsset === "USDC",
+    asset: newAsset,
   };
   const manifest = [
     ...normalized.filter(
@@ -260,7 +296,8 @@ export function manifestForChain(
 export function renderIndexerCandidate(
   source: string,
   chainId: number,
-  startBlock: bigint,
+  /** null keeps the configured start block (pools already indexed stay live). */
+  startBlock: bigint | null,
   addresses: { Pool: readonly string[]; Registry: string },
 ): string {
   const lines = source.split("\n");
@@ -285,7 +322,7 @@ export function renderIndexerCandidate(
 
     const start = line.match(/^(\s*start_block:\s*)\d+\s*$/);
     if (start) {
-      lines[index] = `${start[1]}${startBlock}`;
+      if (startBlock !== null) lines[index] = `${start[1]}${startBlock}`;
       targetStartBlocks += 1;
       continue;
     }
@@ -367,8 +404,10 @@ export function writeDeploymentCandidates(input: {
   webValues: Readonly<Record<string, string>>;
   indexerConfig: string;
 }) {
-  const targets = deploymentOutputPaths(input.root, input);
+  // Resolve symlinks first (macOS tmpdir is /var -> /private/var) so the
+  // containment check compares like with like.
   const resolvedRoot = fs.realpathSync(input.root);
+  const targets = deploymentOutputPaths(resolvedRoot, input);
   const resolvedTargets = path.resolve(targets.directory);
   const relative = path.relative(resolvedRoot, resolvedTargets);
   if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
