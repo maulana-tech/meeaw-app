@@ -1,4 +1,4 @@
-import type { MyNote } from "../../lib/notes";
+import type { ActivityRow } from "../../features/payments/activityTypes";
 
 export type WeeklyActivity = {
   buckets: number[];
@@ -7,6 +7,8 @@ export type WeeklyActivity = {
   /** USDC base units received / cashed out over the same seven days. */
   receivedAmount: bigint;
   cashedOutAmount: bigint;
+  sent: number;
+  sentAmount: bigint;
 };
 
 function validDate(value: string | undefined): Date | null {
@@ -16,7 +18,7 @@ function validDate(value: string | undefined): Date | null {
 }
 
 export function weeklyActivity(
-  notes: MyNote[],
+  rows: readonly ActivityRow[],
   now = new Date(),
 ): WeeklyActivity {
   const firstDay = new Date(
@@ -29,10 +31,11 @@ export function weeklyActivity(
   let cashedOut = 0;
   let receivedAmount = 0n;
   let cashedOutAmount = 0n;
+  let sent=0,sentAmount=0n;
 
   function add(
     value: string | undefined,
-    kind: "received" | "cashedOut",
+    kind: "received" | "cashedOut" | "sent",
     amount: bigint,
   ) {
     const date = validDate(value);
@@ -50,16 +53,13 @@ export function weeklyActivity(
     if (kind === "received") {
       received += 1;
       receivedAmount += amount;
-    } else {
+    } else if(kind==="cashedOut") {
       cashedOut += 1;
       cashedOutAmount += amount;
-    }
+    } else {sent+=1;sentAmount+=amount;}
   }
 
-  for (const note of notes) {
-    add(note.receivedAt, "received", note.amount);
-    add(note.spentAt, "cashedOut", note.amount);
-  }
+  for(const row of rows)if(row.status==="confirmed"&&row.amount!==null&&(row.kind==="received"||row.kind==="cashedOut"||row.kind==="sent"))add(row.at,row.kind,row.amount);
 
   return {
     buckets,
@@ -67,5 +67,7 @@ export function weeklyActivity(
     cashedOut,
     receivedAmount,
     cashedOutAmount,
+    sent,
+    sentAmount,
   };
 }

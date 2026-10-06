@@ -47,6 +47,7 @@ vi.mock("../src/lib/deposit", () => ({ payIntoNote: vi.fn() }));
 
 vi.mock("../src/components/WalletProvider", () => ({
   useWallet: mocks.useWallet,
+  useOptionalWallet:mocks.useWallet,
 }));
 vi.mock("../src/lib/notes", () => ({
   getAccount: mocks.getAccount,

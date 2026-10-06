@@ -71,6 +71,7 @@ export function useMyNotes(
             refresh: false,
             pool,
             includeRequestRecovery: true,
+            includeTransferRecovery: true,
           });
           if (!cancelled && cached.mirrorAvailable) {
             applyResult(cached);
@@ -81,6 +82,7 @@ export function useMyNotes(
         const result = await scanMyNotes(account, {
           pool,
           includeRequestRecovery: true,
+          includeTransferRecovery: true,
         });
         if (!cancelled) applyResult(result);
       } catch (e) {

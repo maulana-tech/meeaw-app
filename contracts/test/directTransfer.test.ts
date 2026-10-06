@@ -1,0 +1,30 @@
+import {expect} from "chai";
+import {b32,deployPoolFixture,depositOwnedNote,expectRevert,H,makeMergeProof,makeTransferProof,output,rememberOwned,merkleProof,syncLeaves,prove} from "./helpers/poolFixture";
+describe("direct private transfer lifecycle",()=>{
+  it("combines fragmented balance, sends once, and lets the recipient spend the recovered note",async()=>{
+    const f=await deployPoolFixture(),sender=900n,recipient=4242n;
+    await depositOwnedNote(f,{amount:10_000_000n,ownerSecret:sender,salt:101n});
+    await depositOwnedNote(f,{amount:15_000_000n,ownerSecret:sender,salt:102n});
+    const merge=await makeMergeProof(f,{indices:[0,1],ownerSecret:sender,outSalt:103n});
+    await f.pool.write.merge([merge.root,merge.nullifiers[0],merge.nullifiers[1],merge.proof,output(merge.outputCommitment)]);
+    const input=await rememberOwned(f,BigInt(merge.outputCommitment),{amount:merge.outputAmount,ownerSecret:sender,salt:103n});
+    const recipientSalt=777n,recipientPk=await H([recipient]);
+    const sent=await makeTransferProof(f,{index:input,ownerSecret:sender,recipientPk,recipientAmount:20_000_000n,recipientSalt,changeSalt:104n});
+    await f.pool.write.transfer([sent.root,sent.nullifier,sent.proof,output(sent.recipientCommitment),output(sent.changeCommitment)]);
+    expect(sent.changeAmount).to.equal(5_000_000n);
+    const recipientIndex=await rememberOwned(f,BigInt(sent.recipientCommitment),{amount:20_000_000n,ownerSecret:recipient,salt:recipientSalt});
+    const changeIndex=await rememberOwned(f,BigInt(sent.changeCommitment),{amount:5_000_000n,ownerSecret:sender,salt:104n});
+    expect(f.owned.get(changeIndex)?.amount).to.equal(5_000_000n);
+    await depositOwnedNote(f,{amount:30_000_000n,ownerSecret:sender,salt:105n});
+    const anotherIndex=(await syncLeaves(f)).length-1;
+    const duplicate=await makeTransferProof(f,{index:anotherIndex,ownerSecret:sender,recipientPk,recipientAmount:20_000_000n,recipientSalt,changeSalt:106n});
+    await expectRevert(f.pool.write.transfer([duplicate.root,duplicate.nullifier,duplicate.proof,output(duplicate.recipientCommitment),output(duplicate.changeCommitment)]),"DuplicateCommitment");
+    expect(await f.pool.read.isSpent([duplicate.nullifier])).to.equal(false);
+    const path=await merkleProof(await syncLeaves(f),recipientIndex),nf=await H([recipient,BigInt(recipientIndex)]),destination=f.payer.account.address;
+    const proof=await prove("withdraw",{root:String(path.root),nullifier:String(nf),recipient:String(BigInt(destination)),amount:"20000000",ownerSecret:String(recipient),salt:String(recipientSalt),pathElements:path.pathElements.map(String),pathIndices:path.pathIndices});
+    const before=await f.usdc.read.balanceOf([destination]);
+    await f.pool.write.withdraw([destination,20_000_000n,b32(path.root),b32(nf),proof]);
+    expect(await f.usdc.read.balanceOf([destination])).to.equal(before+20_000_000n);
+    expect(await f.pool.read.isSpent([b32(nf)])).to.equal(true);
+  });
+});
