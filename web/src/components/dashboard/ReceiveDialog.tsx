@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { useCreatePaymentLink } from "../../features/paymentLinks/hooks/useCreatePaymentLink";
 import type { PaymentLink } from "../../features/paymentLinks/types";
+import { ASSETS } from "../../lib/assets";
 import { payUrl } from "../../lib/paymentLinks";
 import { cn } from "../../lib/utils";
 import { createLinkFormInput } from "../../server/modules/paymentLinks/paymentLinks.schema";
@@ -22,6 +23,7 @@ import {
 import { linenFieldClass, linenInsetClass } from "../ui/glass";
 import { Input } from "../ui/input";
 import { ToastFeedback } from "../ui/toast-feedback";
+import { useSelectedPool } from "./useSelectedPool";
 
 type Step = "method" | "configure" | "creating" | "done";
 type CreateLinkFormInput = z.input<typeof createLinkFormInput>;
@@ -44,6 +46,8 @@ export function ReceiveDialog({
   origin: string;
   onRequest?: () => void;
 }) {
+  const pool = useSelectedPool(),
+    asset = ASSETS[pool.asset].label;
   const [step, setStep] = useState<Step>("method");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [link, setLink] = useState<PaymentLink | null>(null);
@@ -95,7 +99,11 @@ export function ReceiveDialog({
     setSubmitError(null);
     setStep("creating");
     try {
-      const created = await createPaymentLink({ ...values, username });
+      const created = await createPaymentLink({
+        ...values,
+        username,
+        asset: pool.asset,
+      });
       setLink(created);
       setStep("done");
     } catch (e) {
@@ -246,7 +254,7 @@ export function ReceiveDialog({
               htmlFor="receive-amount"
               className="text-sm text-foreground/70"
             >
-              Amount (USDC){" "}
+              Amount ({asset}){" "}
               <span className="text-foreground/60">— optional</span>
             </label>
             <Input

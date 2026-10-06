@@ -84,11 +84,11 @@ export async function expectRevert(promise: Promise<unknown>, error: string) {
 
 type OwnedNote = { amount: bigint; ownerSecret: bigint; salt: bigint };
 
-export async function deployPoolFixture() {
+export async function deployPoolFixture(asset?:{name:string;symbol:string}) {
   const [admin, payer, relayer] = await hre.viem.getWalletClients();
   const publicClient = await hre.viem.getPublicClient();
   const poseidon = await hre.viem.deployContract("poseidon-solidity/PoseidonT3.sol:PoseidonT3");
-  const usdc = await hre.viem.deployContract("MockUSDC");
+  const usdc = asset?await hre.viem.deployContract("MockStablecoin",[asset.name,asset.symbol]):await hre.viem.deployContract("MockUSDC");
   const dv = await hre.viem.deployContract("DepositVerifier");
   const wv = await hre.viem.deployContract("WithdrawVerifier");
   const tv = await hre.viem.deployContract("TransferVerifier");

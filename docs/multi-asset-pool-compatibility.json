@@ -1,0 +1,35 @@
+[
+  {
+    "asset": "USDC",
+    "compatible": null,
+    "status": "unverified-getter-reverted",
+    "error": "ContractFunctionExecutionError / ContractFunctionRevertedError / CallExecutionError / ExecutionRevertedError / RpcRequestError / "
+  },
+  {
+    "asset": "AUSD",
+    "pool": "0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092",
+    "chainId": 10143,
+    "tokenMatches": true,
+    "mergeVerifier": "0xa2690216aa141301f52837415738C36A05c9dFA1",
+    "verifierMatches": true,
+    "compatible": true
+  },
+  {
+    "asset": "USDT0",
+    "pool": "0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d",
+    "chainId": 10143,
+    "tokenMatches": true,
+    "mergeVerifier": "0x58c51CAd7F9dFc56D150f3e2260f16D63C402d25",
+    "verifierMatches": true,
+    "compatible": true
+  },
+  {
+    "asset": "MUSD",
+    "pool": "0x8df03a1b169dda861d633035b945a484bcf234ca",
+    "chainId": 10143,
+    "tokenMatches": true,
+    "mergeVerifier": "0x05eFA5c30208342f0bf2A02E489B2407391d8C35",
+    "verifierMatches": true,
+    "compatible": true
+  }
+]

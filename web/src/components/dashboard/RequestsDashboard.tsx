@@ -12,7 +12,8 @@ import { useRequestPayment } from "../../features/requests/hooks/useRequestPayme
 import type { RequestRow } from "../../features/requests/hooks/useRequests";
 import { useRequests } from "../../features/requests/hooks/useRequests";
 import type { PaymentRequest } from "../../features/requests/types";
-import { requestPool } from "../../lib/pools";
+import { ASSETS } from "../../lib/assets";
+import { findPool, requestPool } from "../../lib/pools";
 import { api } from "../../trpc/client";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -328,6 +329,8 @@ function RequestRowView({
   onTransition: () => void;
 }) {
   const { record } = row;
+  const pool = findPool(record.pool),
+    asset = pool ? ASSETS[pool.asset ?? "USDC"].label : "Unknown asset";
   const other = direction === "received" ? record.requester : record.addressee;
   const label =
     direction === "received"
@@ -403,7 +406,7 @@ function RequestRowView({
           {row.amount !== null ? (
             <p className="text-sm font-medium tabular-nums">
               {formatAmount(row.amount)}
-              <span className="ml-1 text-(--dash-ash)">USDC</span>
+              <span className="ml-1 text-(--dash-ash)">{asset}</span>
             </p>
           ) : (
             <p className="text-sm text-(--dash-ash)">Unlock to view amount</p>

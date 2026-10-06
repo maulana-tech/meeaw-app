@@ -1,8 +1,8 @@
-import { network, poolAddress } from "./chain";
+import type { AssetSymbol } from "./assets";
+import { network } from "./chain";
 import {
   bytesToHex,
   commitment as commitmentHash,
-  fromBaseUnits,
   merkleProof,
   ownerPk as ownerPkHash,
   poseidonHash,
@@ -10,6 +10,8 @@ import {
   toBE32,
 } from "./crypto";
 import type { LocalAccount, MyNote, ScanResult } from "./notes";
+import { formatAssetUnits } from "./paymentAsset";
+import { activePool, resolvePool } from "./pools";
 
 export const DISCLOSURE_VERSION = 1 as const;
 
@@ -30,6 +32,8 @@ export type DisclosureBundle = {
   pathIndices: number[];
   username: string | null;
   disclosedAt: string; // ISO-8601
+  asset?: AssetSymbol;
+  tokenDecimals?: number;
 };
 
 export async function buildDisclosure(params: {
@@ -39,6 +43,9 @@ export async function buildDisclosure(params: {
   username?: string | null;
 }): Promise<DisclosureBundle> {
   const { acct, scan, note, username } = params;
+  const pool = scan.scope ? resolvePool(scan.scope) : activePool();
+  if (note.scope && note.scope !== pool.scope)
+    throw new Error("The receipt belongs to another pool.");
 
   const ownerPk = await ownerPkHash(acct.ownerSecret);
   const comm = await commitmentHash(note.amount, ownerPk, note.salt);
@@ -46,7 +53,7 @@ export async function buildDisclosure(params: {
 
   return {
     version: DISCLOSURE_VERSION,
-    pool: poolAddress,
+    pool: pool.address,
     network,
     leafIndex: note.leafIndex,
     commitmentHex: bytesToHex(toBE32(comm)),
@@ -54,7 +61,9 @@ export async function buildDisclosure(params: {
     rootHex: bytesToHex(toBE32(mp.root)),
     root: mp.root.toString(),
     amount: note.amount.toString(),
-    amountLabel: fromBaseUnits(note.amount),
+    amountLabel: formatAssetUnits(note.amount, pool.tokenDecimals),
+    asset: pool.asset,
+    tokenDecimals: pool.tokenDecimals,
     ownerPk: ownerPk.toString(),
     salt: note.salt.toString(),
     pathElements: mp.pathElements.map((x) => x.toString()),

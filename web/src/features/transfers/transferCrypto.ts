@@ -122,7 +122,7 @@ export async function createSignedTransfer(
   const keys = await localParticipantKeys(input.account);
   if (
     input.pool.role !== "active" ||
-    !input.pool.requestCapable ||
+    !(input.pool.transferCapable ?? input.pool.requestCapable) ||
     input.amount <= 0n ||
     input.amount > (1n << 64n) - 1n
   )

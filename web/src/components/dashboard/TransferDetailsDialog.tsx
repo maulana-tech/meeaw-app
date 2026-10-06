@@ -5,8 +5,8 @@ import type {
   TransferPayload,
   TransferRecord,
 } from "../../features/transfers/types";
-import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount } from "../../lib/notes";
+import { formatPaymentAmount } from "../../lib/paymentAsset";
 import { resolvePool } from "../../lib/pools";
 import { Button } from "../ui/button";
 import {
@@ -67,7 +67,7 @@ export function TransferDetailsDialog({
         {payload ? (
           <>
             <p className="text-2xl tabular-nums">
-              {fromBaseUnits(BigInt(payload.amount))} USDC
+              {formatPaymentAmount(BigInt(payload.amount), record.pool)}
             </p>
             {payload.note && (
               <p className="break-words whitespace-pre-wrap text-sm">

@@ -8,8 +8,9 @@ import {
   vi,
 } from "vitest";
 import { openIsolatedRequestDb } from "./helpers/requestDb";
-import { makeTransferFixture } from "./helpers/transferFixtures";
 import { testParticipant, testPool } from "./helpers/requestFixtures";
+import { makeTransferFixture } from "./helpers/transferFixtures";
+
 const deps = vi.hoisted(() => ({
   db: null as unknown,
   wallet: "",
@@ -25,13 +26,16 @@ vi.mock("../src/server/modules/usernames/usernames.service", () => ({
 vi.mock("../src/lib/pools", async (original) => ({
   ...(await original<typeof import("../src/lib/pools")>()),
   requestPool: () => testPool,
+  resolvePool: () => testPool,
 }));
+
+import { createSignedTransfer } from "../src/features/transfers/transferCrypto";
 import {
   createTransfer,
   getTransfer,
   listTransfers,
 } from "../src/server/modules/transfers/transfers.service";
-import { createSignedTransfer } from "../src/features/transfers/transferCrypto";
+
 describe("transfer participant authorization", () => {
   let db: Awaited<ReturnType<typeof openIsolatedRequestDb>>;
   beforeAll(async () => {

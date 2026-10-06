@@ -33,7 +33,7 @@ vi.mock("../src/lib/notes", () => ({
   scanMyNotes: deps.scanMyNotes,
 }));
 vi.mock("../src/lib/pools", () => ({
-  activePool: () => ({
+  resolvePool: () => ({
     scope: "31337:0x1111111111111111111111111111111111111111",
     chainId: 31337,
     address: "0x1111111111111111111111111111111111111111",

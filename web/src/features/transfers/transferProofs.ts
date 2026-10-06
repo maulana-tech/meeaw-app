@@ -53,7 +53,7 @@ export async function buildTransferSubmission(
     scan.scope !== r.pool ||
     pool.scope !== r.pool ||
     pool.role !== "active" ||
-    !pool.requestCapable ||
+    !(pool.transferCapable ?? pool.requestCapable) ||
     scan.health !== "healthy" ||
     op.transferId !== r.id ||
     op.id !== r.operationId ||

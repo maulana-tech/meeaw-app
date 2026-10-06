@@ -240,6 +240,7 @@ async function relayDeposit(
   proof: EvmProof,
   ephemeralPk: Hex,
   ciphertext: Hex,
+  isCurrent: () => boolean = () => true,
 ): Promise<{ leafIndex: number; txHash: string }> {
   const [poolNonce, allowance] = await Promise.all([
     publicClient.readContract({
@@ -272,6 +273,8 @@ async function relayDeposit(
       functionName: "nonces",
       args: [signer.address],
     });
+    if (!isCurrent())
+      throw new Error("The payment selection changed. Review again.");
     const permitSignature = await signer.walletClient.signTypedData({
       account: signer.address,
       ...permitTypedData({
@@ -293,6 +296,8 @@ async function relayDeposit(
     };
   }
 
+  if (!isCurrent())
+    throw new Error("The payment selection changed. Review again.");
   const signature = await signer.walletClient.signTypedData({
     account: signer.address,
     ...depositTypedData({
@@ -308,6 +313,8 @@ async function relayDeposit(
     }),
   });
 
+  if (!isCurrent())
+    throw new Error("The payment selection changed. Review again.");
   return api.relay.deposit.mutate({
     pool: pool.scope,
     payer: signer.address,
@@ -546,6 +553,7 @@ export async function poolDeposit(
   ephemeralPk: Uint8Array,
   ciphertext: Uint8Array,
   pool: PoolDescriptor = activePool(),
+  isCurrent: () => boolean = () => true,
 ): Promise<{ leafIndex: number; txHash: string }> {
   if (pool.role !== "active")
     throw new Error("This pool no longer takes deposits.");
@@ -558,6 +566,7 @@ export async function poolDeposit(
       proof,
       hexOf(ephemeralPk),
       hexOf(ciphertext),
+      isCurrent,
     );
   }
   const allowance = await publicClient.readContract({
@@ -567,6 +576,8 @@ export async function poolDeposit(
     args: [signer.address, pool.address],
   });
   if (allowance < amount) {
+    if (!isCurrent())
+      throw new Error("The payment selection changed. Review again.");
     await send(signer, {
       address: pool.token,
       abi: erc20Abi,
@@ -574,6 +585,8 @@ export async function poolDeposit(
       args: [pool.address, amount],
     });
   }
+  if (!isCurrent())
+    throw new Error("The payment selection changed. Review again.");
   const { hash, receipt } = await send(signer, {
     address: pool.address,
     abi: maweePoolAbi,

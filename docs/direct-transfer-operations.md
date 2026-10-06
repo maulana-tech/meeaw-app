@@ -1,12 +1,12 @@
 # Direct private transfers
 
-Direct sends use the active USDC pool, participant-encrypted signed intent records,
+Direct sends use the selected active eligible pool, participant-encrypted signed intent records,
 and the existing transfer/Merge circuits. No new pool deployment is required.
 Legacy pool balances remain withdrawal-only.
 
 ## User flow
 
-Open **Send** on the private balance card, enter a registered username, USDC amount,
+Open **Send** on the private balance card, enter a registered username, an amount in that asset,
 and optional note, then review and confirm. Notes are limited to 200 Unicode code
 points. The sender and recipient can decrypt their own copy after unlocking.
 Mawee combines fragmented notes without exposing note selection.
@@ -108,3 +108,11 @@ Injected receipt/transport tests exercise failures separately from real settleme
 An authenticated two-user browser/testnet demonstration is distinct evidence and
 must not be inferred from unit tests, fixture screenshots, or local contract tests.
 No production migration, deployment, activation, push, or merge is implied.
+
+## Multi-asset eligibility
+
+Each new send uses an active pool with `transferCapable`; an omitted flag inherits
+`requestCapable` for older manifests. Pending lookups can filter by pool. Recovery
+uses the original submitted scope even after the selected asset changes. Verify
+each asset's token and Merge verifier before activation; see
+[multi-asset evidence and behavior](multi-asset-payment-flows.md).

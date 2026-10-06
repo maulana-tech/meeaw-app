@@ -15,10 +15,12 @@ export function PaymentQrDialog({
   onOpenChange,
   url,
   triggerRef,
+  asset,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   url: string;
+  asset?: string;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   function handleOpenChange(nextOpen: boolean) {
@@ -35,6 +37,7 @@ export function PaymentQrDialog({
           <DialogTitle>Payment link QR code</DialogTitle>
           <DialogDescription>
             Scan this code to open the payment link on another device.
+            {asset ? ` Payment asset: ${asset}.` : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="aspect-square w-full rounded-(--dash-radius-sm) bg-[#fff] p-4">

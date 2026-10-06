@@ -9,9 +9,10 @@ import {
   parseTransferAmount,
   validateTransferNote,
 } from "../../features/transfers/validation";
-import { fromBaseUnits } from "../../lib/crypto";
+import { ASSETS } from "../../lib/assets";
 import { getAccount, scanMyNotes } from "../../lib/notes";
-import { requestPool } from "../../lib/pools";
+import { formatAssetUnits } from "../../lib/paymentAsset";
+import { type PoolDescriptor, requestPool } from "../../lib/pools";
 import { api } from "../../trpc/client";
 import { Button } from "../ui/button";
 import {
@@ -47,10 +48,12 @@ export function SendTransferDialog({
   open,
   onOpenChange,
   onCreated,
+  pool: providedPool,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (record: TransferRecord) => void;
+  pool?: PoolDescriptor;
 }) {
   const wallet = useWallet(),
     [username, setUsername] = useState(""),
@@ -59,8 +62,10 @@ export function SendTransferDialog({
     [review, setReview] = useState<Review | null>(null),
     [error, setError] = useState<string | null>(null),
     [working, setWorking] = useState(false);
+  const chosenPool = providedPool ?? requestPool(),
+    asset = chosenPool ? ASSETS[chosenPool.asset ?? "USDC"].label : "USDC";
   const busy = useRef(false),
-    identity = `${wallet.address.toLowerCase()}:${wallet.accountUnlocked}:${open}`,
+    identity = `${wallet.address.toLowerCase()}:${wallet.accountUnlocked}:${open}:${chosenPool?.scope ?? ""}`,
     session = useRef(identity);
   session.current = identity;
   useEffect(() => {
@@ -82,10 +87,17 @@ export function SendTransferDialog({
       const handle = username.trim().replace(/^@/, "").toLowerCase();
       if (!/^[a-z0-9_]{3,32}$/.test(handle))
         throw new Error("Enter a registered @username.");
-      const pool = requestPool(),
+      const pool = chosenPool,
         account = getAccount();
       if (!pool || !account || !wallet.username)
         throw new Error("Unlock your registered Mawee account before sending.");
+      if (
+        pool.role !== "active" ||
+        !(pool.transferCapable ?? pool.requestCapable)
+      )
+        throw new Error(
+          `${asset} private sending is not enabled for this pool.`,
+        );
       const units = parseTransferAmount(amount, pool.tokenDecimals),
         memo = validateTransferNote(note);
       const [sender, recipient, status, scan] = await Promise.all([
@@ -112,7 +124,7 @@ export function SendTransferDialog({
         throw new Error("Refresh your balance before sending.");
       if (scan.claimable < units)
         throw new Error(
-          "Your active private USDC balance is too low. Legacy balances must be cashed out separately.",
+          `Your active private ${asset} balance is too low. Legacy balances must be cashed out separately.`,
         );
       setReview({ sender, recipient, amount: units, note: memo, identity: at });
     } catch (e) {
@@ -135,7 +147,7 @@ export function SendTransferDialog({
     const at = session.current;
     try {
       const account = getAccount(),
-        pool = requestPool();
+        pool = chosenPool;
       if (!account || !pool || at !== review.identity)
         throw new Error("Unlock this account and review the transfer again.");
       const currentRecipient = await resolve(review.recipient.username);
@@ -188,7 +200,7 @@ export function SendTransferDialog({
             {review ? "Review transfer" : "Send privately"}
           </DialogTitle>
           <DialogDescription>
-            Send USDC from your private balance to another Mawee user.
+            Send {asset} from your private balance to another Mawee user.
           </DialogDescription>
         </DialogHeader>
         {!wallet.accountUnlocked ? (
@@ -206,7 +218,11 @@ export function SendTransferDialog({
               <div className="flex justify-between gap-4">
                 <dt>Amount</dt>
                 <dd className="font-semibold tabular-nums">
-                  {fromBaseUnits(review.amount)} USDC
+                  {formatAssetUnits(
+                    review.amount,
+                    chosenPool?.tokenDecimals ?? 6,
+                  )}{" "}
+                  {asset}
                 </dd>
               </div>
               {review.note && (
@@ -262,7 +278,7 @@ export function SendTransferDialog({
               className="grid gap-2 text-sm font-medium"
               htmlFor="send-amount"
             >
-              Amount · USDC
+              Amount · {asset}
               <Input
                 appearance="linen"
                 id="send-amount"

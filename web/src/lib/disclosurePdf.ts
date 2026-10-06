@@ -4,6 +4,7 @@
 
 import type { jsPDF } from "jspdf";
 import type { DisclosureBundle } from "./disclosure";
+import { assetLabelFor } from "./paymentAsset";
 
 export const DISCLOSURE_PDF_PALETTE = {
   obsidian: "#1A1F12",
@@ -181,7 +182,7 @@ export async function renderDisclosurePdf(
     subject: "Confirmation of a received private payment",
     author: "Mawee",
     creator: "Mawee",
-    keywords: "Mawee, payment receipt, USDC, Monad",
+    keywords: `Mawee, payment receipt, ${assetLabelFor(bundle.asset ?? "USDC")}, Monad`,
   });
 
   // Page 1: friendly receipt
@@ -216,7 +217,11 @@ export async function renderDisclosurePdf(
   doc.text("Payment confirmation", MARGIN + 22, 260);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(32);
-  doc.text(`${bundle.amountLabel} USDC`, MARGIN + 22, 303);
+  doc.text(
+    `${bundle.amountLabel} ${assetLabelFor(bundle.asset ?? "USDC")}`,
+    MARGIN + 22,
+    303,
+  );
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(MUTED);

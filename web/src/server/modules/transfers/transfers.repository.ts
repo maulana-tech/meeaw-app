@@ -137,10 +137,11 @@ export class TransferRepository {
   async get(wallet: string, id: string) {
     return publicRecord(await this.getDoc(wallet, id));
   }
-  async pending(wallet: string) {
+  async pending(wallet: string, pool?: TransferRecord["pool"]) {
     const doc = await this.collection.findOne({
       "sender.wallet": wallet.toLowerCase(),
       status: "pending",
+      ...(pool ? { pool } : {}),
     });
     return doc ? publicRecord(doc) : null;
   }

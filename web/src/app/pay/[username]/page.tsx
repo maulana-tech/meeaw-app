@@ -3,7 +3,6 @@
 import { Loader } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
 import { Card } from "../../../components/ui/card";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePaymentLink } from "../../../features/paymentLinks/hooks/usePaymentLink";
@@ -116,8 +115,6 @@ export default function PayPage() {
       </section>
 
       <PayForm account={account} username={username} link={link} />
-
-      <PrivacyPoolStat className="pt-6" />
 
       <p className="pt-3 text-center text-xs text-brand-linen/50">
         Unlinkable receipt · encrypted to the recipient · Built on Monad

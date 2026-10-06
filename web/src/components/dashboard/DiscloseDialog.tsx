@@ -2,7 +2,6 @@
 
 import { Download, Loader } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { fromBaseUnits } from "../../lib/crypto";
 import {
   buildDisclosure,
   type DisclosureBundle,
@@ -10,6 +9,8 @@ import {
 } from "../../lib/disclosure";
 import { downloadDisclosurePdf } from "../../lib/disclosurePdf";
 import { getAccount, scanMyNotes } from "../../lib/notes";
+import { assetLabelFor, formatAssetUnits } from "../../lib/paymentAsset";
+import { activePool, type PoolDescriptor } from "../../lib/pools";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import {
@@ -29,12 +30,15 @@ export function DiscloseDialog({
   open,
   onClose,
   leafIndex,
+  pool: providedPool,
 }: {
   open: boolean;
   onClose: () => void;
   leafIndex: number | null;
+  pool?: PoolDescriptor;
 }) {
   const { username } = useWallet();
+  const pool = providedPool ?? activePool();
   const [step, setStep] = useState<Step>("building");
   const [error, setError] = useState<string | null>(null);
   const [bundle, setBundle] = useState<DisclosureBundle | null>(null);
@@ -47,7 +51,11 @@ export function DiscloseDialog({
     try {
       const acct = getAccount();
       if (!acct) throw new Error("No local account found on this device.");
-      const scan = await scanMyNotes(acct);
+      const scan = await scanMyNotes(acct, {
+        pool,
+        includeRequestRecovery: true,
+        includeTransferRecovery: true,
+      });
       const note = scan.notes.find((n) => n.leafIndex === leafIndex);
       if (!note) throw new Error("That payment is no longer available.");
       const disclosure = await buildDisclosure({
@@ -67,7 +75,7 @@ export function DiscloseDialog({
       setError(e instanceof Error ? e.message : "Failed to build proof.");
       setStep("error");
     }
-  }, [leafIndex, username]);
+  }, [leafIndex, username, pool]);
 
   useEffect(() => {
     if (open && leafIndex !== null) void build();
@@ -117,7 +125,11 @@ export function DiscloseDialog({
                   Payment received
                 </span>
                 <span className="font-heading text-2xl font-semibold text-foreground">
-                  {fromBaseUnits(BigInt(bundle.amount))} USDC
+                  {formatAssetUnits(
+                    BigInt(bundle.amount),
+                    bundle.tokenDecimals ?? 6,
+                  )}{" "}
+                  {assetLabelFor(bundle.asset ?? "USDC")}
                 </span>
               </div>
               <dl className="mt-3 grid gap-1.5 border-t border-foreground/15 pt-3 text-xs">
