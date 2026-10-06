@@ -1,7 +1,12 @@
 import { z } from "zod";
+import { env } from "../../../env";
+import { ASSET_SYMBOLS } from "../../../lib/assets";
 import { usernameSchema } from "../usernames/usernames.schema";
 
-const USDC_DECIMALS = 7;
+// Must match the client's toBaseUnits/fromBaseUnits. A hardcoded 7 (left over
+// from Stellar USDC) stored every fixed amount 10x too large.
+const USDC_DECIMALS = env.NEXT_PUBLIC_USDC_DECIMALS;
+const AMOUNT_PATTERN = new RegExp(`^\\d+(\\.\\d{0,${USDC_DECIMALS}})?$`);
 
 function decimalToBaseUnits(amount: string): bigint {
   const [whole, frac = ""] = amount.trim().split(".");
@@ -18,15 +23,15 @@ const amountInput = z
     if (value === null || value === undefined || value.trim() === "")
       return null;
     const trimmed = value.trim();
-    if (!/^\d+(\.\d{0,7})?$/.test(trimmed)) {
-      ctx.addIssue({ code: "custom", message: "Enter a valid USDC amount." });
+    if (!AMOUNT_PATTERN.test(trimmed)) {
+      ctx.addIssue({ code: "custom", message: "Enter a valid amount." });
       return z.NEVER;
     }
     const units = decimalToBaseUnits(trimmed);
-    if (units <= 0n) {
+    if (units <= 0n || units > (1n << 64n) - 1n) {
       ctx.addIssue({
         code: "custom",
-        message: "Enter an amount greater than zero.",
+        message: "Amount is outside the supported range.",
       });
       return z.NEVER;
     }
@@ -39,14 +44,17 @@ const amountFormField = z
     if (value === null || value === undefined || value.trim() === "")
       return null;
     const trimmed = value.trim();
-    if (!/^\d+(\.\d{0,7})?$/.test(trimmed)) {
-      ctx.addIssue({ code: "custom", message: "Enter a valid USDC amount." });
+    if (!AMOUNT_PATTERN.test(trimmed)) {
+      ctx.addIssue({ code: "custom", message: "Enter a valid amount." });
       return z.NEVER;
     }
-    if (decimalToBaseUnits(trimmed) <= 0n) {
+    if (
+      decimalToBaseUnits(trimmed) <= 0n ||
+      decimalToBaseUnits(trimmed) > (1n << 64n) - 1n
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "Enter an amount greater than zero.",
+        message: "Amount is outside the supported range.",
       });
       return z.NEVER;
     }
@@ -81,6 +89,7 @@ const labelInput = z
 export const createLinkInput = z
   .object({
     username: usernameSchema,
+    asset: z.enum(ASSET_SYMBOLS).default("USDC"),
     slug: slugInput,
     amount: amountInput,
     description: descriptionInput,
@@ -96,6 +105,7 @@ export const createLinkInput = z
 export const createLinkFormInput = z
   .object({
     username: usernameSchema,
+    asset: z.enum(ASSET_SYMBOLS).default("USDC"),
     slug: slugInput,
     amount: amountFormField,
     description: descriptionInput,
@@ -139,6 +149,8 @@ export const deleteLinkInput = z
   .strict();
 
 export const linkOutput = z.object({
+  asset: z.enum(ASSET_SYMBOLS).default("USDC"),
+  tokenDecimals: z.number().int().min(0).max(18).default(USDC_DECIMALS),
   id: z.string(),
   owner: z.string(),
   slug: z.string(),

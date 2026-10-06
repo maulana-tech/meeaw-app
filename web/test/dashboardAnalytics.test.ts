@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { weeklyActivity } from "../src/components/dashboard/dashboardAnalytics";
-import type { MyNote } from "../src/lib/notes";
+import type { ActivityRow } from "../src/features/payments/activityTypes";
 
-function note(overrides: Partial<MyNote>): MyNote {
+function note(overrides: Partial<ActivityRow>): ActivityRow {
   return {
-    leafIndex: 0,
+    id:"test",scope:"31337:0x1111111111111111111111111111111111111111",kind:"received",status:"confirmed",note:null,counterparty:null,at:"",txHash:null,leafIndex:0,locked:false,transferId:null,
     amount: 1n,
-    salt: 1n,
-    spent: false,
     ...overrides,
   };
 }
@@ -17,12 +15,12 @@ describe("weeklyActivity", () => {
     const now = new Date(2026, 7, 11, 15, 30);
     const result = weeklyActivity(
       [
-        note({ receivedAt: new Date(2026, 7, 5, 0, 0).toISOString() }),
-        note({ receivedAt: new Date(2026, 7, 11, 15, 30).toISOString() }),
+        note({ at: new Date(2026, 7, 5, 0, 0).toISOString() }),
+        note({ at: new Date(2026, 7, 11, 15, 30).toISOString() }),
         note({
-          receivedAt: new Date(2026, 7, 9, 12).toISOString(),
-          spentAt: new Date(2026, 7, 10, 8).toISOString(),
+          at: new Date(2026, 7, 9, 12).toISOString(),
         }),
+        note({kind:"cashedOut",at:new Date(2026,7,10,8).toISOString()}),
       ],
       now,
     );
@@ -33,6 +31,7 @@ describe("weeklyActivity", () => {
       cashedOut: 1,
       receivedAmount: 3n,
       cashedOutAmount: 1n,
+      sent:0,sentAmount:0n,
     });
   });
 
@@ -40,10 +39,10 @@ describe("weeklyActivity", () => {
     const now = new Date(2026, 7, 11, 15, 30);
     const result = weeklyActivity(
       [
-        note({ receivedAt: new Date(2026, 7, 4, 23, 59).toISOString() }),
-        note({ receivedAt: new Date(2026, 7, 11, 15, 31).toISOString() }),
-        note({ receivedAt: "not-a-date", spent: true }),
-        note({ spent: true }),
+        note({ at: new Date(2026, 7, 4, 23, 59).toISOString() }),
+        note({ at: new Date(2026, 7, 11, 15, 31).toISOString() }),
+        note({ at: "not-a-date" }),
+        note({}),
       ],
       now,
     );
@@ -54,6 +53,7 @@ describe("weeklyActivity", () => {
       cashedOut: 0,
       receivedAmount: 0n,
       cashedOutAmount: 0n,
+      sent:0,sentAmount:0n,
     });
   });
 });

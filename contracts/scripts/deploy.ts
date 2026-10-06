@@ -3,12 +3,20 @@
 //
 //   DEPLOYER_PRIVATE_KEY=<secret> pnpm --filter contracts exec hardhat run scripts/deploy.ts --network monadTestnet
 //   Inspect .deploy-candidates/<network>-<chain>-<block>-<pool>/ before activation.
+//
+// ASSET=AUSD|USDT0|MUSD adds a pool for that stablecoin next to the live USDC
+// pool instead of replacing it. TOKEN_ADDRESS names the token (required on
+// mainnet, where it must be the canonical one); on testnet a MockStablecoin is
+// deployed when it is unset.
 
 import fs from "node:fs";
 import path from "node:path";
 import hre from "hardhat";
 import { getAddress, isAddress } from "viem";
 import {
+  ASSETS,
+  type AssetSymbol,
+  MAINNET_TOKENS,
   candidateManifest,
   configuredIndexerAddresses,
   manifestForChain,
@@ -95,7 +103,17 @@ function previousPool(
   };
 }
 
+function requestedAsset(): AssetSymbol {
+  const asset = process.env.ASSET ?? "USDC";
+  if (!(ASSETS as readonly string[]).includes(asset)) {
+    throw new Error(`ASSET must be one of ${ASSETS.join(", ")}.`);
+  }
+  return asset as AssetSymbol;
+}
+
 async function main() {
+  const asset = requestedAsset();
+  const isUsdc = asset === "USDC";
   const [deployer] = await hre.viem.getWalletClients();
   if (!deployer) throw new Error("Set DEPLOYER_PRIVATE_KEY to deploy.");
   const publicClient = await hre.viem.getPublicClient();
@@ -109,14 +127,18 @@ async function main() {
     throw new Error("POOL_ADMIN cannot be the zero address.");
   }
   console.log(
-    `network=${hre.network.name} chainId=${chainId} deployer=${deployer.account.address}`,
+    `network=${hre.network.name} chainId=${chainId} asset=${asset} deployer=${deployer.account.address}`,
   );
 
   if (!fs.existsSync(SOURCE_INDEXER)) {
     throw new Error("indexer/config.yaml is required to produce a candidate.");
   }
   const sourceIndexer = fs.readFileSync(SOURCE_INDEXER, "utf8");
-  const indexedPools = configuredIndexerAddresses(sourceIndexer, chainId, "Pool");
+  // The checked-in config is a template with 0x0 placeholders; those mean
+  // "nothing indexed yet", not a pool.
+  const indexedPools = configuredIndexerAddresses(sourceIndexer, chainId, "Pool").filter(
+    (address) => address !== ZERO,
+  );
   const indexedRegistries = configuredIndexerAddresses(
     sourceIndexer,
     chainId,
@@ -160,6 +182,7 @@ async function main() {
     oldPool = previousPool(chainId, indexedPools, sameConfiguredChain);
     if (
       oldPool &&
+      indexedPools.length > 0 &&
       !indexedPools.some((address) => address.toLowerCase() === oldPool!.address.toLowerCase())
     ) {
       throw new Error("The configured previous pool is missing from the indexer.");
@@ -180,7 +203,9 @@ async function main() {
     reuseRegistry = true;
   }
 
-  let usdc = process.env.USDC_ADDRESS as `0x${string}` | undefined;
+  let usdc = (isUsdc ? process.env.USDC_ADDRESS : process.env.TOKEN_ADDRESS) as
+    | `0x${string}`
+    | undefined;
   const configuredDecimals =
     process.env.USDC_DECIMALS ??
     (sameConfiguredChain
@@ -193,11 +218,17 @@ async function main() {
       throw new Error("USDC_ADDRESS is invalid.");
     }
     usdc = getAddress(usdc);
-  } else if (sameConfiguredChain) {
+  } else if (sameConfiguredChain && isUsdc) {
     usdc = publicAddress("NEXT_PUBLIC_USDC_ADDRESS");
   }
-  if (chainId === 143 && !usdc) {
-    throw new Error("USDC_ADDRESS is required on mainnet.");
+  if (chainId === 143) {
+    if (!usdc) throw new Error(`${isUsdc ? "USDC_ADDRESS" : "TOKEN_ADDRESS"} is required on mainnet.`);
+    if (usdc.toLowerCase() !== MAINNET_TOKENS[asset]) {
+      throw new Error(`${asset} pool must hold the canonical ${asset} token on mainnet.`);
+    }
+  }
+  if (!isUsdc && !priorManifest && !oldPool) {
+    throw new Error("Deploy the USDC pool first; other assets are added next to it.");
   }
   if (usdc) {
     if (usdc.toLowerCase() === ZERO) {
@@ -227,11 +258,13 @@ async function main() {
   // first deployment transaction is sent.
   const firstBlock = await publicClient.getBlockNumber();
   if (!usdc) {
-    const mock = await hre.viem.deployContract("MockUSDC");
+    const mock = isUsdc
+      ? await hre.viem.deployContract("MockUSDC")
+      : await hre.viem.deployContract("MockStablecoin", [`Mock ${asset}`, asset]);
     usdc = mock.address;
     decimals = 6;
     mintable = true;
-    console.log(`MockUSDC        ${usdc}`);
+    console.log(`Mock ${asset}      ${usdc}`);
   }
 
   const poseidon = await hre.viem.deployContract(
@@ -275,7 +308,10 @@ async function main() {
     depth: 20,
     confirmations: 1,
     role: "active",
-    requestCapable: true,
+    asset,
+    transferCapable:true,
+    requestCapable:true,
+    ...(!isUsdc?{mintable}:{}),
   };
   const manifest = candidateManifest({
     chainId,
@@ -291,7 +327,9 @@ async function main() {
   const candidateIndexer = renderIndexerCandidate(
     sourceIndexer,
     chainId,
-    firstBlock,
+    // A new USDC pool replaces the old one; an added asset must not skip the
+    // history of pools that stay active.
+    isUsdc ? firstBlock : null,
     { Pool: [...new Set(knownPools)], Registry: registry.address },
   );
 
@@ -307,11 +345,26 @@ async function main() {
       NEXT_PUBLIC_MONAD_RPC_URL:
         readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MONAD_RPC_URL") ?? "",
       NEXT_PUBLIC_MAWEE_REGISTRY_ADDRESS: registry.address,
-      NEXT_PUBLIC_MAWEE_POOL_ADDRESS: pool.address,
-      NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK: deployBlock.toString(),
-      NEXT_PUBLIC_USDC_ADDRESS: usdc,
+      // These single-pool variables describe the USDC pool, which an added
+      // asset leaves in place.
+      ...(isUsdc
+        ? {
+            NEXT_PUBLIC_MAWEE_POOL_ADDRESS: pool.address,
+            NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK: deployBlock.toString(),
+            NEXT_PUBLIC_USDC_ADDRESS: usdc,
+            NEXT_PUBLIC_USDC_MINTABLE: String(mintable),
+          }
+        : {
+            NEXT_PUBLIC_MAWEE_POOL_ADDRESS:
+              readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MAWEE_POOL_ADDRESS") ?? "",
+            NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK:
+              readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK") ?? "",
+            NEXT_PUBLIC_USDC_ADDRESS:
+              readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_USDC_ADDRESS") ?? "",
+            NEXT_PUBLIC_USDC_MINTABLE:
+              readPublicSetting(SOURCE_ENV, "NEXT_PUBLIC_USDC_MINTABLE") ?? "false",
+          }),
       NEXT_PUBLIC_USDC_DECIMALS: String(decimals),
-      NEXT_PUBLIC_USDC_MINTABLE: String(mintable),
       NEXT_PUBLIC_POOL_DEPTH: "20",
       NEXT_PUBLIC_MAWEE_POOLS: JSON.stringify(manifest),
       NEXT_PUBLIC_PRIVY_APP_ID:

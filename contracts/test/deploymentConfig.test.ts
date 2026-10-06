@@ -14,6 +14,35 @@ describe("reviewable pool deployment candidates",()=>{
     expect(manifest[0]).to.include({address:a("1"),role:"legacy",requestCapable:false,confirmations:2});
     expect(manifest[1]).to.include({address:a("3"),role:"active",requestCapable:true});
   });
+  it("replaces only the same-asset pool when another stablecoin gets its own pool",()=>{
+    const usdc={chainId:10143,address:a("1"),deployBlock:50,token:a("2"),tokenDecimals:6,depth:20,confirmations:1,role:"active",requestCapable:true};
+    const ausd=candidateManifest({chainId:10143,priorManifest:JSON.stringify([usdc]),newPool:{chainId:10143,address:a("3"),deployBlock:200,token:a("4"),tokenDecimals:6,asset:"AUSD",mintable:true},confirmations:1});
+    expect(ausd[0]).to.include({address:a("1"),role:"active",requestCapable:true,asset:"USDC"});
+    expect(ausd[1]).to.include({address:a("3"),role:"active",requestCapable:false,asset:"AUSD",mintable:true});
+    const ausd2=candidateManifest({chainId:10143,priorManifest:JSON.stringify(ausd),newPool:{chainId:10143,address:a("5"),deployBlock:300,token:a("4"),tokenDecimals:6,asset:"AUSD"},confirmations:1});
+    expect(ausd2.map((p)=>[p.address,p.role])).to.deep.equal([[a("1"),"active"],[a("3"),"legacy"],[a("5"),"active"]]);
+    expect(()=>candidateManifest({chainId:10143,newPool:{chainId:10143,address:a("3"),deployBlock:2,token:a("4"),tokenDecimals:6,asset:"DAI"},confirmations:1})).to.throw();
+  });
+  it("keeps the env-described USDC pool active when a first non-USDC pool is added",()=>{
+    const previousPool={chainId:10143,address:a("1"),deployBlock:50,token:a("2"),tokenDecimals:6};
+    const manifest=candidateManifest({chainId:10143,previousPool,newPool:{chainId:10143,address:a("3"),deployBlock:200,token:a("4"),tokenDecimals:6,asset:"MUSD"},confirmations:1});
+    expect(manifest.map((p)=>[p.asset,p.role,p.requestCapable])).to.deep.equal([["USDC","active",true],["MUSD","active",false]]);
+  });
+  it("can leave the indexer start block alone",()=>{
+    const yaml=`chains:\n  - id: 10143\n    start_block: 90\n    contracts:\n      - name: Pool\n        address:\n          - "${a("1")}"\n      - name: Registry\n        address:\n          - "${a("4")}"\n`;
+    const rendered=renderIndexerCandidate(yaml,10143,null,{Pool:[a("1"),a("3")],Registry:a("4")});
+    expect(rendered).to.contain("start_block: 90");
+    expect(rendered).to.contain(a("3"));
+  });
+  it("replaces the 0x0 template placeholder instead of indexing it",()=>{
+    const zero="0x0000000000000000000000000000000000000000";
+    const yaml=`chains:\n  - id: 10143\n    start_block: 0\n    contracts:\n      - name: Pool\n        address:\n          - "${zero}"\n      - name: Registry\n        address:\n          - "${zero}"\n`;
+    const rendered=renderIndexerCandidate(yaml,10143,null,{Pool:[a("3"),a("1")],Registry:a("4")});
+    expect(rendered).to.not.contain(`- "${zero}"`);
+    expect(rendered).to.contain(`- "${a("1")}"`);
+    expect(rendered).to.contain(`- "${a("3")}"`);
+    expect(rendered).to.contain(`- "${a("4")}"`);
+  });
   it("preserves Pool and Registry addresses while emitting candidate files only",()=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),"mawee-candidate-"));
     try{

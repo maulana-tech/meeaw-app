@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { storeManageToken } from "../../features/paymentLinks/manageTokens";
 import type { PaymentLink } from "../../features/paymentLinks/types";
-import { fromBaseUnits } from "../../lib/crypto";
+import { ASSETS } from "../../lib/assets";
+import { formatAssetUnits } from "../../lib/paymentAsset";
 import { createLinkFormInput } from "../../server/modules/paymentLinks/paymentLinks.schema";
 import { api } from "../../trpc/client";
 import { Button } from "../ui/button";
@@ -22,6 +23,8 @@ import { linenFieldClass, linenSegmentedClass } from "../ui/glass";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { ToastFeedback } from "../ui/toast-feedback";
+import { PaymentAssetSelect } from "./PaymentAssetSelect";
+import { useSelectedPool } from "./useSelectedPool";
 
 type LinkFormInput = z.input<typeof createLinkFormInput>;
 type LinkFormOutput = z.output<typeof createLinkFormInput>;
@@ -53,12 +56,17 @@ export function LinkEditorDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: (link: PaymentLink) => void | Promise<void>;
 }) {
+  const initialPool = useSelectedPool();
+  const [choice, setChoice] = useState(initialPool);
+  const asset = mode === "edit" ? (link?.asset ?? "USDC") : choice.asset;
   const [amountMode, setAmountMode] = useState<"fixed" | "open">(
     link?.amount ? "fixed" : "open",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const initialDescription = link?.description ?? "";
-  const initialAmount = link?.amount ? fromBaseUnits(BigInt(link.amount)) : "";
+  const initialAmount = link?.amount
+    ? formatAssetUnits(BigInt(link.amount), link.tokenDecimals ?? 6)
+    : "";
   const defaultSlug = useMemo(
     () => link?.slug ?? `link-${Math.random().toString(36).slice(2, 8)}`,
     [link?.slug],
@@ -111,6 +119,7 @@ export function LinkEditorDialog({
     try {
       const payload = {
         ...values,
+        asset,
         username,
         amount: amountMode === "fixed" ? values.amount : null,
       };
@@ -152,6 +161,16 @@ export function LinkEditorDialog({
         </DialogHeader>
         <form className="grid gap-4" onSubmit={submit}>
           <input type="hidden" {...register("username")} />
+          {mode === "create" ? (
+            <PaymentAssetSelect
+              value={choice.scope}
+              onChange={setChoice}
+              kind="payment"
+              disabled={isSubmitting}
+            />
+          ) : (
+            <p className="text-sm">Asset: {ASSETS[asset].label}</p>
+          )}
           <div className="grid gap-2">
             <Label
               className="text-foreground"
@@ -184,7 +203,9 @@ export function LinkEditorDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label className="text-foreground">Amount</Label>
+            <Label className="text-foreground">
+              Amount · {ASSETS[asset].label}
+            </Label>
             <div
               className={`${linenSegmentedClass} grid grid-cols-2 gap-1 p-1`}
             >

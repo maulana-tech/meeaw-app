@@ -57,6 +57,9 @@ export const testPool: PoolDescriptor = {
   confirmations: 1,
   role: "active",
   requestCapable: true,
+  transferCapable: true,
+  asset: "USDC",
+  mintable: true,
 };
 
 /** Deterministic, test-only account: never reuse these secrets elsewhere. */

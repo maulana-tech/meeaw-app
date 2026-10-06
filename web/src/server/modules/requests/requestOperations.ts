@@ -1,5 +1,5 @@
 import "server-only";
-import { verifyTypedData, type Hex } from "viem";
+import { type Hex, verifyTypedData } from "viem";
 import {
   requestDigest,
   submissionDigest,
@@ -10,16 +10,17 @@ import type {
   SignedSubmission,
 } from "../../../features/requests/types";
 import { signedSubmissionSchema } from "../../../features/requests/validation";
-import { requestPool, resolvePool } from "../../../lib/pools";
+import { resolvePool } from "../../../lib/pools";
 import {
   getDb,
   getPaymentRequests,
   type PaymentRequestDoc,
   type RequestReservationDoc,
 } from "../../db/mongo";
-import { runtimeSender, type RelayIntent } from "../../lib/durableRelayer";
-import { RelayBusyError } from "../../lib/relayJournal";
+import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerAddress, relayerConfigured } from "../../lib/relayer";
+import { RelayBusyError } from "../../lib/relayJournal";
+import { encodeSubmission, verifyRequestReceipt } from "./requestSettlement";
 import {
   RequestConflictError,
   RequestNotFoundError,
@@ -28,7 +29,6 @@ import {
 } from "./requests.errors";
 import { findForParticipant, toPaymentRequest } from "./requests.repository";
 import { callerWallet, enforceRequestLimit } from "./requests.service";
-import { encodeSubmission, verifyRequestReceipt } from "./requestSettlement";
 
 type OperationDoc = PaymentOperation & { _id: string; payerWallet: string };
 type StepDoc = {
@@ -95,8 +95,9 @@ export async function beginPayment(
     );
   const { doc, wallet } = await owned(user, input.id);
   payer(doc, wallet);
-  const pool = requestPool();
-  if (!pool || pool.scope !== doc.scope) throw new RequestUnavailableError();
+  const pool = resolvePool(doc.scope);
+  if (pool.role !== "active" || !pool.requestCapable)
+    throw new RequestUnavailableError();
   if (doc.status !== "pending") throw new RequestConflictError();
   if (doc.operationId === input.attemptId) return project(doc);
   const requests = await getPaymentRequests();

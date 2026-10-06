@@ -7,18 +7,19 @@ import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import { unlockLabel } from "../../lib/passkey";
 import {
-  activePool,
+  activePools,
   legacyPools,
   type PoolDescriptor,
   type PoolScope,
   resolvePool,
 } from "../../lib/pools";
-import { unlockLabel } from "../../lib/passkey";
 import { useGasless } from "../../lib/useGasless";
 import {
   claimableNotes,
@@ -44,9 +45,10 @@ import { ToastFeedback } from "../ui/toast-feedback";
 import { useWallet } from "../WalletProvider";
 import { DashboardNotice } from "./DashboardNotice";
 import { DashboardPageHeader } from "./DashboardPageHeader";
-import { useLegacyBalances } from "./useLegacyBalances";
 import { dashButtonPrimary, dashButtonSecondary } from "./styles";
+import { useLegacyBalances } from "./useLegacyBalances";
 import { useMyNotes } from "./useMyNotes";
+import { assetLabel, selectAsset, useSelectedPool } from "./useSelectedPool";
 
 type WalletStep = "form" | "review" | "proving";
 type WithdrawalTarget =
@@ -94,10 +96,13 @@ function targetTotal(target: WithdrawalTarget | null): bigint {
 export function WithdrawDashboard() {
   const { address, accountUnlocked, promptUnlock, getSigner, recoveryMethod } =
     useWallet();
-  const [poolScope, setPoolScope] = useState<PoolScope>(
-    () => activePool().scope,
-  );
+  // Active pools follow the dashboard's asset choice; a previous (legacy)
+  // pool is a local override for this page only.
+  const selectedPool = useSelectedPool();
+  const [legacyScope, setLegacyScope] = useState<PoolScope | null>(null);
+  const poolScope = legacyScope ?? selectedPool.scope;
   const pool = useMemo(() => resolvePool(poolScope), [poolScope]);
+  const asset = assetLabel(pool);
   const legacyBalances = useLegacyBalances(
     accountUnlocked ? address : undefined,
   );
@@ -166,7 +171,7 @@ export function WithdrawDashboard() {
       const account = getAccount();
       if (!account) throw new Error("Unlock your private account to continue.");
       // Scan the pool the selected payments live in; never mix pools.
-      const scan = await scanMyNotes(account, { pool });
+      const scan = await scanMyNotes(account, { pool,includeRequestRecovery:true,includeTransferRecovery:true });
 
       if (target.kind === "all") {
         const batch = await withdrawAll({
@@ -182,7 +187,7 @@ export function WithdrawDashboard() {
           );
         }
         const count = batch.succeeded.length;
-        toast.success(`Cashed out ${fromBaseUnits(batch.total)} USDC`, {
+        toast.success(`Cashed out ${fromBaseUnits(batch.total)} ${asset}`, {
           description: `${count} payment${count === 1 ? "" : "s"} sent to ${shortAddress(destination.trim())}.`,
           id: "wallet-withdrawal-success",
         });
@@ -220,16 +225,19 @@ export function WithdrawDashboard() {
         destination: destination.trim(),
       });
       const txUrl = explorerTxUrl(withdrawal.txHash);
-      toast.success(`Cashed out ${fromBaseUnits(target.note.amount)} USDC`, {
-        description: `The funds were sent to ${shortAddress(destination.trim())}.`,
-        id: "wallet-withdrawal-success",
-        action: txUrl
-          ? {
-              label: "View",
-              onClick: () => window.open(txUrl, "_blank", "noopener"),
-            }
-          : undefined,
-      });
+      toast.success(
+        `Cashed out ${fromBaseUnits(target.note.amount)} ${asset}`,
+        {
+          description: `The funds were sent to ${shortAddress(destination.trim())}.`,
+          id: "wallet-withdrawal-success",
+          action: txUrl
+            ? {
+                label: "View",
+                onClick: () => window.open(txUrl, "_blank", "noopener"),
+              }
+            : undefined,
+        },
+      );
       await refresh();
       if (isCurrentRun()) {
         setWalletStep("form");
@@ -277,7 +285,13 @@ export function WithdrawDashboard() {
           legacyBalances={legacyBalances}
           onSelect={(next) => {
             closeWithdrawal();
-            setPoolScope(next);
+            const nextPool = resolvePool(next);
+            if (nextPool.role === "active") {
+              setLegacyScope(null);
+              selectAsset(nextPool.asset);
+            } else {
+              setLegacyScope(next);
+            }
           }}
         />
       ) : null}
@@ -323,6 +337,7 @@ export function WithdrawDashboard() {
               <AllPaymentsCard
                 notes={options}
                 total={claimable}
+                asset={asset}
                 onClick={() =>
                   openWithdrawal({ kind: "all", notes: [...options] })
                 }
@@ -333,6 +348,7 @@ export function WithdrawDashboard() {
                 key={`${note.scope}:${note.leafIndex}`}
                 note={note}
                 index={index}
+                asset={asset}
                 onClick={() => openWithdrawal({ kind: "one", note })}
               />
             ))}
@@ -395,6 +411,7 @@ export function WithdrawDashboard() {
               <WalletWithdrawal
                 step={walletStep}
                 amount={selectedTotal}
+                asset={asset}
                 paymentCount={
                   target.kind === "all" ? target.notes.length : undefined
                 }
@@ -415,8 +432,9 @@ export function WithdrawDashboard() {
 }
 
 /**
- * Shown only while a previous (legacy) pool still holds funds. Legacy pools
- * are withdraw-only; their balance is never mixed into the current one.
+ * One choice per active pool (one per asset), plus previous (legacy) pools
+ * while they still hold funds. Hidden when there is only one pool to pick.
+ * Legacy pools are withdraw-only; balances are never mixed across pools.
  */
 function PoolSelector({
   selected,
@@ -431,12 +449,17 @@ function PoolSelector({
     (p) =>
       (legacyBalances.get(p.scope) ?? 0n) > 0n || p.scope === selected.scope,
   );
-  if (funded.length === 0) return null;
+  const active = activePools();
+  if (funded.length === 0 && active.length < 2) return null;
+  const multiAsset = active.length > 1;
   const choices: { pool: PoolDescriptor; label: string }[] = [
-    { pool: activePool(), label: "Current pool" },
+    ...active.map((p) => ({
+      pool: p,
+      label: multiAsset ? ASSETS[p.asset].label : "Current pool",
+    })),
     ...funded.map((p) => ({
       pool: p,
-      label: `Previous pool · ${formatUsd(legacyBalances.get(p.scope) ?? 0n)}`,
+      label: `Previous ${multiAsset ? `${ASSETS[p.asset].label} ` : ""}pool · ${formatUsd(legacyBalances.get(p.scope) ?? 0n)}`,
     })),
   ];
   return (
@@ -462,10 +485,12 @@ function PoolSelector({
           );
         })}
       </fieldset>
-      <p className="text-xs text-brand-linen/65">
-        You still have funds in a previous Mawee pool. They can only be
-        withdrawn, and are not used to pay requests.
-      </p>
+      {funded.length ? (
+        <p className="text-xs text-brand-linen/65">
+          You still have funds in a previous Mawee pool. They can only be
+          withdrawn, and are not used to pay requests.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -473,10 +498,12 @@ function PoolSelector({
 function PaymentCard({
   note,
   index,
+  asset,
   onClick,
 }: {
   note: MyNote;
   index: number;
+  asset: string;
   onClick: () => void;
 }) {
   return (
@@ -484,7 +511,7 @@ function PaymentCard({
       type="button"
       className="group text-left focus-visible:outline-none"
       onClick={onClick}
-      aria-label={`Withdraw private payment ${index + 1}, ${fromBaseUnits(note.amount)} USDC`}
+      aria-label={`Withdraw private payment ${index + 1}, ${fromBaseUnits(note.amount)} ${asset}`}
     >
       <Card
         appearance="linen"
@@ -500,7 +527,7 @@ function PaymentCard({
               ${fromBaseUnits(note.amount)}
             </p>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
-              USDC
+              {asset}
             </p>
           </div>
           <div className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-secondary text-foreground ring-1 ring-border">
@@ -532,9 +559,11 @@ function AllPaymentsCard({
   notes,
   total,
   onClick,
+  asset,
 }: {
   notes: MyNote[];
   total: bigint;
+  asset: string;
   onClick: () => void;
 }) {
   return (
@@ -542,7 +571,7 @@ function AllPaymentsCard({
       type="button"
       className="group text-left focus-visible:outline-none"
       onClick={onClick}
-      aria-label={`Withdraw all ${notes.length} payments, ${fromBaseUnits(total)} USDC total`}
+      aria-label={`Withdraw all ${notes.length} payments, ${fromBaseUnits(total)} ${asset} total`}
     >
       <Card
         appearance="linen"
@@ -557,7 +586,7 @@ function AllPaymentsCard({
             ${fromBaseUnits(total)}
           </p>
           <p className="mt-1 text-sm font-medium text-muted-foreground">
-            USDC · {notes.length} payments
+            {asset} · {notes.length} payments
           </p>
         </div>
 
@@ -646,6 +675,7 @@ function AllPaymentsSketch() {
 type WalletWithdrawalProps = {
   step: WalletStep;
   amount: bigint;
+  asset: string;
   paymentCount?: number;
   destination: string;
   submitError: string | null;
@@ -661,6 +691,7 @@ type WalletWithdrawalProps = {
 function WalletWithdrawal({
   step,
   amount,
+  asset,
   paymentCount,
   destination,
   submitError,
@@ -723,7 +754,7 @@ function WalletWithdrawal({
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-sm text-foreground/60">Cashing out</span>
             <span className="text-xl font-semibold text-foreground tabular-nums">
-              {fromBaseUnits(amount)} USDC
+              {fromBaseUnits(amount)} {asset}
             </span>
           </div>
           {paymentCount ? (

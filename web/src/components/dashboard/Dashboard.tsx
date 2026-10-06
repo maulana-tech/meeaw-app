@@ -11,17 +11,26 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
+import { useTransfers } from "../../features/transfers/hooks/useTransfers";
+import type { TransferRecord } from "../../features/transfers/types";
+import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH, WITHDRAW_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import { unlockLabel } from "../../lib/passkey";
+import { activePools } from "../../lib/pools";
 import { useWallet } from "../WalletProvider";
 import { ActivityFeed } from "./ActivityFeed";
 import { AddFundsDialog } from "./AddFundsDialog";
 import { BalanceCard } from "./BalanceCard";
+import { CreateRequestDialog } from "./CreateRequestDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { weeklyActivity } from "./dashboardAnalytics";
 import { PaymentQrDialog } from "./PaymentQrDialog";
+import { PendingTransfersNotice } from "./PendingTransfersNotice";
 import { ReceiveDialog } from "./ReceiveDialog";
+import { RequestsTile } from "./RequestsTile";
+import { SendTransferDialog } from "./SendTransferDialog";
 import {
   dashButtonPrimary,
   dashButtonSecondary,
@@ -29,10 +38,9 @@ import {
   dashFocus,
   dashLedger,
 } from "./styles";
+import { TransferProgress } from "./TransferProgress";
 import { useMyNotes } from "./useMyNotes";
-
-import { CreateRequestDialog } from "./CreateRequestDialog";
-import { RequestsTile } from "./RequestsTile";
+import { assetLabel, useSelectedPool } from "./useSelectedPool";
 export function Dashboard() {
   const {
     address,
@@ -47,10 +55,31 @@ export function Dashboard() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const pool = useSelectedPool();
+  const [sendOpen, setSendOpen] = useState(false),
+    [selectedTransfer, setSelectedTransfer] = useState<TransferRecord | null>(
+      null,
+    ),
+    [progressOpen, setProgressOpen] = useState(false),
+    [startTransfer, setStartTransfer] = useState(false);
+  const transfers = useTransfers("sent", pool.scope);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Account changes must clear payment dialogs.
+  useEffect(() => {
+    setSelectedTransfer(null);
+    setProgressOpen(false);
+    setSendOpen(false);
+  }, [address]);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
+    pool,
   );
-  const insight = useMemo(() => weeklyActivity(notes), [notes]);
+  const activity = usePaymentActivity(notes);
+  // Activity spans every pool; keep the selected asset's rows only.
+  const rows = useMemo(
+    () => activity.rows.filter((r) => r.scope === pool.scope),
+    [activity.rows, pool.scope],
+  );
+  const insight = useMemo(() => weeklyActivity(rows), [rows]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -67,6 +96,14 @@ export function Dashboard() {
         description="Your private balance, payment link and recent activity."
       />
 
+      <PendingTransfersNotice
+        record={transfers.pending}
+        onOpen={(record) => {
+          setSelectedTransfer(record);
+          setStartTransfer(false);
+          setProgressOpen(true);
+        }}
+      />
       {needsUsername ? (
         <div className="mb-4 flex flex-col gap-4 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -103,6 +140,17 @@ export function Dashboard() {
             unlockLabel={unlockLabel(recoveryMethod)}
             onUnlock={promptUnlock}
             onReceive={username ? () => setReceiveOpen(true) : undefined}
+            onSend={
+              username
+                ? () => {
+                    if (transfers.pending) {
+                      setSelectedTransfer(transfers.pending);
+                      setStartTransfer(false);
+                      setProgressOpen(true);
+                    } else setSendOpen(true);
+                  }
+                : undefined
+            }
             onAddFunds={() => setAddFundsOpen(true)}
             cashOutHref={WITHDRAW_PATH}
             onRefresh={refresh}
@@ -125,6 +173,7 @@ export function Dashboard() {
           ) : (
             <ActivityFeed
               notes={notes}
+              rows={rows}
               loading={loading}
               limit={5}
               showSeeAll
@@ -140,6 +189,7 @@ export function Dashboard() {
             received={insight.receivedAmount}
             cashedOut={insight.cashedOutAmount}
             hidden={locked || loading}
+            asset={assetLabel(pool)}
           />
         </section>
       </div>
@@ -147,7 +197,29 @@ export function Dashboard() {
       <section aria-label="Requests" className="mt-4">
         <RequestsTile />
       </section>
-      <CreateRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
+      <CreateRequestDialog
+        pool={pool}
+        open={requestOpen}
+        onOpenChange={setRequestOpen}
+      />
+      <SendTransferDialog
+        pool={pool}
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        onCreated={(record) => {
+          setSelectedTransfer(record);
+          setStartTransfer(true);
+          setProgressOpen(true);
+        }}
+      />
+      {selectedTransfer && (
+        <TransferProgress
+          record={selectedTransfer}
+          open={progressOpen}
+          autoStart={startTransfer}
+          onClose={() => setProgressOpen(false)}
+        />
+      )}
       <ReceiveDialog
         open={receiveOpen}
         onClose={() => setReceiveOpen(false)}
@@ -162,6 +234,7 @@ export function Dashboard() {
         open={addFundsOpen}
         onOpenChange={setAddFundsOpen}
         onComplete={refresh}
+        pool={pool}
       />
     </>
   );
@@ -229,8 +302,11 @@ function PayLinkCard({
       {username ? (
         <>
           <p className="mt-4 text-sm leading-6 text-(--dash-ash)">
-            Anyone can pay you in USDC from any wallet. Payments land in your
-            private balance.
+            Anyone can pay you in{" "}
+            {new Intl.ListFormat("en", { type: "disjunction" }).format(
+              activePools().map((p) => ASSETS[p.asset].label),
+            )}{" "}
+            from any wallet. Payments land in your private balance.
           </p>
           <div className="mt-5 truncate border-y border-(--dash-line) py-3 font-mono text-sm">
             {displayLink || "Loading link…"}
@@ -337,7 +413,9 @@ function WeekCard({
   received,
   cashedOut,
   hidden,
+  asset,
 }: {
+  asset: string;
   buckets: number[];
   received: bigint;
   cashedOut: bigint;
@@ -377,7 +455,7 @@ function WeekCard({
         </div>
       </dl>
       <p className="mt-2 text-[11px] tracking-[0.12em] text-(--dash-ash) uppercase">
-        Amounts in USDC
+        Amounts in {asset}
       </p>
 
       <div

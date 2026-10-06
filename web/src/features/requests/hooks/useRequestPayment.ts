@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWallet } from "../../../components/WalletProvider";
 import { getAccount, scanMyNotes } from "../../../lib/notes";
-import { activePool } from "../../../lib/pools";
+import { resolvePool } from "../../../lib/pools";
 import { api } from "../../../trpc/client";
 import { trpc } from "../../../trpc/react";
 import { readPaymentStatus, watchPaymentStatus } from "../paymentStatusMonitor";
@@ -142,7 +142,7 @@ export function useRequestPayment(request: PaymentRequest | null) {
     };
     try {
       const account = getAccount(),
-        pool = activePool(),
+        pool = resolvePool(request.pool),
         signer = await wallet.getSigner();
       if (run.current !== seq) return null;
       if (
@@ -177,6 +177,7 @@ export function useRequestPayment(request: PaymentRequest | null) {
       let scan = await scanMyNotes(account, {
         pool,
         includeRequestRecovery: true,
+        includeTransferRecovery: true,
       });
       if (run.current !== seq) return null;
       if (scan.health !== "healthy")
@@ -318,6 +319,7 @@ export function useRequestPayment(request: PaymentRequest | null) {
           scan = await scanMyNotes(account, {
             pool,
             includeRequestRecovery: true,
+            includeTransferRecovery: true,
           });
           if (scan.health !== "healthy") break;
           continue;

@@ -14,14 +14,28 @@ Share a link or QR code and get paid. Two flavors:
 
 * **Simple link** (`mawee/pay/username`) — the payer chooses the amount. Great as
   your general "pay me" link.
-* **Managed link** (`mawee/pay/username/your-slug`) — you set a fixed amount and a
-  label, like "Consulting call — $150." Perfect for invoices and products.
+* **Managed link** (`mawee/pay/username/your-slug`) — you set an asset, a fixed or
+  open amount, and a description. The payer uses that asset even when the amount
+  is open. Existing links keep USDC. Perfect for invoices and products.
 
 Every link comes with a QR code for in-person or mobile payments.
 
+## Direct private sends
+
+Use **Send** on your private balance card to pay another registered `@username`
+without waiting for a payment request. Enter an amount in the selected eligible asset and an optional private
+note, review the recipient, then confirm. Mawee combines fragmented active-pool
+balance automatically. The note is encrypted for both participants.
+
+A pending send can be reopened from the dashboard or History after closing its
+modal or reloading. History distinguishes Sent, Received, and actual Cashed out
+transactions; internal consolidation and change do not count as payments.
+See [direct-transfer operations](direct-transfer-operations.md) for recovery and
+deployment prerequisites. Legacy balances remain withdrawal-only.
+
 ## Payment Requests
 
-Ask a registered `@username` for a fixed USDC amount with an optional private
+Ask a registered `@username` for a fixed amount in an eligible asset with an optional private
 note. The request appears in the sender's **Sent** list and the recipient's
 **Received** list. The recipient can pay it from their private balance, even
 when that balance is split across multiple notes, or decline it; the requester

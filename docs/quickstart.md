@@ -1,5 +1,10 @@
 # Quickstart
 
+To send an existing private balance, open the dashboard's **Send** button, enter a
+registered `@username`, amount in USDC, and optional note. Review and confirm.
+Reopen a pending transfer from the dashboard or History after reload; unlock and
+Continue if it is still preparing. Only active-pool balance funds direct sends.
+
 Get set up in a few minutes. No seed phrases, no gas tokens to buy.
 
 ## 1. Create your account

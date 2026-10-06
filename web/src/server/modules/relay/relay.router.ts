@@ -15,6 +15,7 @@ import {
 import {
   depositInput,
   depositOutput,
+  mintTestUsdcInput,
   registerInput,
   statusOutput,
   transferInput,
@@ -111,11 +112,12 @@ export const relayRouter = createTRPCRouter({
     }),
 
   mintTestUsdc: protectedProcedure
+    .input(mintTestUsdcInput)
     .output(txOutput)
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:mint:${ctx.privyUserId}`, 3, 60 * MINUTE);
-        return await relayMintTestUsdc(ctx.privyUserId);
+        return await relayMintTestUsdc(ctx.privyUserId, input?.pool);
       } catch (error) {
         mapError(error);
       }

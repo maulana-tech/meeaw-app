@@ -2,6 +2,8 @@
 // the client/server boundary; decrypted payloads (`RequestPayload`) only ever
 // live in browser memory and must never be persisted or logged.
 
+import type { AssetSymbol } from "../../lib/assets";
+
 export type Hex = `0x${string}`;
 
 /** `${chainId}:${lowercase pool address}` */
@@ -26,6 +28,10 @@ export type Participant = {
 
 export type PoolDescriptor = {
   scope: PoolScope;
+  /** Which stablecoin the pool holds; one active pool per asset. */
+  asset: AssetSymbol;
+  /** Testnet mock token anyone can mint for demos. */
+  mintable: boolean;
   chainId: number;
   address: Hex;
   deployBlock: number;
@@ -35,6 +41,7 @@ export type PoolDescriptor = {
   confirmations: number;
   role: "active" | "legacy";
   requestCapable: boolean;
+  transferCapable: boolean;
 };
 
 export type RequestMetadata = {

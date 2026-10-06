@@ -54,6 +54,8 @@ export type PaymentLinkDoc = {
   owner: string;
   slug?: string;
   amount: string | null;
+  asset?: import("../../lib/assets").AssetSymbol;
+  tokenDecimals?: number;
   description?: string | null;
   label: string | null;
   state?: "active" | "archived";
@@ -105,7 +107,9 @@ export type RequestReservationDoc = {
   nextStep: number;
   txHash: string | null;
   relayWallet: string | null;
-  currentSubmission: import("../../features/requests/types").SignedSubmission | null;
+  currentSubmission:
+    | import("../../features/requests/types").SignedSubmission
+    | null;
   currentDigest: string | null;
 };
 

@@ -6,13 +6,14 @@ import {
   poolAddress,
   registryAddress,
   revertErrorName,
-  usdcAddress,
-  usdcMintable,
 } from "../../../lib/chain";
 import { USDC_DECIMALS } from "../../../lib/crypto";
 import { activePool, findPool } from "../../../lib/pools";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
-import { currentWallet } from "../wallets/wallets.service";
+import {
+  currentWallet,
+  verifiedPrivyWallets,
+} from "../wallets/wallets.service";
 import { RelayerUnavailableError, RelayRejectedError } from "./relay.errors";
 import type {
   DepositInput,
@@ -100,9 +101,14 @@ export async function relayDeposit(
     r: `0x${"00".repeat(32)}` as const,
     s: `0x${"00".repeat(32)}` as const,
   };
+  const pool = input.pool ? findPool(input.pool) : activePool();
+  if (!pool) throw new RelayRejectedError("Unknown pool.");
+  if (pool.role !== "active") {
+    throw new RelayRejectedError("This pool no longer takes deposits.");
+  }
   const { hash, receipt } = await relay(() =>
     relayWrite({
-      address: poolAddress,
+      address: pool.address,
       abi: maweePoolAbi,
       functionName: "depositWithAuthorization",
       args: [
@@ -182,17 +188,31 @@ export async function relayTransfer(
   };
 }
 
-/** Testnet only: mint MockUSDC straight into the user's Mawee wallet. */
+/** Testnet only: mint a pool's mock token into the user's Mawee wallet, or a
+ *  payer's Privy wallet when they have no Mawee account. */
 export async function relayMintTestUsdc(
   privyUserId: string,
+  poolScope?: string,
 ): Promise<{ txHash: string }> {
-  if (!usdcMintable) {
-    throw new RelayRejectedError("Test USDC is not available on this network.");
+  const pool = poolScope ? findPool(poolScope) : activePool();
+  if (!pool?.mintable) {
+    throw new RelayRejectedError(
+      "Test tokens are not available for this pool.",
+    );
   }
-  const to = await boundWallet(privyUserId);
+  // A payer with no Mawee account mints into the Privy embedded wallet they
+  // pay from, verified against Privy rather than taken from the client.
+  const to =
+    (await currentWallet(privyUserId))?.address ??
+    ((await verifiedPrivyWallets(privyUserId))[0]?.address as
+      | `0x${string}`
+      | undefined);
+  if (!to) {
+    throw new RelayRejectedError("No wallet is linked to this account.");
+  }
   const { hash } = await relay(() =>
     relayWrite({
-      address: usdcAddress,
+      address: pool.token,
       abi: erc20Abi,
       functionName: "mint",
       args: [to, TEST_USDC_MINT_UNITS],

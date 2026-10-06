@@ -47,7 +47,7 @@ type PrivyLinkedAccount = {
 };
 
 /** Embedded Ethereum wallets Privy says belong to this identity. */
-async function verifiedPrivyWallets(
+export async function verifiedPrivyWallets(
   privyUserId: string,
 ): Promise<{ address: string; id?: string }[]> {
   const user = await getPrivyUser(privyUserId);

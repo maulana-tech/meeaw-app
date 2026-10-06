@@ -2,6 +2,7 @@
 
 import {
   ArrowUpRight,
+  Send,
   Check,
   ChevronDown,
   Eye,
@@ -14,7 +15,9 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { ASSETS } from "../../lib/assets";
 import { fromBaseUnits } from "../../lib/crypto";
+import { activePools } from "../../lib/pools";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,15 +32,27 @@ import {
   dashButtonSecondary,
   dashIconButton,
 } from "./styles";
+import { assetLabel, selectAsset, useSelectedPool } from "./useSelectedPool";
 
-const UPCOMING_STABLECOINS = ["EURC", "GYEN", "ZUSD", "AUDD"] as const;
-const STABLECOIN_ASSETS = {
-  USDC: "/stablecoins/usdc.svg",
-  EURC: "/stablecoins/eurc.png",
-  GYEN: "/stablecoins/gyen.png",
-  ZUSD: "/stablecoins/zusd.png",
-  AUDD: "/stablecoins/audd.png",
-} as const;
+// Balance currencies. AUSD, USDT and MUSD are fiat-backed payment stablecoins
+// already live on Monad (largest supply first, per DefiLlama); MON is Monad's
+// native token. Each needs its own pool, since a MaweePool holds exactly one
+// token: an entry becomes selectable once its pool is active, the rest stay
+// "Coming soon". Entries without a logo show their initials.
+const UPCOMING_CURRENCIES: readonly {
+  symbol: string;
+  issuer: string;
+  logo?: string;
+}[] = [
+  { symbol: "AUSD", issuer: "Agora" },
+  { symbol: "USDT", issuer: "Tether" },
+  { symbol: "MUSD", issuer: "MetaMask USD" },
+  { symbol: "MON", issuer: "Monad native token" },
+  { symbol: "EURC", issuer: "Circle", logo: "/stablecoins/eurc.png" },
+  { symbol: "GYEN", issuer: "GMO Trust", logo: "/stablecoins/gyen.png" },
+  { symbol: "ZUSD", issuer: "GMO Trust", logo: "/stablecoins/zusd.png" },
+  { symbol: "AUDD", issuer: "Novatti", logo: "/stablecoins/audd.png" },
+];
 
 function formatUsd(units: bigint): string {
   return Number(fromBaseUnits(units)).toLocaleString("en-US", {
@@ -54,6 +69,7 @@ export function BalanceCard({
   unlockLabel = "Unlock",
   onUnlock,
   onReceive,
+  onSend,
   onAddFunds,
   cashOutHref,
   onRefresh,
@@ -66,6 +82,7 @@ export function BalanceCard({
   unlockLabel?: string;
   onUnlock?: () => void;
   onReceive?: () => void;
+  onSend?: () => void;
   onAddFunds?: () => void;
   cashOutHref?: string;
   onRefresh?: () => void;
@@ -73,6 +90,7 @@ export function BalanceCard({
   stale?: boolean;
 }) {
   const [balanceVisible, setBalanceVisible] = useState(true);
+  const pool = useSelectedPool();
 
   if (locked) {
     return (
@@ -174,10 +192,11 @@ export function BalanceCard({
         />
         {stale
           ? "Balance may be a few minutes behind. Refresh to try again."
-          : "USDC on Monad, held as private notes only you can read."}
+          : `${assetLabel(pool)} on Monad, held as private notes only you can read.`}
       </p>
 
       <div className="mt-auto flex flex-wrap gap-2 pt-8">
+        {onSend?<button type="button" className={dashButtonPrimary} onClick={onSend} disabled={loading} aria-label="Send private payment"><Send aria-hidden="true"/>Send</button>:null}
         {onReceive ? (
           <button
             type="button"
@@ -211,21 +230,47 @@ export function BalanceCard({
   );
 }
 
+function CurrencyMark({ symbol, logo }: { symbol: string; logo?: string }) {
+  return logo ? (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
+      <Image src={logo} alt="" width={24} height={24} className="size-6" />
+    </span>
+  ) : (
+    <span
+      className="flex size-8 shrink-0 items-center justify-center rounded-full border border-current/30 text-[10px] font-semibold"
+      aria-hidden="true"
+    >
+      {symbol.slice(0, 2)}
+    </span>
+  );
+}
+
 function CurrencySelector() {
+  const selected = useSelectedPool();
+  const pools = activePools();
+  const live = new Set(pools.map((p) => assetLabel(p).toUpperCase()));
+  const upcoming = UPCOMING_CURRENCIES.filter((c) => !live.has(c.symbol));
+  const selectedAsset = ASSETS[selected.asset];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className="group relative flex size-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-(--dash-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)"
         aria-label="Choose balance currency"
-        title="Choose currency"
+        title={`${selectedAsset.label} · choose currency`}
       >
-        <Image
-          src={STABLECOIN_ASSETS.USDC}
-          alt=""
-          width={22}
-          height={22}
-          className="size-5.5"
-        />
+        {selectedAsset.logo ? (
+          <Image
+            src={selectedAsset.logo}
+            alt=""
+            width={22}
+            height={22}
+            className="size-5.5"
+          />
+        ) : (
+          <span className="text-[10px] font-semibold" aria-hidden="true">
+            {selectedAsset.label.slice(0, 2)}
+          </span>
+        )}
         <span className="absolute right-0 bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-(--dash-fg) text-(--dash-surface)">
           <ChevronDown
             className="size-3 transition-transform group-data-[popup-open]:rotate-180"
@@ -241,40 +286,48 @@ function CurrencySelector() {
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 pt-1 pb-2 text-xs font-semibold text-brand-linen/65">
-            Stablecoins on Monad
+            Currencies
           </DropdownMenuLabel>
-          <DropdownMenuItem className="min-h-12 gap-3 rounded-lg bg-brand-linen/12 px-3 py-2 text-brand-linen focus:bg-brand-linen/18 focus:text-brand-linen [&_svg]:text-brand-linen">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
-              <Image
-                src={STABLECOIN_ASSETS.USDC}
-                alt=""
-                width={24}
-                height={24}
-                className="size-6"
-              />
-            </span>
-            <span className="min-w-0 flex-1 font-semibold">USDC</span>
-            <span className="inline-flex items-center gap-1 text-xs text-brand-linen/70">
-              <Check className="size-3" aria-hidden="true" /> Active
-            </span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="my-2 bg-brand-linen/12" />
-          {UPCOMING_STABLECOINS.map((currency) => (
+          {pools.map((pool) => {
+            const asset = ASSETS[pool.asset];
+            const current = pool.scope === selected.scope;
+            return (
+              <DropdownMenuItem
+                key={pool.scope}
+                onClick={() => selectAsset(pool.asset)}
+                className={`min-h-12 gap-3 rounded-lg px-3 py-2 text-brand-linen focus:bg-brand-linen/18 focus:text-brand-linen [&_svg]:text-brand-linen ${current ? "bg-brand-linen/12" : ""}`}
+              >
+                <CurrencyMark symbol={asset.label} logo={asset.logo} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{asset.label}</span>
+                  {pools.length > 1 ? (
+                    <span className="block text-[11px] text-brand-linen/70">
+                      {asset.issuer}
+                    </span>
+                  ) : null}
+                </span>
+                {current ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-brand-linen/70">
+                    <Check className="size-3" aria-hidden="true" /> Active
+                  </span>
+                ) : null}
+              </DropdownMenuItem>
+            );
+          })}
+          {upcoming.length ? (
+            <DropdownMenuSeparator className="my-2 bg-brand-linen/12" />
+          ) : null}
+          {upcoming.map(({ symbol, issuer, logo }) => (
             <DropdownMenuItem
-              key={currency}
+              key={symbol}
               disabled
               className="min-h-11 gap-3 rounded-lg px-3 py-2 text-brand-linen/55 opacity-100 data-disabled:pointer-events-none data-disabled:opacity-55"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
-                <Image
-                  src={STABLECOIN_ASSETS[currency]}
-                  alt=""
-                  width={24}
-                  height={24}
-                  className="size-6"
-                />
+              <CurrencyMark symbol={symbol} logo={logo} />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{symbol}</span>
+                <span className="block text-[11px]">{issuer}</span>
               </span>
-              <span className="min-w-0 flex-1 font-semibold">{currency}</span>
               <span className="text-xs">Coming soon</span>
             </DropdownMenuItem>
           ))}

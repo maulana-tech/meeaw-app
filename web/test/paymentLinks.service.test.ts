@@ -77,6 +77,8 @@ describe("createLink", () => {
 
     const { manageToken, ...link } = out;
     expect(link).toEqual({
+      asset: "USDC",
+      tokenDecimals: 6,
       id: doc._id,
       owner: "alice",
       slug: "invoice-12",
@@ -150,6 +152,8 @@ describe("getLink", () => {
     });
     expect(out).not.toHaveProperty("manageTokenHash");
     expect(out).toEqual({
+      asset: "USDC",
+      tokenDecimals: 6,
       id: "abc123",
       owner: "alice",
       slug: "tips",
@@ -217,6 +221,8 @@ describe("listLinksByOwner", () => {
     expect(mocks.sort).toHaveBeenCalledWith({ createdAt: -1 });
     expect(out).toEqual([
       {
+        asset: "USDC",
+        tokenDecimals: 6,
         id: "l1",
         owner: "alice",
         slug: "tips",

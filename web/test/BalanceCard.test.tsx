@@ -23,7 +23,13 @@ describe("BalanceCard currency selector", () => {
       await screen.findByRole("menuitem", { name: /USDC Active/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: /EURC Coming soon/i }),
+      screen.getByRole("menuitem", { name: /AUSD Agora Coming soon/i }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("menuitem", { name: /MON Monad native token/i }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("menuitem", { name: /EURC Circle Coming soon/i }),
     ).toHaveAttribute("aria-disabled", "true");
   });
 

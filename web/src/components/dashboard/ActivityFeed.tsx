@@ -3,49 +3,42 @@
 import { ChevronRight, Download, FileCheck } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
+import {
+  buildActivityRows,
+  csvActivity,
+} from "../../features/payments/activityRows";
+import type { ActivityRow } from "../../features/payments/activityTypes";
+import { ASSETS } from "../../lib/assets";
 import { HISTORY_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import type { MyNote } from "../../lib/notes";
+import { findPool } from "../../lib/pools";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { DiscloseDialog } from "./DiscloseDialog";
 import { dashButtonSecondary, dashFocus, dashIconButton } from "./styles";
 
-type ActivityEvent = {
-  id: string;
-  kind: "incoming" | "outgoing";
-  amount: bigint;
-  leafIndex: number;
-  at?: string;
-};
+type ActivityEvent = ActivityRow;
 
-const TABS = ["All", "Received", "Cashed out"] as const;
+/** Each row is labelled with its own pool's asset. */
+function rowAsset(scope: string): string {
+  const pool = findPool(scope);
+  return pool ? ASSETS[pool.asset].label : "USDC";
+}
+
+const TABS = ["All", "Received", "Sent", "Cashed out"] as const;
 type Tab = (typeof TABS)[number];
 
 function toEvents(notes: MyNote[]): ActivityEvent[] {
-  const events: ActivityEvent[] = [];
-  for (const note of notes) {
-    events.push({
-      id: `${note.leafIndex}-in`,
-      kind: "incoming",
-      amount: note.amount,
-      leafIndex: note.leafIndex,
-      at: note.receivedAt,
-    });
-    if (note.spent) {
-      events.push({
-        id: `${note.leafIndex}-out`,
-        kind: "outgoing",
-        amount: note.amount,
-        leafIndex: note.leafIndex,
-        at: note.spentAt,
-      });
-    }
-  }
-  return events.sort((a, b) => {
-    if (a.leafIndex !== b.leafIndex) return b.leafIndex - a.leafIndex;
-    return a.kind === "outgoing" ? -1 : 1;
-  });
+  return [
+    ...buildActivityRows({
+      notes,
+      transfers: [],
+      payloads: new Map(),
+      evidence: [],
+      viewer: "0x0000000000000000000000000000000000000000",
+    }),
+  ];
 }
 
 function formatWhen(value: string | undefined): string {
@@ -60,15 +53,8 @@ function formatWhen(value: string | undefined): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function exportCsv(events: ActivityEvent[]) {
-  const header = "type,amount_usdc,note_index\n";
-  const rows = events
-    .map((e) => {
-      const type = e.kind === "incoming" ? "received" : "cashed_out";
-      return `${type},${fromBaseUnits(e.amount)},${e.leafIndex}`;
-    })
-    .join("\n");
-  const blob = new Blob([header + rows], { type: "text/csv" });
+function exportCsv(events: readonly ActivityEvent[]) {
+  const blob = new Blob([csvActivity(events)], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -79,6 +65,8 @@ function exportCsv(events: ActivityEvent[]) {
 
 export function ActivityFeed({
   notes,
+  rows,
+  onTransferOpen,
   loading,
   limit,
   showSeeAll = false,
@@ -89,6 +77,8 @@ export function ActivityFeed({
   className,
 }: {
   notes: MyNote[];
+  rows?: readonly ActivityRow[];
+  onTransferOpen?: (id: string) => void;
   loading: boolean;
   limit?: number;
   showSeeAll?: boolean;
@@ -100,11 +90,13 @@ export function ActivityFeed({
 }) {
   const [tab, setTab] = useState<Tab>("All");
   const [discloseLeaf, setDiscloseLeaf] = useState<number | null>(null);
-  const events = useMemo(() => toEvents(notes), [notes]);
+  const [discloseScope, setDiscloseScope] = useState<string | null>(null);
+  const events = useMemo(() => rows ?? toEvents(notes), [notes, rows]);
   const filtered = useMemo(() => {
-    if (tab === "Received") return events.filter((e) => e.kind === "incoming");
+    if (tab === "Received") return events.filter((e) => e.kind === "received");
+    if (tab === "Sent") return events.filter((e) => e.kind === "sent");
     if (tab === "Cashed out")
-      return events.filter((e) => e.kind === "outgoing");
+      return events.filter((e) => e.kind === "cashedOut");
     return events;
   }, [events, tab]);
   const displayed = limit === undefined ? filtered : filtered.slice(0, limit);
@@ -120,7 +112,7 @@ export function ActivityFeed({
         <h2 className="dashboard-tile-title">{title}</h2>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {showFilters ? (
-            <fieldset className="flex w-fit items-center rounded-full border border-(--dash-line) p-0.5">
+            <fieldset className="flex max-w-full flex-wrap items-center rounded-full border border-(--dash-line) p-0.5">
               <legend className="sr-only">Filter activity</legend>
               {TABS.map((t) => (
                 <button
@@ -200,7 +192,7 @@ export function ActivityFeed({
               >
                 <span
                   className={`size-1.5 shrink-0 rounded-full ${
-                    event.kind === "incoming"
+                    event.kind === "received"
                       ? "bg-(--dash-accent)"
                       : "border border-(--dash-fg)/50"
                   }`}
@@ -208,24 +200,61 @@ export function ActivityFeed({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">
-                    {event.kind === "incoming"
-                      ? "Payment received"
-                      : "Cashed out"}
+                    {
+                      {
+                        received: "Payment received",
+                        sent: "Payment sent",
+                        cashedOut: "Cashed out",
+                        attempt: "Transfer attempt",
+                        unclassified: "Payment details loading",
+                      }[event.kind]
+                    }
+                    {event.counterparty && (
+                      <span className="ml-1.5 text-(--dash-ash)">
+                        @{event.counterparty}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 text-xs text-(--dash-ash)">
                     {formatWhen(event.at)}
+                    {event.status !== "confirmed" &&
+                      ` · ${event.status === "pending" ? "In progress" : "Failed"}`}
                   </div>
+                  {event.note && (
+                    <p className="mt-1 break-words whitespace-pre-wrap text-xs text-(--dash-ash)">
+                      {event.note}
+                    </p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right text-sm font-medium tabular-nums">
-                  {event.kind === "incoming" ? "+" : "−"}
-                  {fromBaseUnits(event.amount)}
-                  <span className="ml-1 text-(--dash-ash)">USDC</span>
+                  {event.amount === null
+                    ? "Locked"
+                    : `${event.kind === "received" ? "+" : event.kind === "sent" || event.kind === "cashedOut" ? "−" : ""}${fromBaseUnits(event.amount)}`}
+                  {event.amount !== null && (
+                    <span className="ml-1 text-(--dash-ash)">
+                      {rowAsset(event.scope)}
+                    </span>
+                  )}
                 </div>
-                {event.kind === "incoming" ? (
+                {event.transferId && onTransferOpen ? (
                   <button
                     type="button"
                     className={dashIconButton}
-                    onClick={() => setDiscloseLeaf(event.leafIndex)}
+                    onClick={() => onTransferOpen(event.transferId!)}
+                    aria-label="View transfer"
+                  >
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                ) : event.kind === "received" &&
+                  event.leafIndex !== null &&
+                  findPool(event.scope) ? (
+                  <button
+                    type="button"
+                    className={dashIconButton}
+                    onClick={() => {
+                      setDiscloseScope(event.scope);
+                      setDiscloseLeaf(event.leafIndex);
+                    }}
                     aria-label="Prove payment"
                     title="Download a proof of this payment (PDF)"
                   >
@@ -240,6 +269,9 @@ export function ActivityFeed({
       </section>
 
       <DiscloseDialog
+        pool={
+          discloseScope ? (findPool(discloseScope) ?? undefined) : undefined
+        }
         open={discloseLeaf !== null}
         onClose={() => setDiscloseLeaf(null)}
         leafIndex={discloseLeaf}

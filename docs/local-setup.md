@@ -1,5 +1,23 @@
 # Local Setup
 
+## Production build on Windows
+
+Run `pnpm build:local` from the repository root, then
+`pnpm --filter web start:local --hostname 127.0.0.1 --port 3010`.
+The local build uses Next.js's normal Node server output in `web/.next-local/`,
+so it can run alongside development output without standalone symlink packaging.
+It requires the installed workspace dependencies to run.
+
+The regular `pnpm build` still produces the standalone output expected by Docker.
+The local runner selects its target only for its child process; it does not edit
+environment files or change the deployment default.
+
+Direct private sending uses the existing payment-reconciliation worker and adds
+the private-transfer/spend-reservation migrations. Read
+[Direct transfer operations](direct-transfer-operations.md) before testing
+restarts or resolving a stuck send. Signed/unknown relay operations must retain
+their original transaction bytes and scoped spend claims.
+
 Run Mawee on your machine against Monad testnet, from a fresh clone to signing
 in on the dashboard. Plan on about 20 minutes.
 
@@ -198,3 +216,10 @@ ENVIO_GRAPHQL_URL=https://<your envio endpoint>/v1/graphql
 
 Every variable is described in [web/.env.example](../web/.env.example) and the
 [Developer Reference](reference.md).
+
+## Multi-asset links
+
+Use the normal migration workflow to apply `20261006130000-payment-link-assets.js`.
+Old documents default to USDC before migration; the backfill preserves integer
+amounts and management-token hashes. Review pool capabilities before activating
+Send or Requests for another asset. See [multi-asset payment flows](multi-asset-payment-flows.md).

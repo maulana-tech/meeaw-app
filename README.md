@@ -1,7 +1,11 @@
-# Mawee - private USDC payments on Monad
+# Mawee - private payments on Monad
 
-Mawee lets freelancers and small businesses accept USDC through simple payment
+Mawee lets freelancers and small businesses accept stablecoins through simple payment
 links without exposing their full payment history on a public ledger.
+
+Multi-asset Send, Requests, and managed links reuse the existing USDC, AUSD,
+USDT0, and mUSD pools. Availability depends on each pool's capabilities. See
+[behavior, migration, and activation evidence](docs/multi-asset-payment-flows.md).
 
 Clients pay a link. Mawee turns that payment into a private note in a shielded
 pool on Monad. The recipient can later withdraw to any Monad address, send it
@@ -167,6 +171,13 @@ proof, so a front-runner cannot redirect it.
 
 ### 6. Shielded transfer
 
+The dashboard's **Send** button pays a registered `@username` directly from private
+USDC balance, with an optional note encrypted for both participants. Fragmented
+balance is consolidated automatically; a persistent pending operation can be
+reopened after reload. History distinguishes outgoing sends, incoming payments,
+and actual withdrawals without counting consolidation/change as income.
+See [Direct transfer operations](docs/direct-transfer-operations.md).
+
 A note can be split into a recipient note and a change note without tokens
 leaving the pool. Value conservation is enforced inside the transfer circuit.
 
@@ -226,16 +237,21 @@ pnpm --filter web build
 ## Deploy To Monad Testnet
 
 ```sh
-DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet
+DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet              # USDC pool
+DEPLOYER_PRIVATE_KEY=0x... ASSET=AUSD pnpm deploy:testnet   # add a pool for AUSD / USDT0 / MUSD
 ```
 
 The deploy script:
 
-- Deploys `MockUSDC` unless `USDC_ADDRESS` is set.
-- Deploys the Poseidon library, the three Groth16 verifiers,
-  `MaweeRegistry`, and `MaweePool` (admin = deployer unless `POOL_ADMIN` is set).
-- Writes the chain id, contract addresses, deploy block and USDC settings to
-  `web/.env.local`.
+- Deploys `MockUSDC` unless `USDC_ADDRESS` is set. With `ASSET` set, it adds a
+  pool for that stablecoin next to the USDC pool, using `TOKEN_ADDRESS` or, on
+  testnet, a fresh `MockStablecoin`.
+- Deploys the Poseidon library, the Groth16 verifiers and `MaweePool` (admin =
+  deployer unless `POOL_ADMIN` is set), and reuses the existing
+  `MaweeRegistry`.
+- Writes review candidates (pool manifest, web env, indexer config) to
+  `.deploy-candidates/`. Live settings are never changed; copy
+  `NEXT_PUBLIC_MAWEE_POOLS` into `web/.env.local` after reviewing.
 
 ## Web App
 
@@ -287,10 +303,37 @@ deploying a new pool, invoke that route once with
 A chain or pool address change automatically clears and rebuilds the public
 deposit/nullifier mirror; it never clears user keys or other collections.
 
+## Deployed Contracts (Monad Testnet)
+
+Chain id `10143`. All pools share the same verifiers and zkeys, and are
+administered by `0xc7e8dc6fA065f85f9f9726dD9a299643c4991DC9`. The mock tokens
+have 6 decimals, support EIP-2612 permit, and can be minted by anyone.
+
+| Contract | Address | Deploy block |
+| --- | --- | --- |
+| MaweeRegistry | [`0xa3024964732bf324256c3dbb3be314e254cb6a70`](https://testnet.monadexplorer.com/address/0xa3024964732bf324256c3dbb3be314e254cb6a70) | — |
+| MaweePool · USDC (payment requests) | [`0xfdfcb53eeb148709510bbd4e7d164065605baea5`](https://testnet.monadexplorer.com/address/0xfdfcb53eeb148709510bbd4e7d164065605baea5) | 68160915 |
+| MockUSDC | [`0x8912cd818eb3f69dc7eee43101349e332ec06c7a`](https://testnet.monadexplorer.com/address/0x8912cd818eb3f69dc7eee43101349e332ec06c7a) | — |
+| MaweePool · AUSD | [`0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092`](https://testnet.monadexplorer.com/address/0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092) | 68589168 |
+| MockStablecoin · AUSD | [`0x2079ff55905b71b6b1bd9675d49e319a7cd9b317`](https://testnet.monadexplorer.com/address/0x2079ff55905b71b6b1bd9675d49e319a7cd9b317) | — |
+| MaweePool · USDT0 | [`0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d`](https://testnet.monadexplorer.com/address/0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d) | 68589289 |
+| MockStablecoin · USDT0 | [`0xb14e77bd5d715195e222768446fddc2bc2a7b932`](https://testnet.monadexplorer.com/address/0xb14e77bd5d715195e222768446fddc2bc2a7b932) | — |
+| MaweePool · MUSD | [`0x8df03a1b169dda861d633035b945a484bcf234ca`](https://testnet.monadexplorer.com/address/0x8df03a1b169dda861d633035b945a484bcf234ca) | 68589368 |
+| MockStablecoin · MUSD | [`0x706fbe38d0806ef7092fa8e2582cad2841ec1494`](https://testnet.monadexplorer.com/address/0x706fbe38d0806ef7092fa8e2582cad2841ec1494) | — |
+
+The matching `NEXT_PUBLIC_MAWEE_POOLS` manifest lists the USDC pool as the only
+`requestCapable` pool; AUSD, USDT0 and MUSD pools take payments and cash-outs.
+
+```sh
+# web/.env.local
+NEXT_PUBLIC_MAWEE_POOLS=[{"chainId":10143,"address":"0xfdfcb53eeb148709510bbd4e7d164065605baea5","deployBlock":68160915,"token":"0x8912cd818eb3f69dc7eee43101349e332ec06c7a","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":true,"asset":"USDC"},{"chainId":10143,"address":"0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092","deployBlock":68589168,"token":"0x2079ff55905b71b6b1bd9675d49e319a7cd9b317","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":false,"asset":"AUSD","mintable":true},{"chainId":10143,"address":"0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d","deployBlock":68589289,"token":"0xb14e77bd5d715195e222768446fddc2bc2a7b932","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":false,"asset":"USDT0","mintable":true},{"chainId":10143,"address":"0x8df03a1b169dda861d633035b945a484bcf234ca","deployBlock":68589368,"token":"0x706fbe38d0806ef7092fa8e2582cad2841ec1494","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","asset":"MUSD","mintable":true,"requestCapable":false}]
+```
+
 ## Testnet Payment Notes
 
-On testnet the pool asset is `MockUSDC`. Recipients can mint test USDC from the
-dashboard's **Add funds** dialog. With the relayer enabled, payers only need
+On testnet the pool assets are `MockUSDC` and `MockStablecoin` stand-ins for
+AUSD, USDT0 and MUSD. Recipients pick an asset in the balance card's currency
+menu and can mint test tokens for it from the dashboard's **Add funds** dialog. With the relayer enabled, payers only need
 USDC (they sign a permit and a deposit authorization; no MON). Receiving never
 requires the recipient to hold anything first.
 

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   hasLocal: true,
   deriveAndStoreAccount: vi.fn(),
   replace: vi.fn(),
+  pathname: "/",
   usernameOf: vi.fn(),
   clearLocalAccount: vi.fn(),
   syncLocalAccountIdentity: vi.fn(),
@@ -55,7 +56,7 @@ vi.mock("@privy-io/react-auth", () => ({
 
 vi.mock("next/navigation", () => {
   const router = { replace: mocks.replace };
-  return { useRouter: () => router };
+  return { useRouter: () => router, usePathname: () => mocks.pathname };
 });
 
 vi.mock("../src/lib/privy-wallet", () => ({
@@ -152,6 +153,7 @@ function Probe() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.pathname = "/";
   mocks.authenticated = true;
   mocks.unstableHookValues = false;
   mocks.wallets = [{ walletClientType: "privy", address: WALLET }];
@@ -193,6 +195,24 @@ describe("WalletProvider Privy session", () => {
     expect(mocks.findWallet).not.toHaveBeenCalled();
     expect(mocks.createWallet).not.toHaveBeenCalled();
     expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("leaves a payer's Privy session alone on a pay link", async () => {
+    mocks.pathname = "/pay/alice";
+    mocks.restore.mockResolvedValue(null);
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("yes"),
+    );
+    // Paying must not create a Mawee account or leave the checkout.
+    expect(mocks.restore).not.toHaveBeenCalled();
+    expect(mocks.bootstrap).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId("address")).toHaveTextContent("none");
   });
 
   it("does not restart setup when Privy returns unstable hook identities", async () => {

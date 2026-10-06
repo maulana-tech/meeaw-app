@@ -19,7 +19,8 @@ import {
   removeManageToken,
 } from "../../features/paymentLinks/manageTokens";
 import type { PaymentLink } from "../../features/paymentLinks/types";
-import { fromBaseUnits } from "../../lib/crypto";
+import { ASSETS } from "../../lib/assets";
+import { formatAssetUnits } from "../../lib/paymentAsset";
 import { payUrl } from "../../lib/paymentLinks";
 import { api } from "../../trpc/client";
 import { Button } from "../ui/button";
@@ -32,8 +33,8 @@ import { PersonalLinkCard } from "./PersonalLinkCard";
 
 function displayAmount(link: PaymentLink) {
   return link.amount
-    ? `${fromBaseUnits(BigInt(link.amount))} USDC`
-    : "Open amount";
+    ? `${formatAssetUnits(BigInt(link.amount), link.tokenDecimals ?? 6)} ${ASSETS[link.asset ?? "USDC"].label}`
+    : `Open amount · ${ASSETS[link.asset ?? "USDC"].label}`;
 }
 
 function isUnauthorized(e: unknown): boolean {
@@ -364,6 +365,7 @@ function GeneratedLinkCard({
         onOpenChange={setQrOpen}
         url={url}
         triggerRef={qrTriggerRef}
+        asset={ASSETS[link.asset ?? "USDC"].label}
       />
 
       <LinkEditorDialog

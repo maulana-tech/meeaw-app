@@ -8,11 +8,11 @@ import {
   accountStatus,
   gasFaucetUrl,
   mintTestUsdc,
-  usdcMintable,
 } from "../../lib/chain";
 import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../lib/crypto";
 import { payIntoNote } from "../../lib/deposit";
 import { accountPubkeys, getAccount } from "../../lib/notes";
+import { activePool, type PoolDescriptor } from "../../lib/pools";
 import { useGasless } from "../../lib/useGasless";
 import { Button } from "../ui/button";
 import {
@@ -26,23 +26,28 @@ import { linenInsetClass } from "../ui/glass";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useWallet } from "../WalletProvider";
+import { assetLabel } from "./useSelectedPool";
 
 const TEST_MINT_UNITS = 100n * 10n ** BigInt(USDC_DECIMALS);
 
 /**
  * Funds arrive in the user's Mawee wallet (a Privy embedded wallet on Monad)
  * and are then shielded into a private note. On testnet the dialog can also
- * mint MockUSDC and points at the MON gas faucet.
+ * mint the pool's mock token and points at the MON gas faucet.
  */
 export function AddFundsDialog({
   open,
   onOpenChange,
   onComplete,
+  pool = activePool(),
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete?: () => void | Promise<void>;
+  /** Pool to fund; its token is what the wallet balance and mint refer to. */
+  pool?: PoolDescriptor;
 }) {
+  const asset = assetLabel(pool);
   const { address, getSigner } = useWallet();
   const gasless = useGasless();
   const [status, setStatus] = useState<AccountStatus | null>(null);
@@ -51,8 +56,9 @@ export function AddFundsDialog({
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (address) setStatus(await accountStatus(address).catch(() => null));
-  }, [address]);
+    if (address)
+      setStatus(await accountStatus(address, pool).catch(() => null));
+  }, [address, pool]);
 
   useEffect(() => {
     if (open) void refresh();
@@ -67,11 +73,11 @@ export function AddFundsDialog({
   const mint = async () => {
     setBusy("mint");
     try {
-      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS);
-      toast.success(`Minted ${fromBaseUnits(TEST_MINT_UNITS)} test USDC`);
+      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS, pool);
+      toast.success(`Minted ${fromBaseUnits(TEST_MINT_UNITS)} test ${asset}`);
       await refresh();
     } catch (error) {
-      toast.error("Could not mint test USDC", {
+      toast.error(`Could not mint test ${asset}`, {
         description: error instanceof Error ? error.message : undefined,
       });
     } finally {
@@ -93,8 +99,13 @@ export function AddFundsDialog({
     setBusy("shield");
     try {
       const units = toBaseUnits(amount);
-      await payIntoNote(await getSigner(), await accountPubkeys(acct), units);
-      toast.success(`Added ${amount} USDC to your private balance`);
+      await payIntoNote(
+        await getSigner(),
+        await accountPubkeys(acct),
+        units,
+        pool,
+      );
+      toast.success(`Added ${amount} ${asset} to your private balance`);
       setAmount("");
       await refresh();
       await onComplete?.();
@@ -113,7 +124,7 @@ export function AddFundsDialog({
         <DialogHeader>
           <DialogTitle>Add funds</DialogTitle>
           <DialogDescription>
-            Send USDC on Monad to your Mawee wallet, then move it into your
+            Send {asset} on Monad to your Mawee wallet, then move it into your
             private balance.
           </DialogDescription>
         </DialogHeader>
@@ -139,7 +150,7 @@ export function AddFundsDialog({
           </div>
           <div className="grid grid-cols-2 gap-3 border-t border-foreground/12 pt-3 text-sm">
             <div>
-              <span className="block text-foreground/60">USDC</span>
+              <span className="block text-foreground/60">{asset}</span>
               <span className="font-mono text-lg text-foreground tabular-nums">
                 {status ? status.usdc : "…"}
               </span>
@@ -160,9 +171,9 @@ export function AddFundsDialog({
               </div>
             )}
           </div>
-          {usdcMintable || (gasFaucetUrl && gasless === false) ? (
+          {pool.mintable || (gasFaucetUrl && gasless === false) ? (
             <div className="flex flex-wrap gap-2 border-t border-foreground/12 pt-3">
-              {usdcMintable ? (
+              {pool.mintable ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -176,7 +187,7 @@ export function AddFundsDialog({
                       aria-hidden="true"
                     />
                   )}
-                  Get {fromBaseUnits(TEST_MINT_UNITS)} test USDC
+                  Get {fromBaseUnits(TEST_MINT_UNITS)} test {asset}
                 </Button>
               ) : null}
               {gasFaucetUrl && gasless === false ? (
@@ -225,7 +236,8 @@ export function AddFundsDialog({
             </Button>
           </div>
           <p className="text-xs text-foreground/60">
-            A zero-knowledge proof is generated in your browser, then the USDC
+            A zero-knowledge proof is generated in your browser, then the{" "}
+            {asset}
             becomes a private note only you can spend.
           </p>
         </form>

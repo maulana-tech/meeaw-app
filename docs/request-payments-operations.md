@@ -8,7 +8,7 @@ configuration are separate operational actions.
 ## What a deployment needs
 
 - A Merge-capable MaweePool and its verifier artifacts on the target chain.
-- A public `NEXT_PUBLIC_MAWEE_POOLS` manifest with exactly one active pool and
+- A public `NEXT_PUBLIC_MAWEE_POOLS` manifest with one active pool per asset and
   every prior pool retained as legacy. Legacy pools stay withdrawable and
   cannot fund request payments.
 - An indexer configuration that watches every pool in that manifest, with the
@@ -100,3 +100,10 @@ relaying, receipt verification, note consolidation, request-output recovery,
 pool-scoped indexing, and the dashboard interactions. Local-chain test results
 and testnet evidence must be reported separately. A passing local suite does not
 mean a testnet pool has been deployed or activated.
+
+## Multi-asset eligibility
+
+Multiple assets may have an active `requestCapable` pool. Request creation selects
+one eligible pool; payment/funding/recovery retain the signed record's scope.
+Enabling a flag requires compatible deployed contracts and workers, independently
+for each asset. See [multi-asset evidence and behavior](multi-asset-payment-flows.md).

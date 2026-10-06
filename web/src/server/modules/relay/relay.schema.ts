@@ -53,7 +53,16 @@ export const registerInput = z.object({
   rotate: z.boolean().default(false),
 });
 
+// A pool in the deployment's manifest (`${chainId}:${poolAddress}`); omitted
+// means the primary active pool. Only manifest scopes resolve on the server.
+const poolScope = z
+  .string()
+  .regex(/^\d{1,16}:0x[0-9a-f]{40}$/)
+  .optional();
+
 export const depositInput = z.object({
+  // Must be an active pool: legacy pools take no new deposits.
+  pool: poolScope,
   payer: address,
   commitment: hex32,
   amount: uint,
@@ -74,12 +83,8 @@ export const depositInput = z.object({
 });
 
 export const withdrawInput = z.object({
-  // The note's pool (`${chainId}:${poolAddress}`); omitted means the active
-  // pool. Only scopes in the deployment's manifest are accepted.
-  pool: z
-    .string()
-    .regex(/^\d{1,16}:0x[0-9a-f]{40}$/)
-    .optional(),
+  // The note's pool; legacy pools stay withdrawable.
+  pool: poolScope,
   recipient: address,
   amount: uint,
   root: hex32,
@@ -110,3 +115,5 @@ export type RegisterInput = z.infer<typeof registerInput>;
 export type DepositInput = z.infer<typeof depositInput>;
 export type WithdrawInput = z.infer<typeof withdrawInput>;
 export type TransferInput = z.infer<typeof transferInput>;
+
+export const mintTestUsdcInput = z.object({ pool: poolScope }).optional();
