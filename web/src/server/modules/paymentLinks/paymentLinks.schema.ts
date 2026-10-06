@@ -1,7 +1,11 @@
 import { z } from "zod";
+import { env } from "../../../env";
 import { usernameSchema } from "../usernames/usernames.schema";
 
-const USDC_DECIMALS = 7;
+// Must match the client's toBaseUnits/fromBaseUnits. A hardcoded 7 (left over
+// from Stellar USDC) stored every fixed amount 10x too large.
+const USDC_DECIMALS = env.NEXT_PUBLIC_USDC_DECIMALS;
+const AMOUNT_PATTERN = new RegExp(`^\\d+(\\.\\d{0,${USDC_DECIMALS}})?$`);
 
 function decimalToBaseUnits(amount: string): bigint {
   const [whole, frac = ""] = amount.trim().split(".");
@@ -18,7 +22,7 @@ const amountInput = z
     if (value === null || value === undefined || value.trim() === "")
       return null;
     const trimmed = value.trim();
-    if (!/^\d+(\.\d{0,7})?$/.test(trimmed)) {
+    if (!AMOUNT_PATTERN.test(trimmed)) {
       ctx.addIssue({ code: "custom", message: "Enter a valid USDC amount." });
       return z.NEVER;
     }
@@ -39,7 +43,7 @@ const amountFormField = z
     if (value === null || value === undefined || value.trim() === "")
       return null;
     const trimmed = value.trim();
-    if (!/^\d+(\.\d{0,7})?$/.test(trimmed)) {
+    if (!AMOUNT_PATTERN.test(trimmed)) {
       ctx.addIssue({ code: "custom", message: "Enter a valid USDC amount." });
       return z.NEVER;
     }
