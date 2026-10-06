@@ -91,6 +91,8 @@ export type MyNote = {
   spent: boolean;
   receivedAt?: string;
   spentAt?: string;
+  nullifierHex?: `0x${string}`;
+  internal?:boolean;
 };
 export type ScanResult = {
   scope: PoolScope;
@@ -107,18 +109,19 @@ export type ScanResult = {
 /// needed to build Merkle proofs. Never mix results from different pools.
 export async function scanMyNotes(
   acct: LocalAccount,
-  options: { refresh?: boolean; pool?: PoolDescriptor; includeRequestRecovery?:boolean } = {},
+  options: { refresh?: boolean; pool?: PoolDescriptor; includeRequestRecovery?:boolean; includeTransferRecovery?:boolean } = {},
 ): Promise<ScanResult> {
   const pool = options.pool ?? activePool();
   const mirror =
     options.refresh === false
       ? await loadPoolMirror(pool)
       : await refreshPoolMirror(pool);
-  const scan=await scanMirrorForAccount(acct, mirror, pool);
+  let scan=await scanMirrorForAccount(acct, mirror, pool);
   if(options.includeRequestRecovery){
     const {recoverPaidRequestOutputs}=await import("../features/requests/requestNoteRecovery");
-    return recoverPaidRequestOutputs(acct,pool,scan);
+    scan=await recoverPaidRequestOutputs(acct,pool,scan);
   }
+  if(options.includeTransferRecovery){const {recoverParticipantTransfers}=await import("../features/transfers/transferNoteRecovery");scan=await recoverParticipantTransfers(acct,pool,scan);}
   return scan;
 }
 
@@ -180,6 +183,7 @@ async function scanMirrorForAccount(
       spent,
       receivedAt: d.receivedAt,
       spentAt: spent ? spentAtByNullifier[nullifierHex] : undefined,
+      nullifierHex: `0x${nullifierHex}`,
     };
     notes.push(note);
     if (!spent) unverified.push({ note, nullifierBytes });

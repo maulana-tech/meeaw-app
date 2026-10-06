@@ -167,6 +167,13 @@ proof, so a front-runner cannot redirect it.
 
 ### 6. Shielded transfer
 
+The dashboard's **Send** button pays a registered `@username` directly from private
+USDC balance, with an optional note encrypted for both participants. Fragmented
+balance is consolidated automatically; a persistent pending operation can be
+reopened after reload. History distinguishes outgoing sends, incoming payments,
+and actual withdrawals without counting consolidation/change as income.
+See [Direct transfer operations](docs/direct-transfer-operations.md).
+
 A note can be split into a recipient note and a change note without tokens
 leaving the pool. Value conservation is enforced inside the transfer circuit.
 

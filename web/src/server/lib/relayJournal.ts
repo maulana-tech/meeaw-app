@@ -52,7 +52,8 @@ export class RelayJournal {
     await this.wallets.updateOne({_id:send.walletKey,fence:send.fence,"active.operationKey":send.operationKey,"active.txHash":send.txHash},{$set:{"active.phase":"unknown"}});
   }
   async abandonUnsigned(send:RelaySend){
-    await this.wallets.updateOne({_id:send.walletKey,fence:send.fence,"active.operationKey":send.operationKey,"active.phase":"reserved"},{$set:{active:null}});
+    const result=await this.wallets.updateOne({_id:send.walletKey,fence:send.fence,"active.operationKey":send.operationKey,"active.phase":"reserved"},{$set:{active:null}});
+    return result.modifiedCount===1;
   }
   async finish(send:RelaySend,phase:"confirmed"|"reverted"){
     // Save recoverable history before releasing the wallet for another nonce.

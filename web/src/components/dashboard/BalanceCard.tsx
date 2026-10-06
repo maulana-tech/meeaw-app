@@ -2,6 +2,7 @@
 
 import {
   ArrowUpRight,
+  Send,
   Check,
   ChevronDown,
   Eye,
@@ -54,6 +55,7 @@ export function BalanceCard({
   unlockLabel = "Unlock",
   onUnlock,
   onReceive,
+  onSend,
   onAddFunds,
   cashOutHref,
   onRefresh,
@@ -66,6 +68,7 @@ export function BalanceCard({
   unlockLabel?: string;
   onUnlock?: () => void;
   onReceive?: () => void;
+  onSend?: () => void;
   onAddFunds?: () => void;
   cashOutHref?: string;
   onRefresh?: () => void;
@@ -178,6 +181,7 @@ export function BalanceCard({
       </p>
 
       <div className="mt-auto flex flex-wrap gap-2 pt-8">
+        {onSend?<button type="button" className={dashButtonPrimary} onClick={onSend} disabled={loading} aria-label="Send private payment"><Send aria-hidden="true"/>Send</button>:null}
         {onReceive ? (
           <button
             type="button"

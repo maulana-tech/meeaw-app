@@ -19,6 +19,19 @@ Share a link or QR code and get paid. Two flavors:
 
 Every link comes with a QR code for in-person or mobile payments.
 
+## Direct private sends
+
+Use **Send** on your private balance card to pay another registered `@username`
+without waiting for a payment request. Enter a USDC amount and an optional private
+note, review the recipient, then confirm. Mawee combines fragmented active-pool
+balance automatically. The note is encrypted for both participants.
+
+A pending send can be reopened from the dashboard or History after closing its
+modal or reloading. History distinguishes Sent, Received, and actual Cashed out
+transactions; internal consolidation and change do not count as payments.
+See [direct-transfer operations](direct-transfer-operations.md) for recovery and
+deployment prerequisites. Legacy balances remain withdrawal-only.
+
 ## Payment Requests
 
 Ask a registered `@username` for a fixed USDC amount with an optional private

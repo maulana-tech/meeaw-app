@@ -11,6 +11,8 @@ vi.mock("@privy-io/react-auth", () => ({
     return props.children;
   },
 }));
+// Provider configuration does not need the pool RPC/prover dependency graph.
+vi.mock("../src/lib/chain",()=>({chain:{id:10143,name:"Monad Testnet"}}));
 
 describe("PrivyAppProvider", () => {
   it("uses Google, email and passkey login and provisions a Monad embedded wallet", async () => {

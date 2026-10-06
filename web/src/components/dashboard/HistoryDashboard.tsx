@@ -9,6 +9,13 @@ import { DashboardNotice } from "./DashboardNotice";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { dashButtonPrimary, dashCell, dashLedger } from "./styles";
 import { useMyNotes } from "./useMyNotes";
+import { useEffect,useState } from "react";
+import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
+import { useTransfers } from "../../features/transfers/hooks/useTransfers";
+import type { TransferRecord } from "../../features/transfers/types";
+import { PendingTransfersNotice } from "./PendingTransfersNotice";
+import { TransferProgress } from "./TransferProgress";
+import { TransferDetailsDialog } from "./TransferDetailsDialog";
 
 export function HistoryDashboard() {
   const { address, accountUnlocked, promptUnlock, recoveryMethod } =
@@ -16,18 +23,20 @@ export function HistoryDashboard() {
   const { notes, loading, error, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
   );
-  const ready = accountUnlocked && !loading;
-  const received = notes.reduce((sum, note) => sum + note.amount, 0n);
-  const cashedOut = notes
-    .filter((note) => note.spent)
-    .reduce((sum, note) => sum + note.amount, 0n);
+  const activity=usePaymentActivity(notes),transfers=useTransfers(),[selected,setSelected]=useState<TransferRecord|null>(null);
+  const ready=accountUnlocked&&!loading&&!activity.loading&&!activity.incomplete&&!activity.error;
+  useEffect(()=>setSelected(null),[address]);
+  const total=(kind:"received"|"sent"|"cashedOut")=>activity.rows.filter(r=>r.kind===kind&&r.status==="confirmed").reduce((sum,r)=>sum+(r.amount??0n),0n);
+  const received=total("received"),cashedOut=total("cashedOut"),sent=total("sent");
 
   return (
     <>
       <DashboardPageHeader
         title="History"
-        description="Private payments you received and everything you cashed out."
+        description="Your private received payments, transfers and cash-outs."
       />
+      <PendingTransfersNotice record={transfers.pending} onOpen={setSelected}/>
+      {accountUnlocked&&activity.incomplete&&<p role="status" className="mb-4 text-sm text-(--dash-ash)">Some transaction details are still being checked. Totals will appear once the history is complete.</p>}
 
       <dl
         className={`${dashLedger} mb-5 sm:grid-cols-3`}
@@ -43,8 +52,8 @@ export function HistoryDashboard() {
           value={ready ? `−${fromBaseUnits(cashedOut)} USDC` : null}
         />
         <Stat
-          label="Payments received"
-          value={ready ? String(notes.length) : null}
+          label="Total sent"
+          value={ready ? `−${fromBaseUnits(sent)} USDC` : null}
         />
       </dl>
 
@@ -65,10 +74,10 @@ export function HistoryDashboard() {
           Your payment records are encrypted on this device. Only you can read
           them.
         </DashboardNotice>
-      ) : error ? (
+      ) : error||activity.error ? (
         <ToastFeedback
           title="Could not load history"
-          message={error}
+          message={error??"Transaction details could not be loaded. Try again shortly."}
           variant="error"
           toastId="history-load-error"
           action={{ label: "Try again", onClick: refresh }}
@@ -76,11 +85,14 @@ export function HistoryDashboard() {
       ) : (
         <ActivityFeed
           notes={notes}
-          loading={loading}
+          rows={activity.rows}
+          loading={loading||activity.loading}
           title="All activity"
           showExport
+          onTransferOpen={id=>setSelected(activity.records.find(r=>r.id===id)??null)}
         />
       )}
+      {selected&&(selected.status==="pending"&&selected.sender.wallet.toLowerCase()===address.toLowerCase()?<TransferProgress record={selected} open onClose={()=>setSelected(null)}/>:<TransferDetailsDialog record={selected} open onOpenChange={next=>{if(!next)setSelected(null);}}/>)}
     </>
   );
 }
