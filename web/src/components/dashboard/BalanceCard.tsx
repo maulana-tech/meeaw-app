@@ -30,14 +30,25 @@ import {
   dashIconButton,
 } from "./styles";
 
-const UPCOMING_STABLECOINS = ["EURC", "GYEN", "ZUSD", "AUDD"] as const;
-const STABLECOIN_ASSETS = {
-  USDC: "/stablecoins/usdc.svg",
-  EURC: "/stablecoins/eurc.png",
-  GYEN: "/stablecoins/gyen.png",
-  ZUSD: "/stablecoins/zusd.png",
-  AUDD: "/stablecoins/audd.png",
-} as const;
+// Upcoming balance currencies. AUSD, USDT and MUSD are fiat-backed payment
+// stablecoins already live on Monad (largest supply first, per DefiLlama); MON
+// is Monad's native token. Each needs its own pool, since a MaweePool holds
+// exactly one token. Entries without a logo show their initials.
+const UPCOMING_CURRENCIES: readonly {
+  symbol: string;
+  issuer: string;
+  logo?: string;
+}[] = [
+  { symbol: "AUSD", issuer: "Agora" },
+  { symbol: "USDT", issuer: "Tether" },
+  { symbol: "MUSD", issuer: "MetaMask USD" },
+  { symbol: "MON", issuer: "Monad native token" },
+  { symbol: "EURC", issuer: "Circle", logo: "/stablecoins/eurc.png" },
+  { symbol: "GYEN", issuer: "GMO Trust", logo: "/stablecoins/gyen.png" },
+  { symbol: "ZUSD", issuer: "GMO Trust", logo: "/stablecoins/zusd.png" },
+  { symbol: "AUDD", issuer: "Novatti", logo: "/stablecoins/audd.png" },
+];
+const USDC_LOGO = "/stablecoins/usdc.svg";
 
 function formatUsd(units: bigint): string {
   return Number(fromBaseUnits(units)).toLocaleString("en-US", {
@@ -220,7 +231,7 @@ function CurrencySelector() {
         title="Choose currency"
       >
         <Image
-          src={STABLECOIN_ASSETS.USDC}
+          src={USDC_LOGO}
           alt=""
           width={22}
           height={22}
@@ -241,12 +252,12 @@ function CurrencySelector() {
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 pt-1 pb-2 text-xs font-semibold text-brand-linen/65">
-            Stablecoins on Monad
+            Currencies
           </DropdownMenuLabel>
           <DropdownMenuItem className="min-h-12 gap-3 rounded-lg bg-brand-linen/12 px-3 py-2 text-brand-linen focus:bg-brand-linen/18 focus:text-brand-linen [&_svg]:text-brand-linen">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
               <Image
-                src={STABLECOIN_ASSETS.USDC}
+                src={USDC_LOGO}
                 alt=""
                 width={24}
                 height={24}
@@ -259,22 +270,34 @@ function CurrencySelector() {
             </span>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="my-2 bg-brand-linen/12" />
-          {UPCOMING_STABLECOINS.map((currency) => (
+          {UPCOMING_CURRENCIES.map(({ symbol, issuer, logo }) => (
             <DropdownMenuItem
-              key={currency}
+              key={symbol}
               disabled
               className="min-h-11 gap-3 rounded-lg px-3 py-2 text-brand-linen/55 opacity-100 data-disabled:pointer-events-none data-disabled:opacity-55"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
-                <Image
-                  src={STABLECOIN_ASSETS[currency]}
-                  alt=""
-                  width={24}
-                  height={24}
-                  className="size-6"
-                />
+              {logo ? (
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
+                  <Image
+                    src={logo}
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="size-6"
+                  />
+                </span>
+              ) : (
+                <span
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full border border-current/30 text-[10px] font-semibold"
+                  aria-hidden="true"
+                >
+                  {symbol.slice(0, 2)}
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{symbol}</span>
+                <span className="block text-[11px]">{issuer}</span>
               </span>
-              <span className="min-w-0 flex-1 font-semibold">{currency}</span>
               <span className="text-xs">Coming soon</span>
             </DropdownMenuItem>
           ))}
