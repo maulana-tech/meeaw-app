@@ -34,6 +34,8 @@ const mocks = vi.hoisted(() => ({
   fetchPoolLogs: vi.fn(),
   readContract: vi.fn(),
   stateFindOne: vi.fn(),
+  stateFindOneAndUpdate: vi.fn(),
+  stateUpdateOne: vi.fn(),
   depositFind: vi.fn(),
   nullifierFind: vi.fn(),
 }));
@@ -57,7 +59,11 @@ vi.mock("../src/lib/pools", () => ({
 }));
 
 vi.mock("../src/server/db/mongo", () => ({
-  getIndexerState: vi.fn(async () => ({ findOne: mocks.stateFindOne })),
+  getIndexerState: vi.fn(async () => ({
+    findOne: mocks.stateFindOne,
+    findOneAndUpdate: mocks.stateFindOneAndUpdate,
+    updateOne: mocks.stateUpdateOne,
+  })),
   getDeposits: vi.fn(async () => ({ find: mocks.depositFind })),
   getSpentNullifiers: vi.fn(async () => ({ find: mocks.nullifierFind })),
 }));
@@ -107,8 +113,31 @@ describe("getPoolSnapshot", () => {
     return { indexedAt, address };
   }
 
+  it("catches a fresh mirror up on read so new payments show without waiting", async () => {
+    seed(pools.legacy.scope, OLD_POOL);
+    mocks.stateFindOneAndUpdate.mockImplementation((_filter, update) => ({
+      leaseOwner: update.$set.leaseOwner,
+    }));
+    mocks.stateUpdateOne.mockResolvedValue({ acknowledged: true });
+    mocks.fetchPoolLogs.mockResolvedValue({
+      logs: [],
+      scannedTo: 30n,
+      latestBlock: 30n,
+    });
+    const { getPoolSnapshot } = await import(
+      "../src/server/modules/deposits/deposits.service"
+    );
+    await getPoolSnapshot(3, 20, pools.legacy.scope);
+
+    expect(mocks.fetchPoolLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ afterBlock: 25n }),
+    );
+  });
+
   it("serves incremental rows below the published watermark without RPC", async () => {
     const { indexedAt } = seed(pools.active.scope, POOL);
+    // Another worker holds the sync lease, so the read must not hit RPC.
+    mocks.stateFindOneAndUpdate.mockResolvedValue({ leaseOwner: "other" });
     const { getPoolSnapshot } = await import(
       "../src/server/modules/deposits/deposits.service"
     );

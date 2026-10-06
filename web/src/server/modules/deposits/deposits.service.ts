@@ -381,6 +381,7 @@ function toDepositOutput(d: DepositDoc): DepositOutput {
 const healInFlight = new Map<string, Promise<PoolSyncResult>>();
 const lastHealAttempt = new Map<string, number>();
 const HEAL_COOLDOWN_MS = 15_000;
+const FRESHEN_WAIT_MS = 2_000;
 
 function healMirror(pool: PoolDescriptor): Promise<PoolSyncResult> {
   const pending = healInFlight.get(pool.scope);
@@ -545,11 +546,15 @@ export async function getPoolSnapshot(
       await healMirror(pool).catch(() => {});
       state = await states.findOne({ _id: stateId });
     }
-  } else {
-    const isStale =
-      !state?.indexedAt ||
-      Date.now() - state.indexedAt.getTime() > STALE_AFTER_MS;
-    if (isStale && (healing || cooled)) void healMirror(pool).catch(() => {});
+  } else if (healing || cooled) {
+    // Freshen on read: catching up since the last sync is usually one
+    // eth_getLogs call, so a new payment shows on the next load instead of
+    // after the stale window. Wait briefly; a slow sync carries on behind.
+    await Promise.race([
+      healMirror(pool).catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, FRESHEN_WAIT_MS)),
+    ]);
+    state = await states.findOne({ _id: stateId });
   }
   const configuredPool = state?.scope === pool.scope;
   const publishedBlock = configuredPool ? (state?.publishedBlock ?? 0) : 0;
