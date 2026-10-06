@@ -14,7 +14,10 @@ chains:
     contracts:
       - name: Pool
         address:
-          - "0x0000000000000000000000000000000000000000"
+          - "0xfdfcb53eeb148709510bbd4e7d164065605baea5"
+          - "0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092"
+          - "0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d"
+          - "0x8df03a1b169dda861d633035b945a484bcf234ca"
         events:
           - event: Deposit(uint32 indexed leafIndex, bytes32 commitment, bytes32 ephemeralPk, bytes ciphertext)
           - event: Spend(bytes32 indexed nullifier)
@@ -22,7 +25,7 @@ chains:
           - event: PausedSet(bool paused)
       - name: Registry
         address:
-          - "0x0000000000000000000000000000000000000000"
+          - "0xa3024964732bf324256c3dbb3be314e254cb6a70"
         events:
           - event: Registered(bytes32 indexed usernameHash, string username, address indexed owner, bytes32 notePubkey, bytes32 viewPubkey)
           - event: PubkeysRotated(bytes32 indexed usernameHash, address indexed owner, bytes32 notePubkey, bytes32 viewPubkey)

@@ -27,8 +27,10 @@ pnpm test                         # simulated events through the real handlers
 ENVIO_API_TOKEN=... pnpm dev      # local: needs Docker; GraphQL on :8080
 ```
 
-`pnpm deploy:testnet` in `contracts/` rewrites `config.yaml` with the new
-addresses and start block.
+`pnpm deploy:testnet` in `contracts/` writes an updated copy to
+`.deploy-candidates/<run>/indexer.config.candidate.yaml`; review it and copy it
+over `config.yaml`. The committed config lists the live testnet Registry and the
+USDC, AUSD, USDT0 and MUSD pools.
 
 ## Deploy to Envio Cloud
 
