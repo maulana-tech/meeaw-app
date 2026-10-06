@@ -39,6 +39,32 @@ function parse(manifest: unknown[] | undefined, chainId = 10143) {
   });
 }
 
+describe("transfer capabilities", () => {
+  it("derives old USDC support conservatively and permits explicit AUSD transfers", () => {
+    const pools = parse([
+      entry(NEW, "active"),
+      entry(OLD, "active", {
+        asset: "AUSD",
+        requestCapable: false,
+        transferCapable: true,
+      }),
+    ]);
+    expect(pools.map((p) => p.transferCapable)).toEqual([true, true]);
+    expect(
+      parse([entry(NEW, "active", { requestCapable: false })])[0]
+        .transferCapable,
+    ).toBe(false);
+  });
+  it("rejects legacy transfer capability", () => {
+    expect(() =>
+      parse([
+        entry(NEW, "active"),
+        entry(OLD, "legacy", { transferCapable: true }),
+      ]),
+    ).toThrow();
+  });
+});
+
 describe("pool manifest", () => {
   it("separates the same leaf index in different pools", () => {
     const a = scopeKey(31337, "0x1111111111111111111111111111111111111111");
@@ -166,13 +192,12 @@ describe("multi-asset pools", () => {
     ).toThrow(/two active pools for one asset/);
   });
 
-  it("lets only one pool accept payment requests", () => {
-    expect(() =>
-      parse([
-        entry(NEW, "active"),
-        ausd(AUSD_POOL, "active", { requestCapable: true }),
-      ]),
-    ).toThrow(/Only one pool/);
+  it("lets one pool per asset accept payment requests", () => {
+    const pools = parse([
+      entry(NEW, "active"),
+      ausd(AUSD_POOL, "active", { requestCapable: true }),
+    ]);
+    expect(pools.filter((p) => p.requestCapable)).toHaveLength(2);
   });
 
   it("refuses a pool whose decimals differ from the app's amount format", () => {

@@ -41,6 +41,7 @@ export type PoolDescriptor = {
   confirmations: number;
   role: "active" | "legacy";
   requestCapable: boolean;
+  transferCapable: boolean;
 };
 
 export type RequestMetadata = {

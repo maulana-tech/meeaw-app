@@ -2,15 +2,17 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
+import { parseRequestAmount } from "../../../features/requests/validation";
 import { ASSETS } from "../../../lib/assets";
 import {
   chain,
@@ -21,7 +23,9 @@ import {
 } from "../../../lib/chain";
 import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../../lib/crypto";
 import { payIntoNote } from "../../../lib/deposit";
-import { activePools } from "../../../lib/pools";
+import { formatAssetUnits } from "../../../lib/paymentAsset";
+import { resolveCheckoutPool } from "../../../lib/paymentLinkAsset";
+import { activePoolFor, activePools } from "../../../lib/pools";
 import { useGasless } from "../../../lib/useGasless";
 
 const payInput = z.object({
@@ -34,7 +38,7 @@ type PayInput = z.infer<typeof payInput>;
 
 const TEST_MINT_UNITS = 100n * 10n ** BigInt(USDC_DECIMALS);
 
-export function PayForm({
+function PayFormContent({
   account,
   username,
   link,
@@ -67,13 +71,16 @@ export function PayForm({
 
   const lockedAmount =
     link && link.owner === username && link.amount
-      ? fromBaseUnits(BigInt(link.amount))
+      ? formatAssetUnits(
+          BigInt(link.amount),
+          link.tokenDecimals ?? USDC_DECIMALS,
+        )
       : null;
-  // Fixed-amount links are priced in the primary asset (USDC); open amounts
-  // can be paid in any asset that has an active pool.
-  const pool =
-    (!lockedAmount && pools.find((p) => p.scope === poolScope)) || pools[0];
+  const pool = resolveCheckoutPool(link, poolScope);
   const asset = ASSETS[pool.asset].label;
+  const identity = `${address}:${username}:${link?.id ?? "general"}:${pool.scope}`,
+    current = useRef(identity);
+  current.current = identity;
 
   const {
     register,
@@ -91,10 +98,13 @@ export function PayForm({
 
   const refreshBalance = useCallback(async () => {
     if (!address) return setBalance(null);
-    setBalance(await tokenBalance(address, pool).catch(() => null));
-  }, [address, pool]);
+    const at = identity;
+    const next = await tokenBalance(address, pool).catch(() => null);
+    if (current.current === at) setBalance(next);
+  }, [address, pool, identity]);
 
   useEffect(() => {
+    setBalance(null);
     void refreshBalance();
   }, [refreshBalance]);
 
@@ -125,8 +135,14 @@ export function PayForm({
       return;
     }
     try {
-      const units = toBaseUnits(amount);
+      const at = current.current;
+      const valid = () =>
+        current.current === at &&
+        activePoolFor(pool.asset)?.scope === pool.scope;
+      const units = parseRequestAmount(amount, pool.tokenDecimals);
       const signer = await getSigner();
+      if (!valid())
+        throw new Error("Your wallet or payment asset changed. Review again.");
       if ((await tokenBalance(signer.address, pool)) < units) {
         setStatus({
           kind: "err",
@@ -135,11 +151,14 @@ export function PayForm({
         return;
       }
 
+      if (!valid())
+        throw new Error("Your wallet or payment asset changed. Review again.");
       const { txHash } = await payIntoNote(
         signer,
         { notePubkey: account.note_pubkey, viewPubkey: account.view_pubkey },
         units,
         pool,
+        valid,
       );
       setStatus({
         kind: "ok",
@@ -170,7 +189,7 @@ export function PayForm({
       </div>
 
       <form className="grid gap-2" onSubmit={onSubmit}>
-        {pools.length > 1 && !lockedAmount ? (
+        {pools.length > 1 && !link ? (
           <fieldset className="flex flex-wrap gap-2">
             <legend className="sr-only">Currency</legend>
             {pools.map((p) => (
@@ -319,6 +338,27 @@ export function PayForm({
           toastId="payment-status"
         />
       </form>
+      <PrivacyPoolStat pool={pool} className="pt-4" />
     </Card>
+  );
+}
+
+export function PayForm(props: Parameters<typeof PayFormContent>[0]) {
+  try {
+    if (props.link) resolveCheckoutPool(props.link);
+  } catch {
+    return (
+      <Card appearance="glass">
+        <p role="alert">
+          This payment asset is unavailable. Ask the recipient for another link.
+        </p>
+      </Card>
+    );
+  }
+  return (
+    <PayFormContent
+      key={`${props.username}:${props.link?.id ?? "general"}:${props.link?.asset ?? ""}`}
+      {...props}
+    />
   );
 }

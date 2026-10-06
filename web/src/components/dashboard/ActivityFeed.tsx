@@ -3,13 +3,16 @@
 import { ChevronRight, Download, FileCheck } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
+import {
+  buildActivityRows,
+  csvActivity,
+} from "../../features/payments/activityRows";
+import type { ActivityRow } from "../../features/payments/activityTypes";
+import { ASSETS } from "../../lib/assets";
 import { HISTORY_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import type { MyNote } from "../../lib/notes";
-import { ASSETS } from "../../lib/assets";
-import { activePool, findPool } from "../../lib/pools";
-import { buildActivityRows,csvActivity } from "../../features/payments/activityRows";
-import type { ActivityRow } from "../../features/payments/activityTypes";
+import { findPool } from "../../lib/pools";
 import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { DiscloseDialog } from "./DiscloseDialog";
@@ -27,7 +30,15 @@ const TABS = ["All", "Received", "Sent", "Cashed out"] as const;
 type Tab = (typeof TABS)[number];
 
 function toEvents(notes: MyNote[]): ActivityEvent[] {
-  return [...buildActivityRows({notes,transfers:[],payloads:new Map(),evidence:[],viewer:"0x0000000000000000000000000000000000000000"})];
+  return [
+    ...buildActivityRows({
+      notes,
+      transfers: [],
+      payloads: new Map(),
+      evidence: [],
+      viewer: "0x0000000000000000000000000000000000000000",
+    }),
+  ];
 }
 
 function formatWhen(value: string | undefined): string {
@@ -66,8 +77,8 @@ export function ActivityFeed({
   className,
 }: {
   notes: MyNote[];
-  rows?:readonly ActivityRow[];
-  onTransferOpen?:(id:string)=>void;
+  rows?: readonly ActivityRow[];
+  onTransferOpen?: (id: string) => void;
   loading: boolean;
   limit?: number;
   showSeeAll?: boolean;
@@ -79,7 +90,8 @@ export function ActivityFeed({
 }) {
   const [tab, setTab] = useState<Tab>("All");
   const [discloseLeaf, setDiscloseLeaf] = useState<number | null>(null);
-  const events = useMemo(() => rows??toEvents(notes), [notes,rows]);
+  const [discloseScope, setDiscloseScope] = useState<string | null>(null);
+  const events = useMemo(() => rows ?? toEvents(notes), [notes, rows]);
   const filtered = useMemo(() => {
     if (tab === "Received") return events.filter((e) => e.kind === "received");
     if (tab === "Sent") return events.filter((e) => e.kind === "sent");
@@ -188,24 +200,61 @@ export function ActivityFeed({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">
-                    {{received:"Payment received",sent:"Payment sent",cashedOut:"Cashed out",attempt:"Transfer attempt",unclassified:"Payment details loading"}[event.kind]}
-                    {event.counterparty&&<span className="ml-1.5 text-(--dash-ash)">@{event.counterparty}</span>}
+                    {
+                      {
+                        received: "Payment received",
+                        sent: "Payment sent",
+                        cashedOut: "Cashed out",
+                        attempt: "Transfer attempt",
+                        unclassified: "Payment details loading",
+                      }[event.kind]
+                    }
+                    {event.counterparty && (
+                      <span className="ml-1.5 text-(--dash-ash)">
+                        @{event.counterparty}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 text-xs text-(--dash-ash)">
                     {formatWhen(event.at)}
-                    {event.status!=="confirmed"&&` · ${event.status==="pending"?"In progress":"Failed"}`}
+                    {event.status !== "confirmed" &&
+                      ` · ${event.status === "pending" ? "In progress" : "Failed"}`}
                   </div>
-                  {event.note&&<p className="mt-1 break-words whitespace-pre-wrap text-xs text-(--dash-ash)">{event.note}</p>}
+                  {event.note && (
+                    <p className="mt-1 break-words whitespace-pre-wrap text-xs text-(--dash-ash)">
+                      {event.note}
+                    </p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right text-sm font-medium tabular-nums">
-                  {event.amount===null?"Locked":`${event.kind==="received"?"+":event.kind==="sent"||event.kind==="cashedOut"?"−":""}${fromBaseUnits(event.amount)}`}
-                  {event.amount!==null&&<span className="ml-1 text-(--dash-ash)">{rowAsset(event.scope)}</span>}
+                  {event.amount === null
+                    ? "Locked"
+                    : `${event.kind === "received" ? "+" : event.kind === "sent" || event.kind === "cashedOut" ? "−" : ""}${fromBaseUnits(event.amount)}`}
+                  {event.amount !== null && (
+                    <span className="ml-1 text-(--dash-ash)">
+                      {rowAsset(event.scope)}
+                    </span>
+                  )}
                 </div>
-                {event.transferId&&onTransferOpen?<button type="button" className={dashIconButton} onClick={()=>onTransferOpen(event.transferId!)} aria-label="View transfer"><ChevronRight aria-hidden="true"/></button>:event.kind === "received"&&event.leafIndex!==null&&event.scope===activePool().scope ? (
+                {event.transferId && onTransferOpen ? (
                   <button
                     type="button"
                     className={dashIconButton}
-                    onClick={() => setDiscloseLeaf(event.leafIndex)}
+                    onClick={() => onTransferOpen(event.transferId!)}
+                    aria-label="View transfer"
+                  >
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                ) : event.kind === "received" &&
+                  event.leafIndex !== null &&
+                  findPool(event.scope) ? (
+                  <button
+                    type="button"
+                    className={dashIconButton}
+                    onClick={() => {
+                      setDiscloseScope(event.scope);
+                      setDiscloseLeaf(event.leafIndex);
+                    }}
                     aria-label="Prove payment"
                     title="Download a proof of this payment (PDF)"
                   >
@@ -220,6 +269,9 @@ export function ActivityFeed({
       </section>
 
       <DiscloseDialog
+        pool={
+          discloseScope ? (findPool(discloseScope) ?? undefined) : undefined
+        }
         open={discloseLeaf !== null}
         onClose={() => setDiscloseLeaf(null)}
         leafIndex={discloseLeaf}

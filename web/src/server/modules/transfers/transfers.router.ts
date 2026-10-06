@@ -1,6 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { requestIdSchema } from "../../../features/requests/validation";
+import {
+  poolScopeSchema,
+  requestIdSchema,
+} from "../../../features/requests/validation";
 import {
   signedTransferSchema,
   transferSubmissionSchema,
@@ -62,9 +65,11 @@ export const transfersRouter = createTRPCRouter({
     .query(({ ctx, input }) =>
       getTransfer(ctx.privyUserId, input.id).catch(mapTransferError),
     ),
-  pending: protectedProcedure.query(({ ctx }) =>
-    pendingTransfer(ctx.privyUserId).catch(mapTransferError),
-  ),
+  pending: protectedProcedure
+    .input(z.strictObject({ pool: poolScopeSchema.optional() }).optional())
+    .query(({ ctx, input }) =>
+      pendingTransfer(ctx.privyUserId, input?.pool).catch(mapTransferError),
+    ),
   status: protectedProcedure
     .input(transferIdInput)
     .query(({ ctx, input }) =>

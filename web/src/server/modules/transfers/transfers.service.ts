@@ -9,7 +9,8 @@ import type {
   TransferParticipant,
 } from "../../../features/transfers/types";
 import { signedTransferSchema } from "../../../features/transfers/validation";
-import { requestPool } from "../../../lib/pools";
+import { requirePaymentPool } from "../../../lib/paymentAsset";
+import type { PoolScope } from "../../../lib/pools";
 import { getDb } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
 import { resolveUsername } from "../usernames/usernames.service";
@@ -56,9 +57,12 @@ async function registered(p: TransferParticipant) {
 export async function createTransfer(user: string, input: SignedTransfer) {
   enforceTransferLimit(user, "create");
   const record = signedTransferSchema.parse(input),
-    wallet = await transferCaller(user),
-    pool = requestPool();
-  if (!pool || record.pool !== pool.scope) throw new TransferUnavailableError();
+    wallet = await transferCaller(user);
+  try {
+    requirePaymentPool(record.pool, "transfer");
+  } catch {
+    throw new TransferUnavailableError();
+  }
   if (record.sender.wallet.toLowerCase() !== wallet)
     throw new TransferRejectedError("Sign with your own sending account.");
   if (
@@ -89,7 +93,7 @@ export async function listTransfers(
   enforceTransferLimit(user, "query");
   return (await transferRepo()).list(await transferCaller(user), input);
 }
-export async function pendingTransfer(user: string) {
+export async function pendingTransfer(user: string, pool?: PoolScope) {
   enforceTransferLimit(user, "query");
-  return (await transferRepo()).pending(await transferCaller(user));
+  return (await transferRepo()).pending(await transferCaller(user), pool);
 }

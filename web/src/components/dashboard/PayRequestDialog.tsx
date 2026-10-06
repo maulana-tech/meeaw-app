@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import type { RequestRow } from "../../features/requests/hooks/useRequests";
 import type { PaymentOperation } from "../../features/requests/types";
+import { ASSETS } from "../../lib/assets";
 import { fromBaseUnits } from "../../lib/crypto";
 import { findPool } from "../../lib/pools";
 import { Button } from "../ui/button";
@@ -49,6 +50,7 @@ export function PayRequestDialog({
   const record = request?.record ?? null,
     amount = request?.amount ?? null;
   const pool = record ? findPool(record.pool) : null;
+  const asset = pool ? ASSETS[pool.asset ?? "USDC"].label : "Unknown asset";
   const notes = useMyNotes(
     address && accountUnlocked && pool?.role === "active" ? address : undefined,
     pool ?? undefined,
@@ -138,7 +140,8 @@ export function PayRequestDialog({
                 Requested by @{record.requester.username}
               </p>
               <p className="mt-3 font-heading text-4xl font-medium tabular-nums">
-                {fromBaseUnits(amount)} <span className="text-base">USDC</span>
+                {fromBaseUnits(amount)}{" "}
+                <span className="text-base">{asset}</span>
               </p>
               <p className="mx-auto mt-2 max-w-sm break-words text-sm text-muted-foreground">
                 {request.note || "Payment request"}
@@ -156,7 +159,7 @@ export function PayRequestDialog({
                   </span>
                   <span className="tabular-nums">
                     {balanceReady
-                      ? `${fromBaseUnits(balance)} USDC`
+                      ? `${fromBaseUnits(balance)} ${asset}`
                       : notes.loading || notes.refreshing
                         ? "Checking private balance…"
                         : pool?.role === "legacy"
@@ -168,7 +171,8 @@ export function PayRequestDialog({
             </div>
             {showBalance && balanceReady && balance < amount ? (
               <p className="text-sm text-muted-foreground">
-                Add or receive at least {fromBaseUnits(amount - balance)} USDC
+                Add or receive at least {fromBaseUnits(amount - balance)}{" "}
+                {asset}
                 in this pool before paying.
               </p>
             ) : null}
@@ -264,7 +268,7 @@ export function PayRequestDialog({
                 ) : null}
                 {operation?.completedMerges
                   ? "Continue payment"
-                  : `Pay ${fromBaseUnits(amount)} USDC`}
+                  : `Pay ${fromBaseUnits(amount)} ${asset}`}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             ) : null}

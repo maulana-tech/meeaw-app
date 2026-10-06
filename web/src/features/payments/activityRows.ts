@@ -1,4 +1,6 @@
+import { ASSETS } from "../../lib/assets";
 import { fromBaseUnits } from "../../lib/crypto";
+import { findPool } from "../../lib/pools";
 import type { ActivityInput, ActivityRow } from "./activityTypes";
 export function buildActivityRows(
   input: ActivityInput,
@@ -136,13 +138,18 @@ function csvText(value: string) {
 }
 export function csvActivity(rows: readonly ActivityRow[]) {
   return (
-    "type,status,amount_usdc,counterparty,note,confirmed_at,transaction\n" +
+    "type,status,amount,asset,counterparty,note,confirmed_at,transaction\n" +
     rows
       .map((r) =>
         [
           r.kind,
           r.status,
           r.amount === null ? "" : fromBaseUnits(r.amount),
+          csvText(
+            findPool(r.scope)
+              ? ASSETS[findPool(r.scope)!.asset].label
+              : "Unknown asset",
+          ),
           csvText(r.counterparty ?? ""),
           csvText(r.note ?? ""),
           csvText(r.at),

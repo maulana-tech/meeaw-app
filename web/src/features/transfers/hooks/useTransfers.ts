@@ -2,8 +2,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useWallet } from "../../../components/WalletProvider";
+import type { PoolScope } from "../../../lib/pools";
 import { api } from "../../../trpc/client";
-export function useTransfers(direction: "sent" | "received" | "all" = "all") {
+export function useTransfers(
+  direction: "sent" | "received" | "all" = "all",
+  pool?: PoolScope,
+) {
   const { address } = useWallet(),
     owner = `${address.toLowerCase()}:${direction}`;
   const [page, setPage] = useState<{
@@ -23,9 +27,9 @@ export function useTransfers(direction: "sent" | "received" | "all" = "all") {
     refetchInterval: 15_000,
   });
   const pending = useQuery({
-    queryKey: ["pending-direct-transfer", address.toLowerCase()],
+    queryKey: ["pending-direct-transfer", address.toLowerCase(), pool ?? "all"],
     enabled: Boolean(address),
-    queryFn: () => api.transfers.pending.query(),
+    queryFn: () => api.transfers.pending.query(pool ? { pool } : undefined),
     refetchInterval: 5000,
   });
   const refetch = query.refetch,

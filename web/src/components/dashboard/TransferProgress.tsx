@@ -7,8 +7,8 @@ import type {
   TransferRecord,
 } from "../../features/transfers/types";
 import { chain } from "../../lib/chain";
-import { fromBaseUnits } from "../../lib/crypto";
 import { getAccount } from "../../lib/notes";
+import { formatPaymentAmount } from "../../lib/paymentAsset";
 import { resolvePool } from "../../lib/pools";
 import { Button } from "../ui/button";
 import {
@@ -90,7 +90,7 @@ export function TransferProgress({
         {payload ? (
           <div className="grid gap-2">
             <p className="text-2xl tabular-nums">
-              {fromBaseUnits(BigInt(payload.amount))} USDC
+              {formatPaymentAmount(BigInt(payload.amount), record.pool)}
             </p>
             <p className="text-sm text-muted-foreground">
               To @{record.recipient.username}

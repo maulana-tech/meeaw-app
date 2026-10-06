@@ -26,7 +26,10 @@ export async function payIntoNote(
   recipient: NoteRecipient,
   units: bigint,
   pool?: PoolDescriptor,
+  isCurrent: () => boolean = () => true,
 ): Promise<{ leafIndex: number; txHash: string }> {
+  if (!isCurrent())
+    throw new Error("The payment selection changed. Review again.");
   const salt = randomFieldElement();
   const ownerPkField = fromBE(recipient.notePubkey);
   const note = toBE32(await commitment(units, ownerPkField, salt));
@@ -41,5 +44,16 @@ export async function payIntoNote(
     units,
     salt,
   );
-  return poolDeposit(signer, note, units, proof, ephemeralPk, ciphertext, pool);
+  if (!isCurrent())
+    throw new Error("The payment selection changed. Review again.");
+  return poolDeposit(
+    signer,
+    note,
+    units,
+    proof,
+    ephemeralPk,
+    ciphertext,
+    pool,
+    isCurrent,
+  );
 }

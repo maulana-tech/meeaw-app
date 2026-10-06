@@ -309,7 +309,9 @@ async function main() {
     confirmations: 1,
     role: "active",
     asset,
-    ...(isUsdc ? { requestCapable: true } : { mintable }),
+    transferCapable:true,
+    requestCapable:true,
+    ...(!isUsdc?{mintable}:{}),
   };
   const manifest = candidateManifest({
     chainId,

@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { MongoServerError } from "mongodb";
+import { env } from "../../../env";
+import { activePoolFor } from "../../../lib/pools";
 import type { PaymentLinkDoc } from "../../db/mongo";
 import { getPaymentLinks } from "../../db/mongo";
 import {
@@ -51,6 +53,8 @@ function assertManageAuthorized(
 function toOutput(doc: PaymentLinkDoc): LinkOutput {
   const description = doc.description ?? doc.label ?? null;
   return {
+    asset: doc.asset ?? "USDC",
+    tokenDecimals: doc.tokenDecimals ?? env.NEXT_PUBLIC_USDC_DECIMALS,
     id: doc._id,
     owner: doc.owner,
     slug: doc.slug ?? doc._id,
@@ -70,12 +74,18 @@ export async function createLink(
 ): Promise<CreateLinkResult> {
   const links = await getPaymentLinks();
   const now = new Date();
+  const asset = input.asset ?? "USDC",
+    pool = activePoolFor(asset);
+  if (!pool || pool.tokenDecimals !== env.NEXT_PUBLIC_USDC_DECIMALS)
+    throw new Error("This payment asset is unavailable.");
   const manageToken = newManageToken();
   const doc: PaymentLinkDoc = {
     _id: newLinkId(),
     owner: input.username,
     slug: input.slug,
     amount: input.amount ?? null,
+    asset,
+    tokenDecimals: pool.tokenDecimals,
     description: input.description ?? null,
     label: input.description ?? null,
     state: "active",
@@ -133,6 +143,11 @@ export async function updateLink(input: UpdateLinkInput): Promise<LinkOutput> {
   const links = await getPaymentLinks();
   const doc = await links.findOne({ _id: input.id });
   assertManageAuthorized(doc, input.manageToken);
+  if (
+    (doc.tokenDecimals ?? env.NEXT_PUBLIC_USDC_DECIMALS) !==
+    env.NEXT_PUBLIC_USDC_DECIMALS
+  )
+    throw new Error("This link's token precision is unsupported.");
   const res = await links.findOneAndUpdate(
     { _id: input.id },
     {

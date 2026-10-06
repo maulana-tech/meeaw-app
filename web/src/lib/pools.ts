@@ -34,6 +34,7 @@ const manifestEntry = z.strictObject({
   confirmations: z.number().int().min(1).max(64).default(1),
   role: z.enum(["active", "legacy"]),
   requestCapable: z.boolean(),
+  transferCapable: z.boolean().optional(),
   // Optional so manifests written before multi-asset pools stay valid.
   asset: z.enum(ASSET_SYMBOLS).default("USDC"),
   // Absent on older manifests: their USDC pool keeps following
@@ -81,6 +82,7 @@ export function parsePoolManifest(input: {
         confirmations: 1,
         role: "active",
         requestCapable: false,
+        transferCapable: false,
         asset: "USDC",
         mintable: input.legacy.mintable,
       },
@@ -98,6 +100,7 @@ export function parsePoolManifest(input: {
 
   const pools: PoolDescriptor[] = entries.map((e) => ({
     ...e,
+    transferCapable: e.transferCapable ?? e.requestCapable,
     mintable: e.mintable ?? (e.asset === "USDC" && input.legacy.mintable),
     scope: scopeKey(e.chainId, e.address),
   }));
@@ -113,9 +116,9 @@ export function parsePoolManifest(input: {
     throw new Error(
       "NEXT_PUBLIC_MAWEE_POOLS has two active pools for one asset.",
     );
-  if (pools.filter((p) => p.requestCapable).length > 1)
-    throw new Error("Only one pool can accept payment requests.");
   if (pools.some((p) => p.role === "legacy" && p.requestCapable))
+    throw new Error("Legacy pools are withdrawal-only.");
+  if (pools.some((p) => p.role === "legacy" && p.transferCapable))
     throw new Error("Legacy pools are withdrawal-only.");
   // ponytail: amounts are formatted with one app-wide decimals setting, so every
   // pool must match it. Per-pool formatting is needed before an 18-decimal
@@ -179,8 +182,12 @@ export function legacyPools(): readonly PoolDescriptor[] {
 }
 
 /** The active pool that accepts payment requests, otherwise null. */
-export function requestPool(): PoolDescriptor | null {
-  return activePools().find((p) => p.requestCapable) ?? null;
+export function requestPool(asset?: string): PoolDescriptor | null {
+  return (
+    activePools().find(
+      (p) => p.requestCapable && (!asset || p.asset === asset),
+    ) ?? null
+  );
 }
 
 /** Only approved scopes resolve; arbitrary caller-supplied pools never do. */

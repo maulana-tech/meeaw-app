@@ -1,7 +1,11 @@
-# Mawee - private USDC payments on Monad
+# Mawee - private payments on Monad
 
-Mawee lets freelancers and small businesses accept USDC through simple payment
+Mawee lets freelancers and small businesses accept stablecoins through simple payment
 links without exposing their full payment history on a public ledger.
+
+Multi-asset Send, Requests, and managed links reuse the existing USDC, AUSD,
+USDT0, and mUSD pools. Availability depends on each pool's capabilities. See
+[behavior, migration, and activation evidence](docs/multi-asset-payment-flows.md).
 
 Clients pay a link. Mawee turns that payment into a private note in a shielded
 pool on Monad. The recipient can later withdraw to any Monad address, send it

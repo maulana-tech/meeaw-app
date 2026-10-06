@@ -12,6 +12,7 @@ export type CandidatePool = Readonly<{
   confirmations?: number;
   role?: "active" | "legacy";
   requestCapable?: boolean;
+  transferCapable?: boolean;
   /** Stablecoin the pool holds; absent means USDC (pre multi-asset). */
   asset?: string;
   /** Testnet mock token anyone can mint. */
@@ -111,6 +112,7 @@ export function candidateManifest(input: {
       "confirmations",
       "role",
       "requestCapable",
+      "transferCapable",
       "asset",
       "mintable",
     ]);
@@ -130,6 +132,7 @@ export function candidateManifest(input: {
       pool.depth !== 20 ||
       !["active", "legacy"].includes(pool.role as string) ||
       typeof pool.requestCapable !== "boolean" ||
+      (pool.transferCapable!==undefined&&typeof pool.transferCapable!=="boolean") ||
       !(ASSETS as readonly string[]).includes(assetOf(pool)) ||
       (pool.mintable !== undefined && typeof pool.mintable !== "boolean")
     ) {
@@ -146,10 +149,11 @@ export function candidateManifest(input: {
       depth: 20,
       confirmations: confirmations(pool.confirmations ?? 1),
       ...(assetOf(pool) === newAsset
-        ? { role: "legacy" as const, requestCapable: false }
+        ? { role: "legacy" as const, requestCapable: false,transferCapable:false }
         : {
             role: pool.role as "active" | "legacy",
             requestCapable: pool.requestCapable as boolean,
+            transferCapable:pool.role==="legacy"?false:(pool.transferCapable??pool.requestCapable) as boolean,
           }),
       asset: assetOf(pool),
       ...(pool.mintable === undefined ? {} : { mintable: pool.mintable as boolean }),
@@ -173,8 +177,8 @@ export function candidateManifest(input: {
         // Without a manifest the env pool is the live USDC pool; it only steps
         // down when the new pool holds the same asset.
         ...(assetOf(input.previousPool) === newAsset
-          ? { role: "legacy" as const, requestCapable: false }
-          : { role: "active" as const, requestCapable: true }),
+          ? { role: "legacy" as const, requestCapable: false,transferCapable:false }
+          : { role: "active" as const, requestCapable: true,transferCapable:input.previousPool.transferCapable??input.previousPool.requestCapable??assetOf(input.previousPool)==="USDC" }),
         asset: assetOf(input.previousPool),
       });
     }
@@ -189,6 +193,7 @@ export function candidateManifest(input: {
     role: "active",
     // Payment requests are USDC-only for now.
     requestCapable: input.newPool.requestCapable ?? newAsset === "USDC",
+    transferCapable:input.newPool.transferCapable??input.newPool.requestCapable??newAsset==="USDC",
     asset: newAsset,
   };
   const manifest = [

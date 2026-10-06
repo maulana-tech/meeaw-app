@@ -216,3 +216,10 @@ ENVIO_GRAPHQL_URL=https://<your envio endpoint>/v1/graphql
 
 Every variable is described in [web/.env.example](../web/.env.example) and the
 [Developer Reference](reference.md).
+
+## Multi-asset links
+
+Use the normal migration workflow to apply `20261006130000-payment-link-assets.js`.
+Old documents default to USDC before migration; the backfill preserves integer
+amounts and management-token hashes. Review pool capabilities before activating
+Send or Requests for another asset. See [multi-asset payment flows](multi-asset-payment-flows.md).

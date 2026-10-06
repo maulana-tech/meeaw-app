@@ -14,7 +14,7 @@ import type {
   RequestPage,
   SignedRequest,
 } from "../../../features/requests/types";
-import { requestPool } from "../../../lib/pools";
+import { resolvePool } from "../../../lib/pools";
 import { getPaymentRequests } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
 import { RegistryLookupFailedError } from "../usernames/usernames.errors";
@@ -127,9 +127,13 @@ export async function createRequest(
   now: Date = new Date(),
 ): Promise<PaymentRequest> {
   enforceRequestLimit(privyUserId, "create");
-  const pool = requestPool();
-  if (!pool) throw new RequestUnavailableError();
-  if (record.pool !== pool.scope)
+  let pool: ReturnType<typeof resolvePool>;
+  try {
+    pool = resolvePool(record.pool);
+  } catch {
+    throw new RequestRejectedError("This request targets an unsupported pool.");
+  }
+  if (pool.role !== "active" || !pool.requestCapable)
     throw new RequestRejectedError("This request targets an unsupported pool.");
 
   const wallet = await callerWallet(privyUserId);

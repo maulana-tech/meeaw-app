@@ -11,6 +11,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
+import { useTransfers } from "../../features/transfers/hooks/useTransfers";
+import type { TransferRecord } from "../../features/transfers/types";
 import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH, WITHDRAW_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
@@ -24,8 +27,10 @@ import { CreateRequestDialog } from "./CreateRequestDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { weeklyActivity } from "./dashboardAnalytics";
 import { PaymentQrDialog } from "./PaymentQrDialog";
+import { PendingTransfersNotice } from "./PendingTransfersNotice";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { RequestsTile } from "./RequestsTile";
+import { SendTransferDialog } from "./SendTransferDialog";
 import {
   dashButtonPrimary,
   dashButtonSecondary,
@@ -33,13 +38,8 @@ import {
   dashFocus,
   dashLedger,
 } from "./styles";
-import { useMyNotes } from "./useMyNotes";
-import { SendTransferDialog } from "./SendTransferDialog";
 import { TransferProgress } from "./TransferProgress";
-import { PendingTransfersNotice } from "./PendingTransfersNotice";
-import { useTransfers } from "../../features/transfers/hooks/useTransfers";
-import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
-import type { TransferRecord } from "../../features/transfers/types";
+import { useMyNotes } from "./useMyNotes";
 import { assetLabel, useSelectedPool } from "./useSelectedPool";
 export function Dashboard() {
   const {
@@ -56,14 +56,24 @@ export function Dashboard() {
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const pool = useSelectedPool();
-  const [sendOpen,setSendOpen]=useState(false),[selectedTransfer,setSelectedTransfer]=useState<TransferRecord|null>(null),[progressOpen,setProgressOpen]=useState(false),[startTransfer,setStartTransfer]=useState(false);
-  const transfers=useTransfers("sent");
-  useEffect(()=>{setSelectedTransfer(null);setProgressOpen(false);setSendOpen(false);},[address]);
+  const [sendOpen, setSendOpen] = useState(false),
+    [selectedTransfer, setSelectedTransfer] = useState<TransferRecord | null>(
+      null,
+    ),
+    [progressOpen, setProgressOpen] = useState(false),
+    [startTransfer, setStartTransfer] = useState(false);
+  const transfers = useTransfers("sent", pool.scope);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Account changes must clear payment dialogs.
+  useEffect(() => {
+    setSelectedTransfer(null);
+    setProgressOpen(false);
+    setSendOpen(false);
+  }, [address]);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
     pool,
   );
-  const activity=usePaymentActivity(notes);
+  const activity = usePaymentActivity(notes);
   // Activity spans every pool; keep the selected asset's rows only.
   const rows = useMemo(
     () => activity.rows.filter((r) => r.scope === pool.scope),
@@ -86,7 +96,14 @@ export function Dashboard() {
         description="Your private balance, payment link and recent activity."
       />
 
-      <PendingTransfersNotice record={transfers.pending} onOpen={record=>{setSelectedTransfer(record);setStartTransfer(false);setProgressOpen(true);}}/>
+      <PendingTransfersNotice
+        record={transfers.pending}
+        onOpen={(record) => {
+          setSelectedTransfer(record);
+          setStartTransfer(false);
+          setProgressOpen(true);
+        }}
+      />
       {needsUsername ? (
         <div className="mb-4 flex flex-col gap-4 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -123,7 +140,17 @@ export function Dashboard() {
             unlockLabel={unlockLabel(recoveryMethod)}
             onUnlock={promptUnlock}
             onReceive={username ? () => setReceiveOpen(true) : undefined}
-            onSend={username ? ()=>{if(transfers.pending){setSelectedTransfer(transfers.pending);setStartTransfer(false);setProgressOpen(true);}else setSendOpen(true);} : undefined}
+            onSend={
+              username
+                ? () => {
+                    if (transfers.pending) {
+                      setSelectedTransfer(transfers.pending);
+                      setStartTransfer(false);
+                      setProgressOpen(true);
+                    } else setSendOpen(true);
+                  }
+                : undefined
+            }
             onAddFunds={() => setAddFundsOpen(true)}
             cashOutHref={WITHDRAW_PATH}
             onRefresh={refresh}
@@ -170,9 +197,29 @@ export function Dashboard() {
       <section aria-label="Requests" className="mt-4">
         <RequestsTile />
       </section>
-      <CreateRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
-      <SendTransferDialog open={sendOpen} onOpenChange={setSendOpen} onCreated={record=>{setSelectedTransfer(record);setStartTransfer(true);setProgressOpen(true);}}/>
-      {selectedTransfer&&<TransferProgress record={selectedTransfer} open={progressOpen} autoStart={startTransfer} onClose={()=>setProgressOpen(false)}/>}
+      <CreateRequestDialog
+        pool={pool}
+        open={requestOpen}
+        onOpenChange={setRequestOpen}
+      />
+      <SendTransferDialog
+        pool={pool}
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        onCreated={(record) => {
+          setSelectedTransfer(record);
+          setStartTransfer(true);
+          setProgressOpen(true);
+        }}
+      />
+      {selectedTransfer && (
+        <TransferProgress
+          record={selectedTransfer}
+          open={progressOpen}
+          autoStart={startTransfer}
+          onClose={() => setProgressOpen(false)}
+        />
+      )}
       <ReceiveDialog
         open={receiveOpen}
         onClose={() => setReceiveOpen(false)}

@@ -242,7 +242,7 @@ export async function submitTransfer(
     if (doc.currentSubmission) return advance(doc);
   }
   const pool = resolvePool(doc.pool);
-  if (pool.role !== "active" || !pool.requestCapable)
+  if (pool.role !== "active" || !(pool.transferCapable ?? pool.requestCapable))
     throw new TransferUnavailableError(
       "This pool no longer accepts private sends.",
     );
