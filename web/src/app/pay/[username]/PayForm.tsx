@@ -11,16 +11,17 @@ import { Input } from "../../../components/ui/input";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
+import { ASSETS } from "../../../lib/assets";
 import {
   chain,
   explorerTxUrl,
   type MaweeAccount,
   mintTestUsdc,
-  usdcBalance,
-  usdcMintable,
+  tokenBalance,
 } from "../../../lib/chain";
 import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../../lib/crypto";
 import { payIntoNote } from "../../../lib/deposit";
+import { activePools } from "../../../lib/pools";
 import { useGasless } from "../../../lib/useGasless";
 
 const payInput = z.object({
@@ -53,6 +54,8 @@ export function PayForm({
     signInWithEmail,
     getSigner,
   } = usePayerWallet();
+  const pools = activePools();
+  const [poolScope, setPoolScope] = useState(pools[0].scope);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [minting, setMinting] = useState(false);
   const gasless = useGasless();
@@ -66,6 +69,11 @@ export function PayForm({
     link && link.owner === username && link.amount
       ? fromBaseUnits(BigInt(link.amount))
       : null;
+  // Fixed-amount links are priced in the primary asset (USDC); open amounts
+  // can be paid in any asset that has an active pool.
+  const pool =
+    (!lockedAmount && pools.find((p) => p.scope === poolScope)) || pools[0];
+  const asset = ASSETS[pool.asset].label;
 
   const {
     register,
@@ -83,8 +91,8 @@ export function PayForm({
 
   const refreshBalance = useCallback(async () => {
     if (!address) return setBalance(null);
-    setBalance(await usdcBalance(address).catch(() => null));
-  }, [address]);
+    setBalance(await tokenBalance(address, pool).catch(() => null));
+  }, [address, pool]);
 
   useEffect(() => {
     void refreshBalance();
@@ -94,13 +102,16 @@ export function PayForm({
     setStatus(null);
     setMinting(true);
     try {
-      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS);
+      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS, pool);
       await refreshBalance();
-      setStatus({ kind: "ok", msg: "Added 100 test USDC to your wallet." });
+      setStatus({
+        kind: "ok",
+        msg: `Added ${fromBaseUnits(TEST_MINT_UNITS)} test ${asset} to your wallet.`,
+      });
     } catch (e) {
       setStatus({
         kind: "err",
-        msg: e instanceof Error ? e.message : "Could not get test USDC.",
+        msg: e instanceof Error ? e.message : `Could not get test ${asset}.`,
       });
     } finally {
       setMinting(false);
@@ -116,10 +127,10 @@ export function PayForm({
     try {
       const units = toBaseUnits(amount);
       const signer = await getSigner();
-      if ((await usdcBalance(signer.address)) < units) {
+      if ((await tokenBalance(signer.address, pool)) < units) {
         setStatus({
           kind: "err",
-          msg: `Not enough USDC on ${chain.name} in this wallet.`,
+          msg: `Not enough ${asset} on ${chain.name} in this wallet.`,
         });
         return;
       }
@@ -128,10 +139,11 @@ export function PayForm({
         signer,
         { notePubkey: account.note_pubkey, viewPubkey: account.view_pubkey },
         units,
+        pool,
       );
       setStatus({
         kind: "ok",
-        msg: `Sent ${amount} USDC to @${username}. See the proof here.`,
+        msg: `Sent ${amount} ${asset} to @${username}. See the proof here.`,
         url: explorerTxUrl(txHash),
       });
       reset({ amount: lockedAmount ?? "" });
@@ -158,11 +170,34 @@ export function PayForm({
       </div>
 
       <form className="grid gap-2" onSubmit={onSubmit}>
+        {pools.length > 1 && !lockedAmount ? (
+          <fieldset className="flex flex-wrap gap-2">
+            <legend className="sr-only">Currency</legend>
+            {pools.map((p) => (
+              <button
+                key={p.scope}
+                type="button"
+                aria-pressed={p.scope === pool.scope}
+                onClick={() => {
+                  setStatus(null);
+                  setPoolScope(p.scope);
+                }}
+                className={`min-h-9 rounded-full px-3 text-sm font-semibold ring-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen ${
+                  p.scope === pool.scope
+                    ? "bg-brand-linen text-brand-obsidian ring-brand-linen"
+                    : "text-brand-linen/75 ring-brand-linen/25 hover:text-brand-linen"
+                }`}
+              >
+                {ASSETS[p.asset].label}
+              </button>
+            ))}
+          </fieldset>
+        ) : null}
         <label
           className="text-sm font-semibold text-brand-linen"
           htmlFor="amount"
         >
-          USDC
+          {asset}
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <Input
@@ -209,10 +244,10 @@ export function PayForm({
         </div>
         <span className="text-xs text-brand-linen/55">
           {address
-            ? `Paying from ${source === "privy" ? "your email wallet" : "your browser wallet"} ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : "You need USDC plus a little MON for gas."}`
+            ? `Paying from ${source === "privy" ? "your email wallet" : "your browser wallet"} ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : `You need ${asset} plus a little MON for gas.`}`
             : "No crypto wallet? Continue with email and we create one for you."}
           {address && balance !== null
-            ? ` Balance: ${fromBaseUnits(balance)} USDC.`
+            ? ` Balance: ${fromBaseUnits(balance)} ${asset}.`
             : ""}
         </span>
         {!address && !preparing ? (
@@ -227,7 +262,7 @@ export function PayForm({
               : "Already have a wallet? Use MetaMask, Rabby or another EVM wallet"}
           </button>
         ) : null}
-        {address && usdcMintable && balance !== null && balance === 0n ? (
+        {address && pool.mintable && balance !== null && balance === 0n ? (
           <Button
             type="button"
             variant="outline"
@@ -241,7 +276,9 @@ export function PayForm({
                 aria-hidden="true"
               />
             )}
-            {minting ? "Adding test USDC…" : "Get 100 test USDC"}
+            {minting
+              ? `Adding test ${asset}…`
+              : `Get ${fromBaseUnits(TEST_MINT_UNITS)} test ${asset}`}
           </Button>
         ) : null}
         <ToastFeedback

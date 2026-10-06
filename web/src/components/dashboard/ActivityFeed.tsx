@@ -10,6 +10,7 @@ import { cn } from "../../lib/utils";
 import { Card } from "../ui/card";
 import { DiscloseDialog } from "./DiscloseDialog";
 import { dashButtonSecondary, dashFocus, dashIconButton } from "./styles";
+import { assetLabel, useSelectedPool } from "./useSelectedPool";
 
 type ActivityEvent = {
   id: string;
@@ -98,6 +99,7 @@ export function ActivityFeed({
   emptyAction?: ReactNode;
   className?: string;
 }) {
+  const asset = assetLabel(useSelectedPool());
   const [tab, setTab] = useState<Tab>("All");
   const [discloseLeaf, setDiscloseLeaf] = useState<number | null>(null);
   const events = useMemo(() => toEvents(notes), [notes]);
@@ -219,7 +221,7 @@ export function ActivityFeed({
                 <div className="shrink-0 text-right text-sm font-medium tabular-nums">
                   {event.kind === "incoming" ? "+" : "−"}
                   {fromBaseUnits(event.amount)}
-                  <span className="ml-1 text-(--dash-ash)">USDC</span>
+                  <span className="ml-1 text-(--dash-ash)">{asset}</span>
                 </div>
                 {event.kind === "incoming" ? (
                   <button

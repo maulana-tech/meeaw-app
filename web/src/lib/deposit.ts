@@ -6,6 +6,7 @@ import {
   randomFieldElement,
   toBE32,
 } from "./crypto";
+import type { PoolDescriptor } from "./pools";
 import { proveDeposit } from "./prover";
 
 export type NoteRecipient = {
@@ -24,6 +25,7 @@ export async function payIntoNote(
   signer: Signer,
   recipient: NoteRecipient,
   units: bigint,
+  pool?: PoolDescriptor,
 ): Promise<{ leafIndex: number; txHash: string }> {
   const salt = randomFieldElement();
   const ownerPkField = fromBE(recipient.notePubkey);
@@ -39,5 +41,5 @@ export async function payIntoNote(
     units,
     salt,
   );
-  return poolDeposit(signer, note, units, proof, ephemeralPk, ciphertext);
+  return poolDeposit(signer, note, units, proof, ephemeralPk, ciphertext, pool);
 }

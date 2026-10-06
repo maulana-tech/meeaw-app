@@ -11,17 +11,21 @@ import {
   useRef,
   useState,
 } from "react";
+import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH, WITHDRAW_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import { unlockLabel } from "../../lib/passkey";
+import { activePools } from "../../lib/pools";
 import { useWallet } from "../WalletProvider";
 import { ActivityFeed } from "./ActivityFeed";
 import { AddFundsDialog } from "./AddFundsDialog";
 import { BalanceCard } from "./BalanceCard";
+import { CreateRequestDialog } from "./CreateRequestDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { weeklyActivity } from "./dashboardAnalytics";
 import { PaymentQrDialog } from "./PaymentQrDialog";
 import { ReceiveDialog } from "./ReceiveDialog";
+import { RequestsTile } from "./RequestsTile";
 import {
   dashButtonPrimary,
   dashButtonSecondary,
@@ -30,9 +34,7 @@ import {
   dashLedger,
 } from "./styles";
 import { useMyNotes } from "./useMyNotes";
-
-import { CreateRequestDialog } from "./CreateRequestDialog";
-import { RequestsTile } from "./RequestsTile";
+import { assetLabel, useSelectedPool } from "./useSelectedPool";
 export function Dashboard() {
   const {
     address,
@@ -47,8 +49,10 @@ export function Dashboard() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const pool = useSelectedPool();
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
+    pool,
   );
   const insight = useMemo(() => weeklyActivity(notes), [notes]);
 
@@ -140,6 +144,7 @@ export function Dashboard() {
             received={insight.receivedAmount}
             cashedOut={insight.cashedOutAmount}
             hidden={locked || loading}
+            asset={assetLabel(pool)}
           />
         </section>
       </div>
@@ -162,6 +167,7 @@ export function Dashboard() {
         open={addFundsOpen}
         onOpenChange={setAddFundsOpen}
         onComplete={refresh}
+        pool={pool}
       />
     </>
   );
@@ -229,8 +235,11 @@ function PayLinkCard({
       {username ? (
         <>
           <p className="mt-4 text-sm leading-6 text-(--dash-ash)">
-            Anyone can pay you in USDC from any wallet. Payments land in your
-            private balance.
+            Anyone can pay you in{" "}
+            {new Intl.ListFormat("en", { type: "disjunction" }).format(
+              activePools().map((p) => ASSETS[p.asset].label),
+            )}{" "}
+            from any wallet. Payments land in your private balance.
           </p>
           <div className="mt-5 truncate border-y border-(--dash-line) py-3 font-mono text-sm">
             {displayLink || "Loading link…"}
@@ -337,7 +346,9 @@ function WeekCard({
   received,
   cashedOut,
   hidden,
+  asset,
 }: {
+  asset: string;
   buckets: number[];
   received: bigint;
   cashedOut: bigint;
@@ -377,7 +388,7 @@ function WeekCard({
         </div>
       </dl>
       <p className="mt-2 text-[11px] tracking-[0.12em] text-(--dash-ash) uppercase">
-        Amounts in USDC
+        Amounts in {asset}
       </p>
 
       <div

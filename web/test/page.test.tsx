@@ -58,9 +58,19 @@ vi.mock("../src/lib/chain", () => ({
   accountStatus: mocks.accountStatus,
   gasFaucetUrl: "https://faucet.monad.xyz",
   mintTestUsdc: vi.fn(),
-  usdcMintable: true,
   gaslessEnabled: async () => true,
 }));
+// The dashboard funds the selected pool; make it a mintable test pool.
+vi.mock("../src/lib/pools", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../src/lib/pools")>();
+  const pool = { ...real.activePool(), mintable: true };
+  return {
+    ...real,
+    activePools: () => [pool],
+    activePool: () => pool,
+    activePoolFor: (asset: string) => (asset === pool.asset ? pool : null),
+  };
+});
 
 import DashboardPage from "../src/app/(dashboard)/dashboard/page";
 import Home from "../src/app/page";

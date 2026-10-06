@@ -9,12 +9,16 @@ import { DashboardNotice } from "./DashboardNotice";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { dashButtonPrimary, dashCell, dashLedger } from "./styles";
 import { useMyNotes } from "./useMyNotes";
+import { assetLabel, useSelectedPool } from "./useSelectedPool";
 
 export function HistoryDashboard() {
   const { address, accountUnlocked, promptUnlock, recoveryMethod } =
     useWallet();
+  const pool = useSelectedPool();
+  const asset = assetLabel(pool);
   const { notes, loading, error, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
+    pool,
   );
   const ready = accountUnlocked && !loading;
   const received = notes.reduce((sum, note) => sum + note.amount, 0n);
@@ -35,12 +39,12 @@ export function HistoryDashboard() {
       >
         <Stat
           label="Total received"
-          value={ready ? `+${fromBaseUnits(received)} USDC` : null}
+          value={ready ? `+${fromBaseUnits(received)} ${asset}` : null}
           positive
         />
         <Stat
           label="Total cashed out"
-          value={ready ? `−${fromBaseUnits(cashedOut)} USDC` : null}
+          value={ready ? `−${fromBaseUnits(cashedOut)} ${asset}` : null}
         />
         <Stat
           label="Payments received"

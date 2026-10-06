@@ -11,6 +11,8 @@ const pools = vi.hoisted(() => {
     tokenDecimals: 6,
     depth: 20,
     confirmations: 1,
+    asset: "USDC",
+    mintable: false,
   } as const;
   const active = {
     ...base,
@@ -36,6 +38,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../src/lib/pools", () => ({
   activePool: () => pools.active,
+  activePools: () => [pools.active],
+  activePoolFor: (asset: string) =>
+    asset === pools.active.asset ? pools.active : null,
   legacyPools: () => [pools.legacy],
   listPools: () => pools.all,
   resolvePool: (scope: string) => {
