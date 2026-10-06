@@ -197,8 +197,8 @@ async function relayRegistryWrite(
   });
 }
 
-/** EIP-712 domain of the pool asset's permit, read from the token itself. */
-async function permitDomain(): Promise<{
+/** EIP-712 domain of a pool asset's permit, read from the token itself. */
+async function permitDomain(token: Address): Promise<{
   name: string;
   version: string;
   chainId: number;
@@ -207,7 +207,7 @@ async function permitDomain(): Promise<{
   try {
     const [, name, version, chainId, verifyingContract] =
       await publicClient.readContract({
-        address: usdcAddress,
+        address: token,
         abi: erc20Abi,
         functionName: "eip712Domain",
       });
@@ -216,24 +216,25 @@ async function permitDomain(): Promise<{
     // Tokens without ERC-5267 (e.g. FiatToken) expose name()/version().
     const [name, version] = await Promise.all([
       publicClient.readContract({
-        address: usdcAddress,
+        address: token,
         abi: erc20Abi,
         functionName: "name",
       }),
       publicClient
         .readContract({
-          address: usdcAddress,
+          address: token,
           abi: erc20Abi,
           functionName: "version",
         })
         .catch(() => "1"),
     ]);
-    return { name, version, chainId: chain.id, verifyingContract: usdcAddress };
+    return { name, version, chainId: chain.id, verifyingContract: token };
   }
 }
 
 async function relayDeposit(
   signer: Signer,
+  pool: PoolDescriptor,
   commitment: Hex,
   amount: bigint,
   proof: EvmProof,
@@ -242,16 +243,16 @@ async function relayDeposit(
 ): Promise<{ leafIndex: number; txHash: string }> {
   const [poolNonce, allowance] = await Promise.all([
     publicClient.readContract({
-      address: poolAddress,
+      address: pool.address,
       abi: maweePoolAbi,
       functionName: "nonces",
       args: [signer.address],
     }),
     publicClient.readContract({
-      address: usdcAddress,
+      address: pool.token,
       abi: erc20Abi,
       functionName: "allowance",
-      args: [signer.address, poolAddress],
+      args: [signer.address, pool.address],
     }),
   ]);
   const deadline = signatureDeadline();
@@ -266,7 +267,7 @@ async function relayDeposit(
   } | null = null;
   if (allowance < amount) {
     const tokenNonce = await publicClient.readContract({
-      address: usdcAddress,
+      address: pool.token,
       abi: erc20Abi,
       functionName: "nonces",
       args: [signer.address],
@@ -274,9 +275,9 @@ async function relayDeposit(
     const permitSignature = await signer.walletClient.signTypedData({
       account: signer.address,
       ...permitTypedData({
-        domain: await permitDomain(),
+        domain: await permitDomain(pool.token),
         owner: signer.address,
-        spender: poolAddress,
+        spender: pool.address,
         value: amount,
         nonce: tokenNonce,
         deadline,
@@ -296,7 +297,7 @@ async function relayDeposit(
     account: signer.address,
     ...depositTypedData({
       chainId: chain.id,
-      pool: poolAddress,
+      pool: pool.address,
       payer: signer.address,
       commitment,
       amount,
@@ -308,6 +309,7 @@ async function relayDeposit(
   });
 
   return api.relay.deposit.mutate({
+    pool: pool.scope,
     payer: signer.address,
     commitment,
     amount: amount.toString(),
@@ -322,11 +324,15 @@ async function relayDeposit(
 
 // --- token -----------------------------------------------------------------
 
-export async function usdcBalance(owner: string): Promise<bigint> {
-  if (usdcAddress === ZERO || !isEvmAddress(owner)) return 0n;
+/** Wallet balance of a pool's token (the primary USDC pool by default). */
+export async function tokenBalance(
+  owner: string,
+  pool: PoolDescriptor = activePool(),
+): Promise<bigint> {
+  if (pool.token === ZERO || !isEvmAddress(owner)) return 0n;
   try {
     return await publicClient.readContract({
-      address: usdcAddress,
+      address: pool.token,
       abi: erc20Abi,
       functionName: "balanceOf",
       args: [getAddress(owner)],
@@ -334,6 +340,10 @@ export async function usdcBalance(owner: string): Promise<bigint> {
   } catch {
     return 0n;
   }
+}
+
+export function usdcBalance(owner: string): Promise<bigint> {
+  return tokenBalance(owner);
 }
 
 export async function usdcBalanceLabel(owner: string): Promise<string> {
@@ -345,9 +355,12 @@ export type AccountStatus = {
   gas: string;
 };
 
-export async function accountStatus(address: string): Promise<AccountStatus> {
+export async function accountStatus(
+  address: string,
+  pool: PoolDescriptor = activePool(),
+): Promise<AccountStatus> {
   const [usdc, gas] = await Promise.all([
-    usdcBalance(address),
+    tokenBalance(address, pool),
     isEvmAddress(address)
       ? publicClient
           .getBalance({ address: getAddress(address) })
@@ -532,10 +545,14 @@ export async function poolDeposit(
   proof: EvmProof,
   ephemeralPk: Uint8Array,
   ciphertext: Uint8Array,
+  pool: PoolDescriptor = activePool(),
 ): Promise<{ leafIndex: number; txHash: string }> {
+  if (pool.role !== "active")
+    throw new Error("This pool no longer takes deposits.");
   if (await gaslessEnabled()) {
     return relayDeposit(
       signer,
+      pool,
       hexOf(commitment),
       amount,
       proof,
@@ -544,21 +561,21 @@ export async function poolDeposit(
     );
   }
   const allowance = await publicClient.readContract({
-    address: usdcAddress,
+    address: pool.token,
     abi: erc20Abi,
     functionName: "allowance",
-    args: [signer.address, poolAddress],
+    args: [signer.address, pool.address],
   });
   if (allowance < amount) {
     await send(signer, {
-      address: usdcAddress,
+      address: pool.token,
       abi: erc20Abi,
       functionName: "approve",
-      args: [poolAddress, amount],
+      args: [pool.address, amount],
     });
   }
   const { hash, receipt } = await send(signer, {
-    address: poolAddress,
+    address: pool.address,
     abi: maweePoolAbi,
     functionName: "deposit",
     args: [
@@ -578,20 +595,22 @@ export async function poolDeposit(
   return { leafIndex: event.args.leafIndex, txHash: hash };
 }
 
-export const usdcMintable = env.NEXT_PUBLIC_USDC_MINTABLE && !isMainnet;
+/** Whether the primary (USDC) pool's token can be minted for demos. */
+export const usdcMintable = activePool().mintable;
 
-/** Testnet only: mint MockUSDC to the signer so demos can be funded freely. */
+/** Testnet only: mint a pool's mock token to the signer to fund demos. */
 export async function mintTestUsdc(
   signer: Signer,
   amount: bigint,
+  pool: PoolDescriptor = activePool(),
 ): Promise<string> {
-  if (!usdcMintable) throw new Error("Test USDC minting is not available.");
+  if (!pool.mintable) throw new Error("Test tokens are not available here.");
   if (await gaslessEnabled()) {
     // The relayer mints a fixed amount to the caller's bound wallet.
-    return (await api.relay.mintTestUsdc.mutate()).txHash;
+    return (await api.relay.mintTestUsdc.mutate({ pool: pool.scope })).txHash;
   }
   const { hash } = await send(signer, {
-    address: usdcAddress,
+    address: pool.token,
     abi: erc20Abi,
     functionName: "mint",
     args: [signer.address, amount],

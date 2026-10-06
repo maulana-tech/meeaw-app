@@ -1,6 +1,7 @@
-// The pools this deployment knows about. Exactly one is active (deposits and
-// payment requests go there); legacy pools stay discoverable and withdrawable,
-// but are never merged across or used to fund a request.
+// The pools this deployment knows about. Each pool holds one stablecoin
+// (`asset`); exactly one pool per asset is active and takes new deposits.
+// Legacy pools stay discoverable and withdrawable, but are never merged across
+// or used to fund a request. At most one active pool accepts payment requests.
 //
 // NEXT_PUBLIC_MAWEE_POOLS is a public JSON manifest. It holds addresses only —
 // the strict schema rejects anything else, so no RPC credential can ride along.
@@ -10,6 +11,7 @@
 import { z } from "zod";
 import { env } from "../env";
 import type { PoolDescriptor, PoolScope } from "../features/requests/types";
+import { ASSET_SYMBOLS, ASSETS, MONAD_MAINNET_CHAIN_ID } from "./assets";
 
 export type { PoolDescriptor, PoolScope };
 
@@ -32,6 +34,11 @@ const manifestEntry = z.strictObject({
   confirmations: z.number().int().min(1).max(64).default(1),
   role: z.enum(["active", "legacy"]),
   requestCapable: z.boolean(),
+  // Optional so manifests written before multi-asset pools stay valid.
+  asset: z.enum(ASSET_SYMBOLS).default("USDC"),
+  // Absent on older manifests: their USDC pool keeps following
+  // NEXT_PUBLIC_USDC_MINTABLE, every other asset defaults to not mintable.
+  mintable: z.boolean().optional(),
 });
 
 export function scopeKey(chainId: number, addr: `0x${string}`): PoolScope {
@@ -57,6 +64,7 @@ export function parsePoolManifest(input: {
     deployBlock: number;
     token: string | undefined;
     tokenDecimals: number;
+    mintable: boolean;
   };
 }): readonly PoolDescriptor[] {
   if (!input.manifest) {
@@ -73,6 +81,8 @@ export function parsePoolManifest(input: {
         confirmations: 1,
         role: "active",
         requestCapable: false,
+        asset: "USDC",
+        mintable: input.legacy.mintable,
       },
     ];
   }
@@ -88,6 +98,7 @@ export function parsePoolManifest(input: {
 
   const pools: PoolDescriptor[] = entries.map((e) => ({
     ...e,
+    mintable: e.mintable ?? (e.asset === "USDC" && input.legacy.mintable),
     scope: scopeKey(e.chainId, e.address),
   }));
   const scopes = new Set(pools.map((p) => p.scope));
@@ -95,10 +106,29 @@ export function parsePoolManifest(input: {
     throw new Error("NEXT_PUBLIC_MAWEE_POOLS lists a pool twice.");
   if (pools.some((p) => p.chainId !== input.chainId))
     throw new Error("NEXT_PUBLIC_MAWEE_POOLS has a pool on another chain.");
-  if (pools.filter((p) => p.role === "active").length !== 1)
-    throw new Error("NEXT_PUBLIC_MAWEE_POOLS needs exactly one active pool.");
+  const actives = pools.filter((p) => p.role === "active");
+  if (actives.length === 0)
+    throw new Error("NEXT_PUBLIC_MAWEE_POOLS needs an active pool.");
+  if (new Set(actives.map((p) => p.asset)).size !== actives.length)
+    throw new Error(
+      "NEXT_PUBLIC_MAWEE_POOLS has two active pools for one asset.",
+    );
+  if (pools.filter((p) => p.requestCapable).length > 1)
+    throw new Error("Only one pool can accept payment requests.");
   if (pools.some((p) => p.role === "legacy" && p.requestCapable))
     throw new Error("Legacy pools are withdrawal-only.");
+  // ponytail: amounts are formatted with one app-wide decimals setting, so every
+  // pool must match it. Per-pool formatting is needed before an 18-decimal
+  // asset (e.g. WMON) can be added.
+  if (pools.some((p) => p.tokenDecimals !== input.legacy.tokenDecimals))
+    throw new Error("Every pool must use NEXT_PUBLIC_USDC_DECIMALS decimals.");
+  if (input.chainId === MONAD_MAINNET_CHAIN_ID) {
+    for (const p of pools) {
+      if (p.mintable) throw new Error("Mainnet pools cannot be mintable.");
+      if (p.token !== ASSETS[p.asset].mainnetAddress)
+        throw new Error(`${p.asset} pool does not hold the canonical token.`);
+    }
+  }
   return pools;
 }
 
@@ -114,26 +144,43 @@ export function listPools(): readonly PoolDescriptor[] {
         deployBlock: env.NEXT_PUBLIC_MAWEE_POOL_DEPLOY_BLOCK,
         token: env.NEXT_PUBLIC_USDC_ADDRESS,
         tokenDecimals: env.NEXT_PUBLIC_USDC_DECIMALS,
+        mintable:
+          env.NEXT_PUBLIC_USDC_MINTABLE &&
+          env.NEXT_PUBLIC_MONAD_CHAIN_ID !== MONAD_MAINNET_CHAIN_ID,
       },
     });
   }
   return cached;
 }
 
+/** Every pool that takes new deposits, one per asset, USDC first. */
+export function activePools(): readonly PoolDescriptor[] {
+  return listPools()
+    .filter((p) => p.role === "active")
+    .sort((a, b) => Number(b.asset === "USDC") - Number(a.asset === "USDC"));
+}
+
+/**
+ * The primary active pool: USDC when configured. Callers that are not
+ * asset-aware yet (requests, history defaults) keep using this one.
+ */
 export function activePool(): PoolDescriptor {
-  const active = listPools().find((p) => p.role === "active");
+  const active = activePools()[0];
   if (!active) throw new Error("No active pool is configured.");
   return active;
+}
+
+export function activePoolFor(asset: string): PoolDescriptor | null {
+  return activePools().find((p) => p.asset === asset) ?? null;
 }
 
 export function legacyPools(): readonly PoolDescriptor[] {
   return listPools().filter((p) => p.role === "legacy");
 }
 
-/** The active pool when it accepts payment requests, otherwise null. */
+/** The active pool that accepts payment requests, otherwise null. */
 export function requestPool(): PoolDescriptor | null {
-  const active = activePool();
-  return active.requestCapable ? active : null;
+  return activePools().find((p) => p.requestCapable) ?? null;
 }
 
 /** Only approved scopes resolve; arbitrary caller-supplied pools never do. */

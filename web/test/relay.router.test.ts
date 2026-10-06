@@ -22,6 +22,30 @@ vi.mock("../src/server/modules/wallets/wallets.service", () => ({
   currentWallet: mocks.currentWallet,
   verifiedPrivyWallets: mocks.verifiedPrivyWallets,
 }));
+// The env-configured USDC pool, made mintable, plus one withdrawal-only
+// legacy pool, so per-pool deposit and mint rules can be exercised.
+vi.mock("../src/lib/pools", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/lib/pools")>();
+  const active = () => ({ ...actual.activePool(), mintable: true });
+  const legacy = () => ({
+    ...actual.activePool(),
+    scope: "10143:0x00000000000000000000000000000000000000d0" as const,
+    address: "0x00000000000000000000000000000000000000d0" as const,
+    role: "legacy" as const,
+    mintable: false,
+  });
+  return {
+    ...actual,
+    activePool: active,
+    findPool: (scope: string) =>
+      scope === active().scope
+        ? active()
+        : scope === legacy().scope
+          ? legacy()
+          : null,
+  };
+});
+
 vi.mock("../src/lib/chain", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/chain")>();
   return {
@@ -29,7 +53,6 @@ vi.mock("../src/lib/chain", async (importOriginal) => {
     registryAddress: "0x00000000000000000000000000000000000000A0",
     poolAddress: "0x00000000000000000000000000000000000000B0",
     usdcAddress: "0x00000000000000000000000000000000000000C0",
-    usdcMintable: true,
   };
 });
 
@@ -266,5 +289,53 @@ describe("relay router", () => {
     mocks.verifiedPrivyWallets.mockResolvedValue([]);
     await expect(caller().mintTestUsdc()).rejects.toBeTruthy();
     expect(mocks.relayWrite).not.toHaveBeenCalled();
+  });
+
+  describe("per-pool deposits and test tokens", () => {
+    const LEGACY = "10143:0x00000000000000000000000000000000000000d0";
+    const deposit = {
+      payer: OWNER,
+      commitment: B32,
+      amount: "1000000",
+      proof,
+      ephemeralPk: B32,
+      ciphertext: "0x1234",
+      deadline: "1999999999",
+      signature: SIG,
+      permit: null,
+    };
+
+    it("deposits into the requested active pool", async () => {
+      const { activePool } = await import("../src/lib/pools");
+      // No Deposit event in the mocked receipt, so the call fails after
+      // submitting; what matters is which pool it was sent to.
+      await caller(null)
+        .deposit({ ...deposit, pool: activePool().scope })
+        .catch(() => {});
+      expect(mocks.relayWrite.mock.calls[0][0]).toMatchObject({
+        address: activePool().address,
+        functionName: "depositWithAuthorization",
+      });
+    });
+
+    it("refuses deposits into a legacy or unknown pool", async () => {
+      await expect(
+        caller(null).deposit({ ...deposit, pool: LEGACY }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      await expect(
+        caller(null).deposit({
+          ...deposit,
+          pool: "10143:0x00000000000000000000000000000000000000ee",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mocks.relayWrite).not.toHaveBeenCalled();
+    });
+
+    it("mints only for a mintable pool", async () => {
+      await expect(
+        caller().mintTestUsdc({ pool: LEGACY }),
+      ).rejects.toBeTruthy();
+      expect(mocks.relayWrite).not.toHaveBeenCalled();
+    });
   });
 });

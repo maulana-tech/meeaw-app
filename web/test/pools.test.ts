@@ -28,12 +28,13 @@ const legacyEnv = {
   deployBlock: 7,
   token: USDC,
   tokenDecimals: 6,
+  mintable: false,
 };
 
-function parse(manifest: unknown[] | undefined) {
+function parse(manifest: unknown[] | undefined, chainId = 10143) {
   return parsePoolManifest({
     manifest: manifest ? JSON.stringify(manifest) : undefined,
-    chainId: 10143,
+    chainId,
     legacy: legacyEnv,
   });
 }
@@ -119,5 +120,86 @@ describe("pool manifest", () => {
         legacy: legacyEnv,
       }),
     ).toThrow();
+  });
+});
+
+describe("multi-asset pools", () => {
+  const AUSD_POOL = "0x4444444444444444444444444444444444444444";
+  const MOCK_AUSD = "0x5555555555555555555555555555555555555555";
+  const ausd = (address: string, role: "active" | "legacy", extra = {}) =>
+    entry(address, role, {
+      token: MOCK_AUSD,
+      asset: "AUSD",
+      requestCapable: false,
+      ...extra,
+    });
+
+  it("reads manifests written before assets existed as USDC pools", () => {
+    const [pool] = parse([entry(NEW, "active")]);
+    expect(pool).toMatchObject({ asset: "USDC", mintable: false });
+  });
+
+  it("keeps an older manifest's USDC pool mintable when the env says so", () => {
+    const pools = parsePoolManifest({
+      manifest: JSON.stringify([
+        entry(NEW, "active"),
+        ausd(AUSD_POOL, "active"),
+      ]),
+      chainId: 10143,
+      legacy: { ...legacyEnv, mintable: true },
+    });
+    expect(pools.map((p) => p.mintable)).toEqual([true, false]);
+  });
+
+  it("allows one active pool per asset", () => {
+    const pools = parse([
+      entry(NEW, "active"),
+      ausd(AUSD_POOL, "active", { mintable: true }),
+    ]);
+    expect(pools.filter((p) => p.role === "active")).toHaveLength(2);
+    expect(pools[1]).toMatchObject({ asset: "AUSD", mintable: true });
+  });
+
+  it("rejects two active pools for the same asset", () => {
+    expect(() =>
+      parse([ausd(AUSD_POOL, "active"), ausd(OLD, "active")]),
+    ).toThrow(/two active pools for one asset/);
+  });
+
+  it("lets only one pool accept payment requests", () => {
+    expect(() =>
+      parse([
+        entry(NEW, "active"),
+        ausd(AUSD_POOL, "active", { requestCapable: true }),
+      ]),
+    ).toThrow(/Only one pool/);
+  });
+
+  it("refuses a pool whose decimals differ from the app's amount format", () => {
+    expect(() =>
+      parse([
+        entry(NEW, "active"),
+        ausd(AUSD_POOL, "active", { tokenDecimals: 18 }),
+      ]),
+    ).toThrow(/decimals/);
+  });
+
+  it("holds mainnet pools to the canonical token and no minting", () => {
+    const canonicalAusd = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
+    const mainnet = (extra: Record<string, unknown>) =>
+      parse(
+        [
+          entry(AUSD_POOL, "active", {
+            chainId: 143,
+            asset: "AUSD",
+            token: canonicalAusd,
+            ...extra,
+          }),
+        ],
+        143,
+      );
+    expect(mainnet({})[0].asset).toBe("AUSD");
+    expect(() => mainnet({ token: MOCK_AUSD })).toThrow(/canonical token/);
+    expect(() => mainnet({ mintable: true })).toThrow(/cannot be mintable/);
   });
 });
