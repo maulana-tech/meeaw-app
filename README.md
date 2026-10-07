@@ -189,6 +189,12 @@ network, username, and timestamp. A verifier can recompute the commitment and
 root to confirm that the disclosed payment existed without exposing the user's
 full wallet history.
 
+Download the PDF and companion JSON from History. The public `/verify` page checks
+the JSON locally against the configured pool's confirmed historical block, without
+login or proof upload. Username and generation time remain issuer-provided metadata;
+the result proves note inclusion, not identity or invoice settlement. See
+[receipt verification](docs/receipt-verification.md) for versions and RPC requirements.
+
 ## Privacy Model
 
 What observers can see:

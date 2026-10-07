@@ -18,11 +18,11 @@ vi.mock("../src/features/paymentLinks/hooks/useCreatePaymentLink", () => ({
 }));
 
 vi.mock("../src/components/WalletProvider", () => ({
-  useWallet: () => ({ username: "olive" }),
+  useWallet: () => ({ username: "olive", address:"0x01", accountUnlocked:true }),
 }));
 
 vi.mock("../src/lib/notes", () => ({
-  getAccount: () => ({ ownerSecret: 1n }),
+  getAccount: (()=>{const account={ownerSecret:1n};return ()=>account;})(),
   scanMyNotes: mocks.scanMyNotes,
 }));
 
@@ -30,6 +30,7 @@ vi.mock("../src/lib/disclosure", () => ({
   buildDisclosure: mocks.buildDisclosure,
   verifyDisclosure: mocks.verifyDisclosure,
 }));
+vi.mock("../src/features/receipts/prepareReceipt",()=>({prepareReceipt:mocks.buildDisclosure}));
 
 vi.mock("../src/lib/disclosurePdf", () => ({
   downloadDisclosurePdf: vi.fn(),

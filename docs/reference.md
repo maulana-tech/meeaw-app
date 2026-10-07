@@ -151,3 +151,11 @@ verifiers via `pnpm --filter contracts verifiers`. Redeploy the pool afterwards.
 | `/history` | Local payment history |
 | `/pay/<username>` | Payer checkout |
 | `/pay/<username>/<slug>` | Managed payment-link checkout |
+## Receipt verification API
+
+`receipts.chainSnapshot` is a public read-only query accepting pool scope,
+blockNumber, and optional blockHash. It returns historical root/count/token,
+canonical block information and availability/mismatch status. It does not accept
+disclosure files or their private fields. The browser validates versioned JSON,
+commitment/path/index/aliases, labels, identity fingerprint and returned chain
+observations. See [receipt verification](receipt-verification.md).

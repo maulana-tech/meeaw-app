@@ -92,9 +92,10 @@ export type MyNote = {
   receivedAt?: string;
   spentAt?: string;
   nullifierHex?: `0x${string}`;
-  internal?:boolean;
+  internal?: boolean;
 };
 export type ScanResult = {
+  snapshot?: { blockNumber: number; leafCount: number };
   scope: PoolScope;
   notes: MyNote[];
   leaves: bigint[];
@@ -109,19 +110,31 @@ export type ScanResult = {
 /// needed to build Merkle proofs. Never mix results from different pools.
 export async function scanMyNotes(
   acct: LocalAccount,
-  options: { refresh?: boolean; pool?: PoolDescriptor; includeRequestRecovery?:boolean; includeTransferRecovery?:boolean } = {},
+  options: {
+    refresh?: boolean;
+    pool?: PoolDescriptor;
+    includeRequestRecovery?: boolean;
+    includeTransferRecovery?: boolean;
+  } = {},
 ): Promise<ScanResult> {
   const pool = options.pool ?? activePool();
   const mirror =
     options.refresh === false
       ? await loadPoolMirror(pool)
       : await refreshPoolMirror(pool);
-  let scan=await scanMirrorForAccount(acct, mirror, pool);
-  if(options.includeRequestRecovery){
-    const {recoverPaidRequestOutputs}=await import("../features/requests/requestNoteRecovery");
-    scan=await recoverPaidRequestOutputs(acct,pool,scan);
+  let scan = await scanMirrorForAccount(acct, mirror, pool);
+  if (options.includeRequestRecovery) {
+    const { recoverPaidRequestOutputs } = await import(
+      "../features/requests/requestNoteRecovery"
+    );
+    scan = await recoverPaidRequestOutputs(acct, pool, scan);
   }
-  if(options.includeTransferRecovery){const {recoverParticipantTransfers}=await import("../features/transfers/transferNoteRecovery");scan=await recoverParticipantTransfers(acct,pool,scan);}
+  if (options.includeTransferRecovery) {
+    const { recoverParticipantTransfers } = await import(
+      "../features/transfers/transferNoteRecovery"
+    );
+    scan = await recoverParticipantTransfers(acct, pool, scan);
+  }
   return scan;
 }
 
@@ -212,6 +225,10 @@ async function scanMirrorForAccount(
     .reduce((s, n) => s + n.amount, 0n);
   return {
     scope: pool.scope,
+    snapshot: {
+      blockNumber: mirror.publishedBlock,
+      leafCount: mirror.publishedLeafIndex + 1,
+    },
     notes,
     leaves,
     claimable,
