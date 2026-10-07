@@ -98,6 +98,27 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  if (pathname === "/verify") {
+    return (
+      <div
+        className="theme-product min-h-svh bg-(--dash-bg) text-(--dash-fg)"
+        data-product-theme=""
+      >
+        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
+          <header className="mb-6">
+            <Link
+              href="/"
+              aria-label="Mawee home"
+              className="font-heading text-3xl font-bold tracking-tight"
+            >
+              mawee
+            </Link>
+          </header>
+          {children}
+        </div>
+      </div>
+    );
+  }
   if (isPay) {
     return (
       <div className="theme-product contents" data-product-theme="">

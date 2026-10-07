@@ -1,3 +1,4 @@
+import { verifyReceiptMath } from "../features/receipts/receiptProof";
 import type { AssetSymbol } from "./assets";
 import { network } from "./chain";
 import {
@@ -5,7 +6,6 @@ import {
   commitment as commitmentHash,
   merkleProof,
   ownerPk as ownerPkHash,
-  poseidonHash,
   TREE_DEPTH,
   toBE32,
 } from "./crypto";
@@ -82,22 +82,5 @@ export type DisclosureCheck = {
 export async function verifyDisclosure(
   bundle: DisclosureBundle,
 ): Promise<DisclosureCheck> {
-  const amount = BigInt(bundle.amount);
-  const ownerPk = BigInt(bundle.ownerPk);
-  const salt = BigInt(bundle.salt);
-
-  const comm = await commitmentHash(amount, ownerPk, salt);
-  const commitmentOk = comm.toString() === bundle.commitment;
-
-  let node = comm;
-  for (let i = 0; i < bundle.pathElements.length; i += 1) {
-    const sibling = BigInt(bundle.pathElements[i]);
-    node =
-      bundle.pathIndices[i] === 0
-        ? await poseidonHash([node, sibling])
-        : await poseidonHash([sibling, node]);
-  }
-  const rootOk = node.toString() === bundle.root;
-
-  return { commitmentOk, rootOk, valid: commitmentOk && rootOk };
+  return verifyReceiptMath(bundle);
 }

@@ -178,6 +178,14 @@ beforeEach(() => {
 });
 
 describe("WalletProvider Privy session", () => {
+  it("keeps an authenticated visitor on Verify without wallet bootstrap", async () => {
+    mocks.pathname = "/verify";
+    render(<WalletProvider><Probe /></WalletProvider>);
+    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("yes"));
+    expect(mocks.restore).not.toHaveBeenCalled();
+    expect(mocks.bootstrap).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
   it("restores the account mapped to the Privy identity", async () => {
     render(
       <WalletProvider>
