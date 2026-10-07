@@ -49,6 +49,13 @@ A private log of the payments you've received, readable only by you. Use it to
 keep track of who paid, when, and how much — and to pull up a specific payment if
 you ever need to prove it (see [disclosure](practical-privacy.md#traceability-on-your-terms)).
 
+## Receipt verification
+
+Download PDF and JSON for one payment from History. Anyone can open `/verify` and
+check the JSON without signing in. Proof details stay in the browser; historical
+pool reads distinguish chain-verified, invalid, and unavailable evidence. Older
+unanchored receipts remain locally checkable. See [receipt verification](receipt-verification.md).
+
 ## Settings
 
 Manage your account: your username keys, PIN, and account recovery. This is also

@@ -3,7 +3,9 @@
 // machine-readable details are kept in a separate verification appendix.
 
 import type { jsPDF } from "jspdf";
-import type { DisclosureBundle } from "./disclosure";
+import { receiptIdentity } from "../features/receipts/receiptIdentity";
+import type { ReceiptBundle } from "../features/receipts/receiptTypes";
+import { ASSETS } from "./assets";
 import { assetLabelFor } from "./paymentAsset";
 
 export const DISCLOSURE_PDF_PALETTE = {
@@ -56,7 +58,7 @@ function truncMiddle(value: string, keep = 12): string {
     : value;
 }
 
-function receiptReference(bundle: DisclosureBundle): string {
+function receiptReference(bundle: ReceiptBundle): string {
   const leaf = String(bundle.leafIndex).padStart(4, "0");
   return `MAWEE-${leaf}-${bundle.commitmentHex.slice(0, 8).toUpperCase()}`;
 }
@@ -162,7 +164,8 @@ function drawTechnicalHeader(
 /// download helper so it can be unit-tested without touching the DOM. jsPDF is
 /// imported lazily so it never evaluates during SSR.
 export async function renderDisclosurePdf(
-  bundle: DisclosureBundle,
+  bundle: ReceiptBundle,
+  options: { verifyUrl?: string; verifiedAtExport?: boolean } = {},
 ): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -172,7 +175,8 @@ export async function renderDisclosurePdf(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - MARGIN * 2;
-  const reference = receiptReference(bundle);
+  const identity = bundle.version === 2 ? await receiptIdentity(bundle) : null;
+  const reference = identity?.reference ?? receiptReference(bundle);
   const recipient = bundle.username
     ? `@${bundle.username}`
     : "Private Mawee account";
@@ -198,7 +202,7 @@ export async function renderDisclosurePdf(
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Issued by Mawee", pageWidth - MARGIN, 76, { align: "right" });
+  doc.text("Generated with Mawee", pageWidth - MARGIN, 76, { align: "right" });
 
   doc.setFillColor(PANEL);
   doc.roundedRect(MARGIN, 180, contentWidth, 176, 14, 14, "F");
@@ -225,13 +229,17 @@ export async function renderDisclosurePdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(MUTED);
-  doc.text("USD Coin received privately through Mawee", MARGIN + 22, 325);
+  doc.text(
+    `${ASSETS[bundle.asset ?? "USDC"].name} note disclosed through Mawee`,
+    MARGIN + 22,
+    325,
+  );
 
   const rightX = pageWidth - MARGIN - 160;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(MUTED);
-  doc.text("RECEIVED BY", rightX, 259);
+  doc.text("USERNAME (ISSUER-PROVIDED)", rightX, 259);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(INK);
@@ -252,16 +260,22 @@ export async function renderDisclosurePdf(
 
   const detailRows: [string, string, string, string][] = [
     [
-      "DATE AND TIME",
+      "RECEIPT GENERATED",
       `${displayDate(bundle.disclosedAt)} UTC`,
-      "PAYMENT STATUS",
-      "Received",
+      "PROOF FORMAT",
+      bundle.version === 2 && options.verifiedAtExport
+        ? "Inclusion checked at export"
+        : bundle.version === 2
+          ? "Historical anchor included"
+          : "Local proof data",
     ],
     [
       "PAYMENT NETWORK",
       displayNetwork(bundle.network),
-      "PAYMENT REFERENCE",
-      `Private payment #${bundle.leafIndex}`,
+      bundle.version === 2 ? "ANCHOR BLOCK" : "PAYMENT REFERENCE",
+      bundle.version === 2
+        ? `#${bundle.anchor.blockNumber}${options.verifiedAtExport ? " (confirmed at export)" : ""}`
+        : `Private payment #${bundle.leafIndex}`,
     ],
   ];
   let rowY = 430;
@@ -288,11 +302,11 @@ export async function renderDisclosurePdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(OBSIDIAN);
-  doc.text("Verified by Mawee", MARGIN + 44, 614);
+  doc.text("Check this receipt independently", MARGIN + 44, 614);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   const confirmation = doc.splitTextToSize(
-    "This receipt confirms that the named recipient can prove ownership of this specific payment. It does not reveal their balance or any other payment activity.",
+    "The proof discloses one private note. Check its JSON against the pool using Mawee Verify. The username is provided by the receipt issuer; this receipt does not prove identity, current ownership, or available balance.",
     contentWidth - 68,
   ) as string[];
   doc.text(confirmation, MARGIN + 44, 635);
@@ -303,6 +317,19 @@ export async function renderDisclosurePdf(
     MARGIN + 44,
     679,
   );
+
+  if (identity) {
+    doc.setFont("courier", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(INK);
+    doc.text(identity.fingerprint, MARGIN, 732);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const verifyUrl = options.verifyUrl ?? "/verify";
+    doc.text(`Verify JSON: ${verifyUrl}`, MARGIN, 756);
+    if (options.verifyUrl)
+      doc.link(MARGIN, 744, contentWidth, 16, { url: options.verifyUrl });
+  }
 
   // Page 2: concise verification guide
   doc.addPage();
@@ -324,7 +351,7 @@ export async function renderDisclosurePdf(
   const technicalFacts: [string, string][] = [
     ["Private payment index", `#${bundle.leafIndex}`],
     ["Commitment", truncMiddle(bundle.commitmentHex, 16)],
-    ["Verified ledger root", truncMiddle(bundle.rootHex, 16)],
+    ["Proof root", truncMiddle(bundle.rootHex, 16)],
     ["Mawee pool contract", truncMiddle(bundle.pool, 16)],
     ["Network", displayNetwork(bundle.network)],
   ];
@@ -346,10 +373,12 @@ export async function renderDisclosurePdf(
   doc.text("How an independent verifier checks it", MARGIN, y);
   y += 25;
   const verificationSteps = [
-    "Recreate the private payment fingerprint from the amount, recipient key, and one-time secret in the appendix.",
-    "Use the included proof path to confirm that fingerprint belongs to the verified ledger root shown above.",
-    "Confirm the Mawee pool published the fingerprint at the stated payment index and recognized that ledger root.",
-    "Confirm the recipient key maps to the Mawee username shown on the receipt.",
+    "Recompute the note commitment from the amount, recipient public key, and note salt in the appendix.",
+    "Use the included Merkle path to match that commitment to the proof root shown above.",
+    bundle.version === 2
+      ? "Compare the proof root and leaf count with the pool at the included block and canonical block hash. Use /verify with the JSON file."
+      : "This legacy bundle has no historical block anchor. Reissue an anchored receipt from History to enable chain verification.",
+    "Treat the username and receipt generation time as information supplied by the issuer, not independently verified identity or payment time.",
   ];
   verificationSteps.forEach((step, index) => {
     doc.setFillColor(SECONDARY_OBSIDIAN);
@@ -372,7 +401,7 @@ export async function renderDisclosurePdf(
   doc.setFontSize(9);
   doc.setTextColor(OBSIDIAN);
   const privacyNote = doc.splitTextToSize(
-    "Privacy note: verification proves only this payment. The recipient's remaining balance and other transactions stay private.",
+    "Verification checks the disclosed note's inclusion, not payer identity or invoice status. Other private notes remain undisclosed.",
     contentWidth - 30,
   ) as string[];
   doc.text(privacyNote, MARGIN + 15, y + 27);
@@ -428,8 +457,19 @@ export async function renderDisclosurePdf(
 
 /// Trigger a browser download of the disclosure PDF.
 export async function downloadDisclosurePdf(
-  bundle: DisclosureBundle,
+  bundle: ReceiptBundle,
+  options: {
+    verifyUrl?: string;
+    verifiedAtExport?: boolean;
+    isCurrent?: () => boolean;
+  } = {},
 ): Promise<void> {
-  const doc = await renderDisclosurePdf(bundle);
-  doc.save(`mawee-receipt-${receiptReference(bundle).toLowerCase()}.pdf`);
+  const doc = await renderDisclosurePdf(bundle, options);
+  if (options.isCurrent && !options.isCurrent()) return;
+  const reference =
+    bundle.version === 2
+      ? (await receiptIdentity(bundle)).reference
+      : receiptReference(bundle);
+  if (options.isCurrent && !options.isCurrent()) return;
+  doc.save(`mawee-receipt-${reference.toLowerCase()}.pdf`);
 }

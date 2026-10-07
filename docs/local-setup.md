@@ -217,6 +217,14 @@ ENVIO_GRAPHQL_URL=https://<your envio endpoint>/v1/graphql
 Every variable is described in [web/.env.example](../web/.env.example) and the
 [Developer Reference](reference.md).
 
+## Receipt verification
+
+The public `/verify` route needs no login. Anchored exports require healthy
+indexed snapshots and a server RPC that supports historical `eth_call`. No new
+environment fields, database migrations, contracts or circuit setup are needed.
+See [receipt verification](receipt-verification.md) for version compatibility and
+the public-only API contract.
+
 ## Multi-asset links
 
 Use the normal migration workflow to apply `20261006130000-payment-link-assets.js`.

@@ -90,9 +90,11 @@ const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  // On a pay link, a Privy session belongs to the payer: it only supplies the
-  // wallet that pays, so it must not become a Mawee account or leave checkout.
-  const payerRoute = usePathname()?.startsWith("/pay") ?? false;
+  // Public payment and proof pages must not bootstrap an account or redirect.
+  const pathname = usePathname();
+  const payerRoute = Boolean(
+    pathname?.startsWith("/pay") || pathname === "/verify",
+  );
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const { createWallet } = useCreateWallet();

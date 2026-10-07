@@ -54,6 +54,12 @@ specific payment happened — an audit, a tax filing, a "please prove this depos
 from your bank — Mawee lets you export a disclosure for just that one payment.
 Everything else stays private.
 
+Share the PDF and JSON proof for the selected note. The recipient can check its
+historical pool inclusion at `/verify` without logging in or uploading the private
+proof. The displayed username remains issuer-provided, and inclusion does not
+prove an invoice was settled or that the note is still unspent. See
+[receipt verification](receipt-verification.md).
+
 That's the difference between privacy and secrecy. You're never stuck unable to
 account for your own money.
 

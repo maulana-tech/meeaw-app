@@ -1,13 +1,13 @@
 "use client";
 
 import { Download, Loader } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import {
-  buildDisclosure,
-  type DisclosureBundle,
-  verifyDisclosure,
-} from "../../lib/disclosure";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { downloadReceiptJson } from "../../features/receipts/downloadReceiptJson";
+import { prepareReceipt } from "../../features/receipts/prepareReceipt";
+import { loadReceiptSnapshot } from "../../features/receipts/receiptClient";
+import type { ReceiptV2 } from "../../features/receipts/receiptTypes";
 import { downloadDisclosurePdf } from "../../lib/disclosurePdf";
+import type { LocalAccount } from "../../lib/notes";
 import { getAccount, scanMyNotes } from "../../lib/notes";
 import { assetLabelFor, formatAssetUnits } from "../../lib/paymentAsset";
 import { activePool, type PoolDescriptor } from "../../lib/pools";
@@ -37,49 +37,101 @@ export function DiscloseDialog({
   leafIndex: number | null;
   pool?: PoolDescriptor;
 }) {
-  const { username } = useWallet();
+  const { username, address, accountUnlocked } = useWallet();
   const pool = providedPool ?? activePool();
   const [step, setStep] = useState<Step>("building");
   const [error, setError] = useState<string | null>(null);
-  const [bundle, setBundle] = useState<DisclosureBundle | null>(null);
+  const [bundle, setBundle] = useState<ReceiptV2 | null>(null);
 
+  const session = `${address}:${accountUnlocked}:${open}:${pool.scope}:${leafIndex}`;
+  const identity = useRef(session),
+    generation = useRef(0);
+  identity.current = session;
+  const prepared = useRef<{
+    account: LocalAccount;
+    session: string;
+    generation: number;
+  } | null>(null);
   const build = useCallback(async () => {
-    if (leafIndex === null) return;
-    setStep("building");
-    setError(null);
+    const at = identity.current,
+      run = ++generation.current,
+      acct = getAccount();
     setBundle(null);
+    prepared.current = null;
+    setError(null);
+    setStep("building");
+    const current = () =>
+      generation.current === run &&
+      identity.current === at &&
+      getAccount() === acct;
     try {
-      const acct = getAccount();
-      if (!acct) throw new Error("No local account found on this device.");
+      if (!acct || !accountUnlocked)
+        throw new Error("Unlock your account to prepare a receipt.");
+      if (leafIndex === null)
+        throw new Error("Choose a payment for the receipt.");
       const scan = await scanMyNotes(acct, {
         pool,
+        refresh: true,
         includeRequestRecovery: true,
         includeTransferRecovery: true,
       });
+      if (!current()) return;
       const note = scan.notes.find((n) => n.leafIndex === leafIndex);
       if (!note) throw new Error("That payment is no longer available.");
-      const disclosure = await buildDisclosure({
+      const disclosure = await prepareReceipt({
         acct,
         scan,
         note,
         username,
+        load: loadReceiptSnapshot,
+        isCurrent: current,
       });
-      // Sanity-check the envelope round-trips before we let it out the door.
-      const check = await verifyDisclosure(disclosure);
-      if (!check.valid) {
-        throw new Error("Could not build a consistent proof for this payment.");
-      }
+      if (!current()) return;
       setBundle(disclosure);
+      prepared.current = { account: acct, session: at, generation: run };
       setStep("ready");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to build proof.");
+      if (!current()) return;
+      setError(
+        e instanceof Error ? e.message : "Receipt could not be prepared.",
+      );
       setStep("error");
     }
-  }, [leafIndex, username, pool]);
-
+  }, [leafIndex, username, pool, accountUnlocked]);
   useEffect(() => {
-    if (open && leafIndex !== null) void build();
-  }, [open, leafIndex, build]);
+    if (identity.current !== session) return;
+    if (open) void build();
+    else setBundle(null);
+    return () => {
+      generation.current++;
+    };
+  }, [open, build, session]);
+  async function download(kind: "pdf" | "json") {
+    const accepted = prepared.current;
+    if (!bundle || !accepted) return;
+    const current = () =>
+      identity.current === accepted.session &&
+      generation.current === accepted.generation &&
+      getAccount() === accepted.account &&
+      prepared.current === accepted;
+    if (!current()) {
+      setBundle(null);
+      setError("Your account or selection changed. Prepare the receipt again.");
+      setStep("error");
+      return;
+    }
+    try {
+      if (kind === "json") await downloadReceiptJson(bundle, current);
+      else
+        await downloadDisclosurePdf(bundle, {
+          verifyUrl: new URL("/verify", window.location.origin).href,
+          verifiedAtExport: true,
+          isCurrent: current,
+        });
+    } catch {
+      if (current()) setError("Receipt could not be downloaded. Try again.");
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -148,11 +200,22 @@ export function DiscloseDialog({
               </dl>
             </div>
 
+            <p className="text-xs text-foreground/65">
+              Sharing the proof reveals this note’s amount and recipient public
+              key. The username is provided by the receipt issuer.
+            </p>
+            <Button
+              onClick={() => void download("json")}
+              className="min-h-11"
+              variant="outline"
+            >
+              Download proof (JSON)
+            </Button>
             <Button
               variant="default"
               className="min-h-11 mt-4"
               size="lg"
-              onClick={() => void downloadDisclosurePdf(bundle)}
+              onClick={() => void download("pdf")}
             >
               <Download className="size-4" aria-hidden="true" />
               Download receipt (PDF)
