@@ -13,9 +13,11 @@ import { requirePaymentPool } from "../../../lib/paymentAsset";
 import type { PoolScope } from "../../../lib/pools";
 import { getDb } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
+import { accountSpendGate } from "../privacyKeys/spendGate";
 import { resolveUsername } from "../usernames/usernames.service";
 import { currentWallet } from "../wallets/wallets.service";
 import {
+  TransferConflictError,
   TransferNotFoundError,
   TransferRejectedError,
   TransferUnavailableError,
@@ -80,7 +82,28 @@ export async function createTransfer(user: string, input: SignedTransfer) {
   if (Math.abs(Date.now() - Date.parse(record.createdAt)) > 10 * 60_000)
     throw new TransferRejectedError("Refresh this transfer before sending.");
   await Promise.all([registered(record.sender), registered(record.recipient)]);
-  return repo.create(record);
+  const capture = await (await accountSpendGate()).admit(
+    wallet as `0x${string}`,
+    `transfer:${record.id}`,
+    record.sender,
+    {},
+    true,
+  );
+  try {
+    return await repo.create(record, capture);
+  } catch (error) {
+    if (
+      error instanceof TransferConflictError &&
+      !(await repo.collection.findOne({ _id: record.id }))
+    )
+      await (await accountSpendGate()).finish(
+        wallet as `0x${string}`,
+        `transfer:${record.id}`,
+        capture,
+        "unsigned-abandoned",
+      );
+    throw error;
+  }
 }
 export async function getTransfer(user: string, id: string) {
   enforceTransferLimit(user, "query");

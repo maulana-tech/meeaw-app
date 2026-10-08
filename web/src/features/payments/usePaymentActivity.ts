@@ -7,6 +7,8 @@ import { nullifier, toBE32 } from "../../lib/crypto";
 import { getAccount, type MyNote } from "../../lib/notes";
 import { activePool, listPools, resolvePool } from "../../lib/pools";
 import { api } from "../../trpc/client";
+import { accountForNote } from "../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../privacyKeys/session";
 import { openTransfer } from "../transfers/transferCrypto";
 import type { TransferPayload, TransferRecord } from "../transfers/types";
 import { buildActivityRows } from "./activityRows";
@@ -67,6 +69,7 @@ export function usePaymentActivity(notes: readonly MyNote[]) {
   useEffect(() => {
     let cancelled = false;
     const account = getAccount();
+    const ring = getPrivacyKeyring();
     if (!wallet.accountUnlocked || !account) {
       setDecrypted({ identity: "", payloads: new Map(), notes: [] });
       return;
@@ -87,7 +90,14 @@ export function usePaymentActivity(notes: readonly MyNote[]) {
           ...n,
           nullifierHex:
             n.nullifierHex ??
-            toHex(toBE32(await nullifier(account.ownerSecret, n.leafIndex))),
+            toHex(
+              toBE32(
+                await nullifier(
+                  (ring ? accountForNote(ring, n) : account).ownerSecret,
+                  n.leafIndex,
+                ),
+              ),
+            ),
         })),
       );
       if (!cancelled && getAccount() === account)

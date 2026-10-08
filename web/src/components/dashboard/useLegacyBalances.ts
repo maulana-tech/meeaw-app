@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAccount, scanMyNotes } from "../../lib/notes";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../lib/notes";
 import { legacyPools, type PoolScope } from "../../lib/pools";
 
 /**
@@ -15,6 +16,7 @@ export function useLegacyBalances(
   const [balances, setBalances] = useState<ReadonlyMap<PoolScope, bigint>>(
     () => new Map(),
   );
+  const ring = getPrivacyKeyring();
 
   useEffect(() => {
     const account = address ? getAccount() : null;
@@ -28,18 +30,20 @@ export function useLegacyBalances(
       const next = new Map<PoolScope, bigint>();
       for (const pool of pools) {
         try {
-          const scan = await scanMyNotes(account, { pool });
+          const scan = ring
+            ? await scanKeyringNotes(ring, pool)
+            : await scanMyNotes(account, { pool });
           next.set(pool.scope, scan.claimable);
         } catch {
           // Unknown, not zero: keep it out of the map.
         }
       }
-      if (!cancelled) setBalances(next);
+      if (!cancelled && getPrivacyKeyring() === ring) setBalances(next);
     })();
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, ring]);
 
   return balances;
 }

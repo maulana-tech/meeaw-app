@@ -5,6 +5,11 @@ import { getAddress } from "viem";
 import { getUsers, type UserDoc } from "../../db/mongo";
 import { getPrivyUser } from "../../lib/privy";
 import {
+  assertRecoverySetupAllowed,
+  recoverFencedEscrowChange,
+  withFencedEscrowChange,
+} from "./privacyRecovery";
+import {
   WalletConflictError,
   WalletEscrowAlreadyInitializedError,
   WalletEscrowMissingError,
@@ -181,6 +186,7 @@ export async function saveEscrow(
   privyUserId: string,
   input: SaveEscrowInput,
 ): Promise<void> {
+  await assertRecoverySetupAllowed(privyUserId);
   const users = await getUsers();
   const result = await users.updateOne(
     {
@@ -217,6 +223,12 @@ export async function rotateEscrow(
   privyUserId: string,
   input: RotateEscrowInput,
 ): Promise<RotateEscrowOutput> {
+  return withFencedEscrowChange(privyUserId, input, rotateEscrowUnfenced);
+}
+async function rotateEscrowUnfenced(
+  privyUserId: string,
+  input: RotateEscrowInput,
+): Promise<RotateEscrowOutput> {
   const users = await getUsers();
   const revision = input.expectedRevision + 1;
   const result = await users.updateOne(
@@ -247,6 +259,7 @@ export async function rotateEscrow(
 }
 
 export async function getEscrow(privyUserId: string): Promise<EscrowOutput> {
+  await recoverFencedEscrowChange(privyUserId, rotateEscrowUnfenced);
   const doc = await (await getUsers()).findOne({ privyUserId });
   if (!doc?.encryptedMaster || !doc.masterSalt || !doc.kdfParams) return null;
   return {
@@ -266,6 +279,7 @@ export async function savePasskey(
   privyUserId: string,
   input: PasskeyRecord,
 ): Promise<void> {
+  await assertRecoverySetupAllowed(privyUserId);
   const users = await getUsers();
   const result = await users.updateOne(
     {

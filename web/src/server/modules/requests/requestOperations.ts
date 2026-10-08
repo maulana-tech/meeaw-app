@@ -20,6 +20,7 @@ import {
 import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerAddress, relayerConfigured } from "../../lib/relayer";
 import { RelayBusyError } from "../../lib/relayJournal";
+import { accountSpendGate } from "../privacyKeys/spendGate";
 import { encodeSubmission, verifyRequestReceipt } from "./requestSettlement";
 import {
   RequestConflictError,
@@ -51,6 +52,13 @@ function wire(doc: PaymentRequestDoc): PaymentOperation {
   const r = doc.reservation;
   if (!r || !doc.operationId) throw new RequestConflictError();
   return {
+    ...(r.accountTicketId
+      ? {
+          fundingGeneration: r.fundingGeneration,
+          keyRevision: r.keyRevision,
+          accountTicketId: r.accountTicketId,
+        }
+      : {}),
     id: doc.operationId,
     requestId: doc._id,
     pool: doc.scope as PaymentOperation["pool"],
@@ -69,6 +77,13 @@ async function project(doc: PaymentRequestDoc) {
     { $set: { ...op, payerWallet: doc.addresseeWallet } },
     { upsert: true },
   );
+  if (op.phase === "confirmed" || op.phase === "failed")
+    await (await accountSpendGate()).finish(
+      doc.addresseeWallet as Hex,
+      `request:${op.id}`,
+      op,
+      "terminal",
+    );
   return op;
 }
 async function owned(user: string, id: string) {
@@ -140,7 +155,16 @@ export async function beginPayment(
   const old = await operations.findOne({ _id: input.attemptId });
   if (old) throw new RequestConflictError("Use a new payment attempt.");
   const now = new Date();
+  const capture = await (await accountSpendGate()).admit(
+    wallet as Hex,
+    `request:${input.attemptId}`,
+    {
+      notePubkey: doc.addressee.notePubkey as Hex,
+      viewPubkey: doc.addressee.viewPubkey as Hex,
+    },
+  );
   const reservation: RequestReservationDoc = {
+    ...capture,
     attemptId: input.attemptId,
     phase: "preparing",
     updatedAt: now,
@@ -165,7 +189,17 @@ export async function beginPayment(
     },
     { returnDocument: "after", includeResultMetadata: false },
   );
-  if (!reserved) throw new RequestConflictError();
+  if (!reserved) {
+    const latest = await requests.findOne({ _id: doc._id });
+    if (latest?.operationId !== input.attemptId)
+      await (await accountSpendGate()).finish(
+        wallet as Hex,
+        `request:${input.attemptId}`,
+        capture,
+        "unsigned-abandoned",
+      );
+    throw new RequestConflictError();
+  }
   return project(reserved);
 }
 function intentFor(
@@ -190,12 +224,14 @@ async function setPhase(
   hash: string | null,
 ) {
   const requests = await getPaymentRequests();
+  const reservation = doc.reservation;
+  if (!reservation) throw new RequestConflictError();
   const changed = await requests.findOneAndUpdate(
     {
       _id: doc._id,
       operationId: doc.operationId,
-      "reservation.nextStep": doc.reservation!.nextStep,
-      "reservation.currentDigest": doc.reservation!.currentDigest,
+      "reservation.nextStep": reservation.nextStep,
+      "reservation.currentDigest": reservation.currentDigest,
       status: "pending",
     },
     {
@@ -426,6 +462,38 @@ async function submit(
   )
     throw new RequestRejectedError("The payment signature is invalid.");
   const hash = submissionDigest(body).toLowerCase();
+  if (!doc.reservation.accountTicketId) {
+    const capture = await (await accountSpendGate()).admit(
+      wallet as Hex,
+      `request:${body.operationId}`,
+      {
+        notePubkey: doc.addressee.notePubkey as Hex,
+        viewPubkey: doc.addressee.viewPubkey as Hex,
+      },
+    );
+    if (capture.accountTicketId) {
+      await (await getPaymentRequests()).updateOne(
+        {
+          _id: doc._id,
+          operationId: body.operationId,
+          "reservation.accountTicketId": { $exists: false },
+        },
+        {
+          $set: {
+            "reservation.accountTicketId": capture.accountTicketId,
+            "reservation.keyRevision": capture.keyRevision,
+            "reservation.fundingGeneration": capture.fundingGeneration,
+          },
+        },
+      );
+      Object.assign(doc.reservation, capture);
+    }
+  }
+  await (await accountSpendGate()).assert(
+    wallet as Hex,
+    `request:${body.operationId}`,
+    doc.reservation,
+  );
   if (doc.reservation.currentSubmission) {
     if (doc.reservation.currentDigest !== hash)
       throw new RequestConflictError();
@@ -473,6 +541,15 @@ export async function reconcileRequestOperation(
 ): Promise<PaymentOperation | null> {
   const doc = await (await getPaymentRequests()).findOne({ operationId: id });
   if (!doc?.reservation) return null;
+  if (
+    doc.status === "pending" &&
+    doc.reservation.phase === "preparing" &&
+    !doc.reservation.currentSubmission &&
+    !doc.reservation.txHash &&
+    Date.now() - doc.reservation.updatedAt.getTime() >= 600_000
+  ) {
+    return failAttempt(doc);
+  }
   if (doc.status !== "pending" || !doc.reservation.currentSubmission)
     return project(doc);
   return process(doc, false);

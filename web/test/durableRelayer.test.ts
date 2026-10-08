@@ -1,16 +1,19 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { privateKeyToAccount } from "viem/accounts";
 import type { Hex, TransactionReceipt } from "viem";
-import { keccak256, parseTransaction, encodeFunctionData } from "viem";
+import { encodeFunctionData, keccak256, parseTransaction } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { registryRotationCalldata } from "../src/features/privacyKeys/registryRotation";
 import { maweePoolAbi } from "../src/lib/abi";
-import { SpendReservations } from "../src/server/lib/spendReservations";
-import { openIsolatedRequestDb } from "./helpers/requestDb";
-import { RelayJournal } from "../src/server/lib/relayJournal";
 import {
   makeDurableSender,
   type RelayIntent,
   type RelayPort,
 } from "../src/server/lib/durableRelayer";
+import { RelayJournal } from "../src/server/lib/relayJournal";
+import { SpendReservations } from "../src/server/lib/spendReservations";
+import { makePrivacyFixture } from "./helpers/privacyKeyFixtures";
+import { openIsolatedRequestDb } from "./helpers/requestDb";
+
 describe("durable transaction recovery", () => {
   let db: Awaited<ReturnType<typeof openIsolatedRequestDb>>,
     journal: RelayJournal;
@@ -91,6 +94,33 @@ describe("durable transaction recovery", () => {
       sender.prepare({ ...intent, data: "0xabcd" }),
     ).rejects.toThrow();
     expect(calls).toHaveLength(0);
+  });
+  it("journals exact registry rotation bytes without claiming a pool nullifier", async () => {
+    const f = await makePrivacyFixture();
+    const registryIntent = {
+      ...intent,
+      operationKey: `privacy-rotation:${f.approval.id}`,
+      to: f.registry.split(":")[1] as Hex,
+      data: registryRotationCalldata(await f.signApproval(), {
+        nonce: "0",
+        deadline: "4102444800",
+        signature: `0x${"1".repeat(130)}`,
+      }),
+    };
+    const sender = makeDurableSender(
+      journal,
+      port,
+      new SpendReservations(db.db),
+    );
+    const first = await sender.prepare(registryIntent),
+      second = await sender.prepare(registryIntent);
+    expect(second.serializedTransaction).toBe(first.serializedTransaction);
+    expect(signs).toBe(1);
+    expect(await db.db.collection("spend_claims").countDocuments()).toBe(0);
+    expect(await db.db.collection("spend_nullifiers").countDocuments()).toBe(0);
+    expect(parseTransaction(first.serializedTransaction).data).toBe(
+      registryIntent.data,
+    );
   });
   it("releases the wallet only after an identified mined receipt", async () => {
     const sender = makeDurableSender(journal, port),

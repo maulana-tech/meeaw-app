@@ -1,54 +1,293 @@
-import {fromBE,merkleProof,nullifier,ownerPk,randomFieldElement,toBE32,viewPubkey,hexToBytes} from "../../lib/crypto";
-import {toHex} from "viem";
-import type {Signer} from "../../lib/chain";
-import type {LocalAccount,MyNote,ScanResult} from "../../lib/notes";
-import {resolvePool} from "../../lib/pools";
-import {proveMerge,proveTransfer} from "../../lib/prover";
-import {createNoteOutput as output,proofWire} from "../payments/proofOutputs";
-import {localParticipantKeys,openRequest} from "./requestCrypto";
-import {submissionTypedData} from "./requestTypedData";
-import type {Hex,PaymentOperation,PoolDescriptor,RequestPayload,SignedRequest,SignedSubmission,SubmissionBody} from "./types";
+import { toHex } from "viem";
+import type { Signer } from "../../lib/chain";
+import {
+  fromBE,
+  hexToBytes,
+  merkleProof,
+  nullifier,
+  ownerPk,
+  randomFieldElement,
+  toBE32,
+  viewPubkey,
+} from "../../lib/crypto";
+import type { LocalAccount, ScanResult } from "../../lib/notes";
+import { resolvePool } from "../../lib/pools";
+import { proveMerge, proveTransfer } from "../../lib/prover";
+import {
+  createNoteOutput as output,
+  proofWire,
+} from "../payments/proofOutputs";
+import type { GenerationFundingAction } from "../privacyKeys/generationFunding";
+import {
+  fundingAccount,
+  type GenerationProofContext,
+  noteProofAccount,
+} from "../privacyKeys/generationProofContext";
+import { localParticipantKeys, openRequest } from "./requestCrypto";
+import { submissionTypedData } from "./requestTypedData";
+import type {
+  PaymentOperation,
+  PoolDescriptor,
+  RequestPayload,
+  SignedRequest,
+  SignedSubmission,
+  SubmissionBody,
+} from "./types";
 
-export function signedRecordOf(r:SignedRequest):SignedRequest{return {version:r.version,id:r.id,pool:r.pool,requester:r.requester,addressee:r.addressee,createdAt:r.createdAt,recipientCommitment:r.recipientCommitment,requesterEnvelope:r.requesterEnvelope,addresseeEnvelope:r.addresseeEnvelope,signature:r.signature};}
-type Context={record:SignedRequest;operation:PaymentOperation;account:LocalAccount;scan:ScanResult;signer:Signer;artifactRoot?:string;pool?:PoolDescriptor};
-async function assertContext(c:Context){
-  const keys=await localParticipantKeys(c.account);
-  if(c.scan.scope!==c.record.pool||c.operation.pool!==c.record.pool||c.operation.requestId!==c.record.id||c.signer.address.toLowerCase()!==c.record.addressee.wallet.toLowerCase()||keys.notePubkey.toLowerCase()!==c.record.addressee.notePubkey.toLowerCase()||keys.viewPubkey.toLowerCase()!==c.record.addressee.viewPubkey.toLowerCase())throw new Error("Unlock the account this request was sent to.");
+export function signedRecordOf(r: SignedRequest): SignedRequest {
+  return {
+    version: r.version,
+    id: r.id,
+    pool: r.pool,
+    requester: r.requester,
+    addressee: r.addressee,
+    createdAt: r.createdAt,
+    recipientCommitment: r.recipientCommitment,
+    requesterEnvelope: r.requesterEnvelope,
+    addresseeEnvelope: r.addresseeEnvelope,
+    signature: r.signature,
+  };
 }
-function owned(c:Context,index:number){
-  const n=c.scan.notes.find(n=>n.scope===c.record.pool&&n.leafIndex===index&&!n.spent&&n.amount>0n);if(!n)throw new Error("This payment balance changed. Refresh and try again.");return n;
+type Context = {
+  record: SignedRequest;
+  operation: PaymentOperation;
+  account: LocalAccount;
+  scan: ScanResult;
+  signer: Signer;
+  artifactRoot?: string;
+  pool?: PoolDescriptor;
+} & GenerationProofContext;
+async function assertContext(c: Context) {
+  fundingAccount(c);
+  const pool = c.pool ?? (c.keyring ? resolvePool(c.record.pool) : null);
+  if (
+    (pool &&
+      (pool.scope !== c.record.pool ||
+        pool.role !== "active" ||
+        !pool.requestCapable)) ||
+    c.scan.health !== "healthy" ||
+    (c.keyring &&
+      c.keyring.owner.toLowerCase() !== c.signer.address.toLowerCase())
+  )
+    throw new Error(
+      "This pool or privacy key session cannot prepare a payment.",
+    );
+  const keys = await localParticipantKeys(c.account);
+  if (
+    c.scan.scope !== c.record.pool ||
+    c.operation.pool !== c.record.pool ||
+    c.operation.requestId !== c.record.id ||
+    c.signer.address.toLowerCase() !==
+      c.record.addressee.wallet.toLowerCase() ||
+    keys.notePubkey.toLowerCase() !==
+      c.record.addressee.notePubkey.toLowerCase() ||
+    keys.viewPubkey.toLowerCase() !==
+      c.record.addressee.viewPubkey.toLowerCase()
+  )
+    throw new Error("Unlock the account this request was sent to.");
 }
-async function sign(c:Context,body:SubmissionBody):Promise<SignedSubmission>{
-  return {...body,signature:await c.signer.walletClient.signTypedData({account:c.signer.walletClient.account??c.signer.address,...submissionTypedData(body)})};
+function owned(c: Context, index: number) {
+  const n = c.scan.notes.find(
+    (n) =>
+      n.scope === c.record.pool &&
+      n.leafIndex === index &&
+      !n.spent &&
+      n.amount > 0n,
+  );
+  if (!n)
+    throw new Error("This payment balance changed. Refresh and try again.");
+  return n;
 }
-function bodyBase(c:Context){return {version:1 as const,requestId:c.record.id,operationId:c.operation.id,step:c.operation.nextStep,pool:c.record.pool};}
-export async function buildMergeSubmission(c:Context & {inputIndices:readonly [number,number]}):Promise<SignedSubmission>{
-  await assertContext(c);if(c.inputIndices[0]===c.inputIndices[1])throw new Error("Choose distinct notes.");
-  const a=owned(c,c.inputIndices[0]),b=owned(c,c.inputIndices[1]),sum=a.amount+b.amount;
-  if(sum>(1n<<64n)-1n)throw new Error("Split this balance before combining it.");
-  const pk=await ownerPk(c.account.ownerSecret),salt=randomFieldElement();
-  const paths=await Promise.all([merkleProof(c.scan.leaves,a.leafIndex,20),merkleProof(c.scan.leaves,b.leafIndex,20)]);
-  const nfs=await Promise.all([nullifier(c.account.ownerSecret,a.leafIndex),nullifier(c.account.ownerSecret,b.leafIndex)]);
-  const o=await output(sum,pk,viewPubkey(c.account.viewSk),salt);
-  const p=await proveMerge({root:String(paths[0].root),nullifierA:String(nfs[0]),nullifierB:String(nfs[1]),outCommitment:String(fromBE(hexToBytes(o.commitment))),ownerSecret:String(c.account.ownerSecret),amounts:[String(a.amount),String(b.amount)],salts:[String(a.salt),String(b.salt)],pathElements:[paths[0].pathElements.map(String),paths[1].pathElements.map(String)],pathIndices:[paths[0].pathIndices,paths[1].pathIndices],outSalt:String(salt)},c.artifactRoot);
-  return sign(c,{...bodyBase(c),kind:"merge",root:toHex(toBE32(paths[0].root)),nullifiers:nfs.map(n=>toHex(toBE32(n))),proof:proofWire(p.proof),outputs:[o]});
+async function sign(
+  c: Context,
+  body: SubmissionBody,
+): Promise<SignedSubmission> {
+  fundingAccount(c);
+  return {
+    ...body,
+    signature: await c.signer.walletClient.signTypedData({
+      account: c.signer.walletClient.account ?? c.signer.address,
+      ...submissionTypedData(body),
+    }),
+  };
 }
-async function transfer(c:Context,inputIndex:number,amount:bigint,recipientPk:bigint,recipientView:Uint8Array,recipientSalt:bigint,kind:"split"|"payment"){
-  await assertContext(c);const n=owned(c,inputIndex);
-  if(amount<=0n||amount>n.amount)throw new Error("Your private balance is too low.");
-  const pk=await ownerPk(c.account.ownerSecret),changeSalt=randomFieldElement(),mp=await merkleProof(c.scan.leaves,n.leafIndex,20),nf=await nullifier(c.account.ownerSecret,n.leafIndex);
-  const recipient=await output(amount,recipientPk,recipientView,recipientSalt),change=await output(n.amount-amount,pk,viewPubkey(c.account.viewSk),changeSalt);
-  const p=await proveTransfer({root:String(mp.root),nullifier:String(nf),outCommitmentRecipient:String(fromBE(hexToBytes(recipient.commitment))),outCommitmentChange:String(fromBE(hexToBytes(change.commitment))),inAmount:String(n.amount),ownerSecret:String(c.account.ownerSecret),inSalt:String(n.salt),pathElements:mp.pathElements.map(String),pathIndices:mp.pathIndices,recipientPk:String(recipientPk),recipientAmount:String(amount),recipientSalt:String(recipientSalt),changeAmount:String(n.amount-amount),changeSalt:String(changeSalt)},c.artifactRoot);
-  return sign(c,{...bodyBase(c),kind,root:toHex(toBE32(mp.root)),nullifiers:[toHex(toBE32(nf))],proof:proofWire(p.proof),outputs:[recipient,change]});
+function bodyBase(c: Context) {
+  return {
+    version: 1 as const,
+    requestId: c.record.id,
+    operationId: c.operation.id,
+    step: c.operation.nextStep,
+    pool: c.record.pool,
+  };
 }
-export async function buildPaymentSubmission(c:Context & {payload:RequestPayload;inputIndex:number}):Promise<SignedSubmission>{
+export async function buildMergeSubmission(
+  c: Context & { inputIndices: readonly [number, number] },
+): Promise<SignedSubmission> {
+  await assertContext(c);
+  if (c.inputIndices[0] === c.inputIndices[1])
+    throw new Error("Choose distinct notes.");
+  const a = owned(c, c.inputIndices[0]),
+    b = owned(c, c.inputIndices[1]),
+    sum = a.amount + b.amount;
+  if (sum > (1n << 64n) - 1n)
+    throw new Error("Split this balance before combining it.");
+  const account = await noteProofAccount(c, a);
+  await noteProofAccount(c, b);
+  const pk = await ownerPk(account.ownerSecret),
+    salt = randomFieldElement();
+  const paths = await Promise.all([
+    merkleProof(c.scan.leaves, a.leafIndex, 20),
+    merkleProof(c.scan.leaves, b.leafIndex, 20),
+  ]);
+  const nfs = await Promise.all([
+    nullifier(account.ownerSecret, a.leafIndex),
+    nullifier(account.ownerSecret, b.leafIndex),
+  ]);
+  const o = await output(sum, pk, viewPubkey(account.viewSk), salt);
+  const p = await proveMerge(
+    {
+      root: String(paths[0].root),
+      nullifierA: String(nfs[0]),
+      nullifierB: String(nfs[1]),
+      outCommitment: String(fromBE(hexToBytes(o.commitment))),
+      ownerSecret: String(account.ownerSecret),
+      amounts: [String(a.amount), String(b.amount)],
+      salts: [String(a.salt), String(b.salt)],
+      pathElements: [
+        paths[0].pathElements.map(String),
+        paths[1].pathElements.map(String),
+      ],
+      pathIndices: [paths[0].pathIndices, paths[1].pathIndices],
+      outSalt: String(salt),
+    },
+    c.artifactRoot,
+  );
+  return sign(c, {
+    ...bodyBase(c),
+    kind: "merge",
+    root: toHex(toBE32(paths[0].root)),
+    nullifiers: nfs.map((n) => toHex(toBE32(n))),
+    proof: proofWire(p.proof),
+    outputs: [o],
+  });
+}
+async function transfer(
+  c: Context,
+  inputIndex: number,
+  amount: bigint,
+  recipientPk: bigint,
+  recipientView: Uint8Array,
+  recipientSalt: bigint,
+  kind: "split" | "payment",
+  migration = false,
+) {
+  await assertContext(c);
+  const n = owned(c, inputIndex);
+  if (amount <= 0n || amount > n.amount)
+    throw new Error("Your private balance is too low.");
+  const account = await noteProofAccount(c, n, migration);
+  const pk = await ownerPk(account.ownerSecret),
+    changeSalt = randomFieldElement(),
+    mp = await merkleProof(c.scan.leaves, n.leafIndex, 20),
+    nf = await nullifier(account.ownerSecret, n.leafIndex);
+  const recipient = await output(
+      amount,
+      recipientPk,
+      recipientView,
+      recipientSalt,
+    ),
+    change = await output(
+      n.amount - amount,
+      pk,
+      viewPubkey(account.viewSk),
+      changeSalt,
+    );
+  const p = await proveTransfer(
+    {
+      root: String(mp.root),
+      nullifier: String(nf),
+      outCommitmentRecipient: String(fromBE(hexToBytes(recipient.commitment))),
+      outCommitmentChange: String(fromBE(hexToBytes(change.commitment))),
+      inAmount: String(n.amount),
+      ownerSecret: String(account.ownerSecret),
+      inSalt: String(n.salt),
+      pathElements: mp.pathElements.map(String),
+      pathIndices: mp.pathIndices,
+      recipientPk: String(recipientPk),
+      recipientAmount: String(amount),
+      recipientSalt: String(recipientSalt),
+      changeAmount: String(n.amount - amount),
+      changeSalt: String(changeSalt),
+    },
+    c.artifactRoot,
+  );
+  return sign(c, {
+    ...bodyBase(c),
+    kind,
+    root: toHex(toBE32(mp.root)),
+    nullifiers: [toHex(toBE32(nf))],
+    proof: proofWire(p.proof),
+    outputs: [recipient, change],
+  });
+}
+export async function buildPaymentSubmission(
+  c: Context & { payload: RequestPayload; inputIndex: number },
+): Promise<SignedSubmission> {
   await assertContext(c);
   // Verify the payload against the signed record again before selecting its amount.
-  const pool=c.pool??resolvePool(c.record.pool);
-  const verified=await openRequest(signedRecordOf(c.record),c.account,pool);
-  if(verified.amount!==c.payload.amount||verified.salt!==c.payload.salt||verified.metadata.id!==c.payload.metadata.id)throw new Error("This payment request changed.");
-  return transfer(c,c.inputIndex,BigInt(verified.amount),fromBE(hexToBytes(c.record.requester.notePubkey)),hexToBytes(c.record.requester.viewPubkey),BigInt(verified.salt),"payment");
+  const pool = c.pool ?? resolvePool(c.record.pool);
+  const verified = await openRequest(signedRecordOf(c.record), c.account, pool);
+  if (
+    verified.amount !== c.payload.amount ||
+    verified.salt !== c.payload.salt ||
+    verified.metadata.id !== c.payload.metadata.id
+  )
+    throw new Error("This payment request changed.");
+  return transfer(
+    c,
+    c.inputIndex,
+    BigInt(verified.amount),
+    fromBE(hexToBytes(c.record.requester.notePubkey)),
+    hexToBytes(c.record.requester.viewPubkey),
+    BigInt(verified.salt),
+    "payment",
+  );
 }
-export async function buildSplitSubmission(c:Context & {inputIndex:number;splitAmount:bigint}){
-  return transfer(c,c.inputIndex,c.splitAmount,await ownerPk(c.account.ownerSecret),viewPubkey(c.account.viewSk),randomFieldElement(),"split");
+export async function buildSplitSubmission(
+  c: Context & { inputIndex: number; splitAmount: bigint },
+) {
+  const account = fundingAccount(c);
+  return transfer(
+    c,
+    c.inputIndex,
+    c.splitAmount,
+    await ownerPk(account.ownerSecret),
+    viewPubkey(account.viewSk),
+    randomFieldElement(),
+    "split",
+  );
+}
+export async function buildRequestKeyMigrationSubmission(
+  c: Context,
+  action: Extract<GenerationFundingAction, { kind: "key-migrate" }>,
+): Promise<SignedSubmission> {
+  const n = owned(c, action.inputIndex),
+    target = fundingAccount(c);
+  if (
+    !c.keyring ||
+    action.fromGeneration !== (n.keyGeneration ?? 0) ||
+    action.toGeneration !== c.fundingGeneration ||
+    action.fromGeneration === action.toGeneration
+  )
+    throw new Error("Privacy key preparation target changed.");
+  return transfer(
+    c,
+    action.inputIndex,
+    action.amount,
+    await ownerPk(target.ownerSecret),
+    viewPubkey(target.viewSk),
+    randomFieldElement(),
+    "split",
+    true,
+  );
 }

@@ -6,6 +6,8 @@ import { concatBytes, randomBytes } from "@noble/hashes/utils.js";
 import { hexToBytes, toBytes, toHex, verifyTypedData } from "viem";
 import { poseidonHash, randomFieldElement, toBE32 } from "../../lib/crypto";
 import type { LocalAccount } from "../../lib/notes";
+import { accountForParticipants } from "../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../privacyKeys/session";
 import { localParticipantKeys } from "../requests/requestCrypto";
 import { transferMetadataHash, transferTypedData } from "./transferTypedData";
 import type {
@@ -203,6 +205,11 @@ export async function openTransfer(
       }))
     )
       throw new TransferUnreadableError();
+    account = await accountForParticipants(
+      account,
+      [r.sender, r.recipient],
+      getPrivacyKeyring(),
+    );
     const keys = await localParticipantKeys(account);
     const role =
       keys.viewPubkey.toLowerCase() === r.sender.viewPubkey.toLowerCase()

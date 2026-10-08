@@ -1,4 +1,11 @@
 import { env } from "../env";
+import { assertKeyGeneration } from "../features/privacyKeys/keyDerivation";
+import { accountForGeneration } from "../features/privacyKeys/keyRing";
+import {
+  clearPrivacyKeyring,
+  getPrivacyKeyring,
+} from "../features/privacyKeys/session";
+import type { LocalPrivacyKeyring } from "../features/privacyKeys/types";
 import { isSpent } from "./chain";
 import {
   bytesToHex,
@@ -34,6 +41,8 @@ let sessionAccount: LocalAccount | null = null;
 
 export function getAccount(): LocalAccount | null {
   if (typeof window === "undefined") return null;
+  const ring = getPrivacyKeyring();
+  if (ring) return accountForGeneration(ring, ring.activeGeneration);
   return sessionAccount;
 }
 
@@ -41,10 +50,15 @@ export function getAccount(): LocalAccount | null {
 /// uses this to decide whether a restored session still needs to unlock its
 /// master: after a reload it is false, so the passkey/PIN prompt reappears.
 export function hasLocalAccount(): boolean {
-  return sessionAccount !== null;
+  return sessionAccount !== null || getPrivacyKeyring() !== null;
 }
 
 export function clearLocalAccount(): void {
+  clearPrivacyKeyring();
+  if (sessionAccount) {
+    sessionAccount.viewSk.fill(0);
+    sessionAccount.ownerSecret = 0n;
+  }
   sessionAccount = null;
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(USERNAME_KEY);
@@ -64,6 +78,10 @@ export function syncLocalAccountIdentity(privyUserId: string | null): void {
 /// reproduces the exact pubkeys registered on-chain — that is what makes
 /// balances recoverable without ever persisting a secret.
 export function deriveAndStoreAccount(master: Uint8Array): LocalAccount {
+  if (getPrivacyKeyring())
+    throw new Error(
+      "Restore the verified privacy key history before replacing this session",
+    );
   const { ownerSecret, viewSk } = deriveNoteSecrets(master);
   sessionAccount = { ownerSecret, viewSk };
   return sessionAccount;
@@ -83,6 +101,7 @@ export function setStoredUsername(username: string): void {
 }
 
 export type MyNote = {
+  keyGeneration?: number;
   /** The pool this note lives in; leaf indices are only unique per pool. */
   scope: PoolScope;
   leafIndex: number;
@@ -142,6 +161,7 @@ async function scanMirrorForAccount(
   acct: LocalAccount,
   mirror: PoolMirror,
   pool: PoolDescriptor,
+  spentReader: typeof isSpent = isSpent,
 ): Promise<ScanResult> {
   const deposits = mirror.deposits;
   const spentNullifiers = new Set(mirror.spentNullifiers);
@@ -212,7 +232,7 @@ async function scanMirrorForAccount(
   await Promise.all(
     unverified.map(async ({ note, nullifierBytes }) => {
       try {
-        if (await isSpent(nullifierBytes, pool)) note.spent = true;
+        if (await spentReader(nullifierBytes, pool)) note.spent = true;
       } catch {
         // A failed view leaves the mirror's optimistic value; the pool still
         // rejects an actual double-spend on-chain.
@@ -239,3 +259,79 @@ async function scanMirrorForAccount(
 }
 
 export { TREE_DEPTH };
+export async function scanKeyringNotes(
+  ring: LocalPrivacyKeyring,
+  pool: PoolDescriptor,
+  options: {
+    refresh?: boolean;
+    includeRequestRecovery?: boolean;
+    includeTransferRecovery?: boolean;
+    loadMirror?: (pool: PoolDescriptor) => Promise<PoolMirror>;
+    isSpent?: typeof isSpent;
+  } = {},
+): Promise<ScanResult> {
+  if (!ring.accounts.size || ring.accounts.size > 64)
+    throw new Error("Privacy key ring is incomplete");
+  const mirror = options.loadMirror
+    ? await options.loadMirror(pool)
+    : options.refresh === false
+      ? await loadPoolMirror(pool)
+      : await refreshPoolMirror(pool);
+  const scans: ScanResult[] = [];
+  for (const [generation, account] of ring.accounts) {
+    assertKeyGeneration(generation);
+    const scan = await scanMirrorForAccount(
+      account,
+      mirror,
+      pool,
+      options.isSpent,
+    );
+    scans.push({
+      ...scan,
+      notes: scan.notes.map((note) => ({ ...note, keyGeneration: generation })),
+    });
+  }
+  const notes = [
+    ...new Map(
+      scans
+        .flatMap((scan) => scan.notes)
+        .map((note) => [
+          `${note.scope}:${note.leafIndex}:${scans[0].leaves[note.leafIndex]}`,
+          note,
+        ]),
+    ).values(),
+  ].sort((a, b) => a.leafIndex - b.leafIndex);
+  let result: ScanResult = {
+    ...scans[0],
+    notes,
+    claimable: notes
+      .filter((note) => !note.spent)
+      .reduce((sum, note) => sum + note.amount, 0n),
+  };
+  if (options.includeRequestRecovery) {
+    const { recoverPaidRequestOutputs } = await import(
+      "../features/requests/requestNoteRecovery"
+    );
+    result = await recoverPaidRequestOutputs(
+      accountForGeneration(ring, ring.activeGeneration),
+      pool,
+      result,
+      undefined,
+      undefined,
+      ring,
+    );
+  }
+  if (options.includeTransferRecovery) {
+    const { recoverParticipantTransfers } = await import(
+      "../features/transfers/transferNoteRecovery"
+    );
+    result = await recoverParticipantTransfers(
+      accountForGeneration(ring, ring.activeGeneration),
+      pool,
+      result,
+      undefined,
+      ring,
+    );
+  }
+  return result;
+}

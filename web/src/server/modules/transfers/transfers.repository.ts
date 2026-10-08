@@ -80,7 +80,10 @@ export class TransferRepository {
       { unique: true, name: "transfer_step_unique" },
     );
   }
-  async create(record: SignedTransfer): Promise<TransferRecord> {
+  async create(
+    record: SignedTransfer,
+    capture: import("../../../features/privacyKeys/types").FundingCapture = {},
+  ): Promise<TransferRecord> {
     const digest = transferDigest(record),
       prior = await this.collection.findOne({ _id: record.id });
     if (prior) {
@@ -102,6 +105,7 @@ export class TransferRepository {
       updatedAt: now,
       receipt: null,
       operation: {
+        ...capture,
         id,
         transferId: record.id,
         phase: "preparing",

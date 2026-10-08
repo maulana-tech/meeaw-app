@@ -4,6 +4,15 @@ import { Binary } from "mongodb";
 const mocks = vi.hoisted(() => ({ getUsers: vi.fn() }));
 vi.mock("../src/server/db/mongo", () => ({ getUsers: mocks.getUsers }));
 vi.mock("../src/server/lib/privy", () => ({ getPrivyUser: vi.fn() }));
+vi.mock("../src/server/modules/wallets/privacyRecovery", () => ({
+  assertRecoverySetupAllowed: async () => {},
+  withFencedEscrowChange: (
+    user: string,
+    input: unknown,
+    write: (user: string, input: unknown) => Promise<unknown>,
+  ) => write(user, input),
+  recoverFencedEscrowChange: async () => {},
+}));
 
 import {
   WalletEscrowAlreadyInitializedError,

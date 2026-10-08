@@ -19,6 +19,8 @@ vi.mock("../src/lib/prover", () => ({
   proveWithdraw: vi.fn(async () => ({ proof: new Uint8Array(), ms: 10 })),
 }));
 vi.mock("../src/lib/crypto", () => ({
+  commitment: vi.fn(async () => 1n),
+  ownerPk: vi.fn(async () => 1n),
   merkleProof: vi.fn(async () => ({
     root: 1n,
     pathElements: [] as bigint[],
@@ -111,7 +113,7 @@ describe("withdrawAll", () => {
   const scan = {
     scope: SCOPE,
     notes: [],
-    leaves: [],
+    leaves: new Array(16).fill(1n),
     claimable: 0n,
   } as unknown as ScanResult;
   const signer = {} as Signer;

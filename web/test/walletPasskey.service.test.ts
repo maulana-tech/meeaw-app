@@ -4,6 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ getUsers: vi.fn() }));
 vi.mock("../src/server/db/mongo", () => ({ getUsers: mocks.getUsers }));
 vi.mock("../src/server/lib/privy", () => ({ getPrivyUser: vi.fn() }));
+vi.mock("../src/server/modules/wallets/privacyRecovery", () => ({
+  assertRecoverySetupAllowed: async () => {},
+  recoverFencedEscrowChange: async () => {},
+  withFencedEscrowChange: (
+    user: string,
+    input: unknown,
+    write: (user: string, input: unknown) => Promise<unknown>,
+  ) => write(user, input),
+}));
 
 import { WalletEscrowAlreadyInitializedError } from "../src/server/modules/wallets/wallets.errors";
 import { passkeyRecord } from "../src/server/modules/wallets/wallets.schema";

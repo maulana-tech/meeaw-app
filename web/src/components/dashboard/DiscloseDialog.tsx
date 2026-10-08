@@ -2,13 +2,14 @@
 
 import { Download, Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
 import { downloadReceiptJson } from "../../features/receipts/downloadReceiptJson";
 import { prepareReceipt } from "../../features/receipts/prepareReceipt";
 import { loadReceiptSnapshot } from "../../features/receipts/receiptClient";
 import type { ReceiptV2 } from "../../features/receipts/receiptTypes";
 import { downloadDisclosurePdf } from "../../lib/disclosurePdf";
 import type { LocalAccount } from "../../lib/notes";
-import { getAccount, scanMyNotes } from "../../lib/notes";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../lib/notes";
 import { assetLabelFor, formatAssetUnits } from "../../lib/paymentAsset";
 import { activePool, type PoolDescriptor } from "../../lib/pools";
 import { cn } from "../../lib/utils";
@@ -69,12 +70,19 @@ export function DiscloseDialog({
         throw new Error("Unlock your account to prepare a receipt.");
       if (leafIndex === null)
         throw new Error("Choose a payment for the receipt.");
-      const scan = await scanMyNotes(acct, {
-        pool,
-        refresh: true,
-        includeRequestRecovery: true,
-        includeTransferRecovery: true,
-      });
+      const ring = getPrivacyKeyring();
+      const scan = ring
+        ? await scanKeyringNotes(ring, pool, {
+            refresh: true,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : await scanMyNotes(acct, {
+            pool,
+            refresh: true,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
       if (!current()) return;
       const note = scan.notes.find((n) => n.leafIndex === leafIndex);
       if (!note) throw new Error("That payment is no longer available.");

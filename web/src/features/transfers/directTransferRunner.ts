@@ -1,6 +1,11 @@
 import type { Signer } from "../../lib/chain";
 import type { LocalAccount, ScanResult } from "../../lib/notes";
-import { type FundingAction, nextFundingAction } from "../payments/funding";
+import { nextFundingAction } from "../payments/funding";
+import {
+  type GenerationFundingAction,
+  nextGenerationFundingAction,
+} from "../privacyKeys/generationFunding";
+import type { LocalPrivacyKeyring } from "../privacyKeys/types";
 import { openTransfer } from "./transferCrypto";
 import type {
   PoolDescriptor,
@@ -15,7 +20,7 @@ export type TransferRunnerPort = {
   build: (
     op: TransferOperation,
     scan: ScanResult,
-    action: FundingAction,
+    action: GenerationFundingAction,
   ) => Promise<SignedTransferSubmission>;
   submit: (s: SignedTransferSubmission) => Promise<TransferOperation>;
   tick: (op: TransferOperation) => void;
@@ -26,6 +31,7 @@ export async function runDirectTransfer(
     account: LocalAccount;
     pool: PoolDescriptor;
     signer: Signer;
+    keyring?: LocalPrivacyKeyring;
   },
   port: TransferRunnerPort,
 ): Promise<TransferOperation | null> {
@@ -53,11 +59,18 @@ export async function runDirectTransfer(
     if (!current()) return null;
     if (scan.health !== "healthy" || scan.scope !== context.pool.scope)
       throw new Error("Refresh the balance before sending.");
-    const action = nextFundingAction(
-      scan.notes,
-      BigInt(payload.amount),
-      context.pool.scope,
-    );
+    const action = context.keyring
+      ? nextGenerationFundingAction(
+          scan.notes,
+          BigInt(payload.amount),
+          context.pool.scope,
+          operation.fundingGeneration ?? 0,
+        )
+      : nextFundingAction(
+          scan.notes,
+          BigInt(payload.amount),
+          context.pool.scope,
+        );
     const submission = await port.build(operation, scan, action);
     if (!current()) return null;
     operation = await port.submit(submission);

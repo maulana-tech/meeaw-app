@@ -30,6 +30,8 @@ import {
   toBE32,
 } from "../../lib/crypto";
 import type { LocalAccount } from "../../lib/notes";
+import { accountForParticipants } from "../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../privacyKeys/session";
 import { requestTypedData } from "./requestTypedData";
 import type {
   Envelope,
@@ -293,6 +295,16 @@ export async function openRequest(
     signed = false;
   }
   if (!signed) throw new RequestUnreadableError();
+
+  try {
+    account = await accountForParticipants(
+      account,
+      [r.requester, r.addressee],
+      getPrivacyKeyring(),
+    );
+  } catch {
+    throw new RequestUnreadableError();
+  }
 
   const myViewPk = rawHex(x25519.getPublicKey(account.viewSk));
   const role: Role | null =

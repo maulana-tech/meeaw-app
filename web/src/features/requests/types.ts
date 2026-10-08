@@ -114,6 +114,9 @@ export type SubmissionBody = {
 export type SignedSubmission = SubmissionBody & { signature: Hex };
 
 export type PaymentOperation = {
+  fundingGeneration?: number;
+  keyRevision?: number;
+  accountTicketId?: string;
   id: string;
   requestId: string;
   pool: PoolScope;
