@@ -8,7 +8,7 @@ import { WalletProvider } from "../components/WalletProvider";
 import { TRPCReactProvider } from "../trpc/react";
 
 export const metadata: Metadata = {
-  title: "Mawee: private USDC payments",
+  title: "Meaw: private USDC payments",
   description:
     "Confidential USDC payment links on Monad. Private by default, provable on demand.",
 };

@@ -5,9 +5,9 @@ import { Frame, MonoLabel } from "./primitives";
 
 const FAQ_ITEMS = [
   {
-    question: "Do my clients need to use Mawee?",
+    question: "Do my clients need to use Meaw?",
     answer:
-      "No. They open your link and pay in USDC from the wallet they already use, like MetaMask. They only sign — Mawee covers the network fee.",
+      "No. They open your link and pay in USDC from the wallet they already use, like MetaMask. They only sign — Meaw covers the network fee.",
   },
   {
     question: "What stays private?",
@@ -25,14 +25,14 @@ const FAQ_ITEMS = [
       "Sign in on a new device. If you chose a passkey, unlock with the same passkey (synced by iCloud Keychain, Google Password Manager, or 1Password) and your balance reappears. If you chose a PIN, enter your PIN.",
   },
   {
-    question: "How is Mawee different from a crypto mixer?",
+    question: "How is Meaw different from a crypto mixer?",
     answer:
-      "Mixers hide where money came from with no practical way to prove a single transaction. Mawee is built for business: routine payments stay private, and you can prove any specific payment whenever you need to.",
+      "Mixers hide where money came from with no practical way to prove a single transaction. Meaw is built for business: routine payments stay private, and you can prove any specific payment whenever you need to.",
   },
   {
     question: "Why not just use a new wallet for every payment?",
     answer:
-      "It gets unmanageable fast, and moving funds between those wallets still reveals the pattern on a public blockchain. Mawee gives you one link and one balance, with privacy built in.",
+      "It gets unmanageable fast, and moving funds between those wallets still reveals the pattern on a public blockchain. Meaw gives you one link and one balance, with privacy built in.",
   },
   {
     question: "Why Monad?",

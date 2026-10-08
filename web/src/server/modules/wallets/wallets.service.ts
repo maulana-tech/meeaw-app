@@ -108,7 +108,7 @@ export async function restoreWallet(
     .toArray();
   if (matches.length > 1) {
     throw new WalletConflictError(
-      "Multiple Mawee accounts match wallets on this Privy identity.",
+      "Multiple Meaw accounts match wallets on this Privy identity.",
     );
   }
   const previous = matches[0];
@@ -207,7 +207,7 @@ export async function saveEscrow(
   if (result.matchedCount === 1) return;
   if (!(await users.findOne({ privyUserId }))) {
     throw new WalletMigrationError(
-      "No Mawee wallet is linked to this Privy identity.",
+      "No Meaw wallet is linked to this Privy identity.",
     );
   }
   throw new WalletEscrowAlreadyInitializedError();
@@ -285,7 +285,7 @@ export async function savePasskey(
   if (result.matchedCount === 1) return;
   if (!(await users.findOne({ privyUserId }))) {
     throw new WalletMigrationError(
-      "No Mawee wallet is linked to this Privy identity.",
+      "No Meaw wallet is linked to this Privy identity.",
     );
   }
   throw new WalletEscrowAlreadyInitializedError();

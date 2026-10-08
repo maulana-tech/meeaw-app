@@ -85,7 +85,7 @@ describe("AppShell network banner", () => {
 
     expect(
       screen.getByRole("status", { name: "Network status" }),
-    ).toHaveTextContent("Mawee is running on Monad Testnet.");
+    ).toHaveTextContent("Meaw is running on Monad Testnet.");
   });
 
   it.each([

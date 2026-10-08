@@ -62,7 +62,7 @@ describe("EditionsTopNav", () => {
     render(<EditionsTopNav />);
     const sections = screen.getByRole("navigation", { name: "Sections" });
     for (const [name, href] of [
-      ["Why Mawee", "#why"],
+      ["Why Meaw", "#why"],
       ["How it works", "#how"],
       ["Who it's for", "#who"],
       ["FAQ", "#faq"],

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { VerifyReceipt } from "../../components/receipts/VerifyReceipt";
 export const metadata: Metadata = {
-  title: "Verify a receipt | Mawee",
+  title: "Verify a receipt | Meaw",
   description:
-    "Check a shared Mawee note proof without uploading private details.",
+    "Check a shared Meaw note proof without uploading private details.",
 };
 export default function VerifyPage() {
   return (

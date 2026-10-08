@@ -139,7 +139,7 @@ export async function createRequest(
   const wallet = await callerWallet(privyUserId);
   if (!wallet)
     throw new RequestRejectedError(
-      "No Mawee wallet is linked to this account.",
+      "No Meaw wallet is linked to this account.",
     );
   if (record.requester.wallet.toLowerCase() !== wallet)
     throw new RequestRejectedError("Sign the request with your own account.");

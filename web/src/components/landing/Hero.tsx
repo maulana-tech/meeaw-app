@@ -64,9 +64,9 @@ export function Hero() {
             </div>
           </div>
 
-          <nav aria-label="Explore Mawee" className="hidden lg:block">
+          <nav aria-label="Explore Meaw" className="hidden lg:block">
             <MonoLabel className="block border-b border-starlight/70 pb-3 text-starlight/85">
-              Explore Mawee
+              Explore Meaw
             </MonoLabel>
             <ul className="list-none">
               {LANDING_SECTIONS.map((section) => (

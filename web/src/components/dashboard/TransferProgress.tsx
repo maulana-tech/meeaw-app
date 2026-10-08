@@ -103,7 +103,7 @@ export function TransferProgress({
           </div>
         ) : (
           <p className="text-sm">
-            Unlock Mawee to read the transfer amount and note.
+            Unlock Meaw to read the transfer amount and note.
           </p>
         )}
         {transfer.error && (
@@ -128,7 +128,7 @@ export function TransferProgress({
           </a>
         )}
         {!wallet.accountUnlocked ? (
-          <Button onClick={wallet.promptUnlock}>Unlock Mawee</Button>
+          <Button onClick={wallet.promptUnlock}>Unlock Meaw</Button>
         ) : phase === "preparing" ? (
           <Button
             disabled={transfer.working}

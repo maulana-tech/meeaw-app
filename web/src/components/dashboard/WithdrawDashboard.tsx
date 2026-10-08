@@ -487,7 +487,7 @@ function PoolSelector({
       </fieldset>
       {funded.length ? (
         <p className="text-xs text-brand-linen/65">
-          You still have funds in a previous Mawee pool. They can only be
+          You still have funds in a previous Meaw pool. They can only be
           withdrawn, and are not used to pay requests.
         </p>
       ) : null}
@@ -727,8 +727,8 @@ function WalletWithdrawal({
           >
             Enter the Monad address that should receive the funds.{" "}
             {gasless === false
-              ? "The transaction is sent from your Mawee wallet, which pays the gas."
-              : "Network fees are covered, and your Mawee wallet never appears in the withdrawal."}
+              ? "The transaction is sent from your Meaw wallet, which pays the gas."
+              : "Network fees are covered, and your Meaw wallet never appears in the withdrawal."}
           </p>
           <ToastFeedback
             message={fieldError}

@@ -27,10 +27,10 @@ export function useDirectTransfer(record: TransferRecord | null) {
   const continueSend = useCallback(async () => {
     if (!record || busy.current) return null;
     if (!wallet.accountUnlocked)
-      throw new Error("Unlock Mawee before continuing.");
+      throw new Error("Unlock Meaw before continuing.");
     const currentIdentity = session.current,
       account = getAccount();
-    if (!account) throw new Error("Unlock Mawee before continuing.");
+    if (!account) throw new Error("Unlock Meaw before continuing.");
     busy.current = true;
     auto.current = true;
     setWorking(true);

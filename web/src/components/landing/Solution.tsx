@@ -184,7 +184,7 @@ const REASONS = [
   },
   {
     title: "No gas, no friction",
-    body: "Mawee covers network fees. Your client signs once with the wallet they already use, and you never need to hold MON.",
+    body: "Meaw covers network fees. Your client signs once with the wallet they already use, and you never need to hold MON.",
     art: <GaslessArt />,
   },
 ] as const;
@@ -204,7 +204,7 @@ export function Solution() {
               id="why-title"
               className="text-[clamp(1.9rem,2.8vw,2.6rem)] font-normal tracking-tight lg:sticky lg:top-28"
             >
-              Why Mawee
+              Why Meaw
             </h2>
           </div>
           <div>

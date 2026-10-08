@@ -90,7 +90,7 @@ export function SendTransferDialog({
       const pool = chosenPool,
         account = getAccount();
       if (!pool || !account || !wallet.username)
-        throw new Error("Unlock your registered Mawee account before sending.");
+        throw new Error("Unlock your registered Meaw account before sending.");
       if (
         pool.role !== "active" ||
         !(pool.transferCapable ?? pool.requestCapable)
@@ -200,13 +200,13 @@ export function SendTransferDialog({
             {review ? "Review transfer" : "Send privately"}
           </DialogTitle>
           <DialogDescription>
-            Send {asset} from your private balance to another Mawee user.
+            Send {asset} from your private balance to another Meaw user.
           </DialogDescription>
         </DialogHeader>
         {!wallet.accountUnlocked ? (
           <div className="grid gap-4">
-            <p>Unlock Mawee to send a private payment.</p>
-            <Button onClick={wallet.promptUnlock}>Unlock Mawee</Button>
+            <p>Unlock Meaw to send a private payment.</p>
+            <Button onClick={wallet.promptUnlock}>Unlock Meaw</Button>
           </div>
         ) : review ? (
           <div className="grid gap-5">

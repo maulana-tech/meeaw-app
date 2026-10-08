@@ -92,7 +92,7 @@ export function Dashboard() {
   return (
     <>
       <DashboardPageHeader
-        title={username ? `Hi, @${username}` : "Welcome to Mawee"}
+        title={username ? `Hi, @${username}` : "Welcome to Meaw"}
         description="Your private balance, payment link and recent activity."
       />
 

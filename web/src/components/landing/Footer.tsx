@@ -8,7 +8,7 @@ const COLUMNS: {
   {
     title: "Product",
     links: [
-      { label: "Why Mawee", href: "#why" },
+      { label: "Why Meaw", href: "#why" },
       { label: "How it works", href: "#how" },
       { label: "Who it's for", href: "#who" },
       { label: "FAQ", href: "#faq" },
@@ -41,10 +41,10 @@ export function Footer() {
           <a
             href="#top"
             className="inline-flex items-center gap-2.5 text-starlight hover:text-starlight"
-            aria-label="Mawee home"
+            aria-label="Meaw home"
           >
             <Image src="/assets/mawee.svg" alt="" width={28} height={28} />
-            <span className="text-xl font-medium tracking-tight">Mawee</span>
+            <span className="text-xl font-medium tracking-tight">Meaw</span>
           </a>
           <p className="mt-4 max-w-[36ch] text-sm leading-relaxed text-starlight/55">
             Private USDC payment links on Monad. Private by default, provable on
@@ -83,7 +83,7 @@ export function Footer() {
         <a href="/privacy" className="hover:text-starlight/80">
           Privacy policy
         </a>
-        <span>© {new Date().getFullYear()} Mawee. All rights reserved.</span>
+        <span>© {new Date().getFullYear()} Meaw. All rights reserved.</span>
       </Frame>
     </footer>
   );

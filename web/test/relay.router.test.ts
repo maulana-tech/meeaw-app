@@ -276,7 +276,7 @@ describe("relay router", () => {
     expect(request.args[0]).toBe(OWNER);
   });
 
-  it("mints to a payer's verified Privy wallet when there is no Mawee wallet", async () => {
+  it("mints to a payer's verified Privy wallet when there is no Meaw wallet", async () => {
     const PAYER = "0x00000000000000000000000000000000000000Fa";
     mocks.currentWallet.mockResolvedValue(null);
     mocks.verifiedPrivyWallets.mockResolvedValue([{ address: PAYER }]);

@@ -173,7 +173,7 @@ export function RequestsDashboard({
                   onClick={promptUnlock}
                 >
                   <LockKeyhole aria-hidden="true" />
-                  Unlock Mawee
+                  Unlock Meaw
                 </button>
               }
             >

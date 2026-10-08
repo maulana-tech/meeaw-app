@@ -131,7 +131,7 @@ describe("fixed private balance payment dialog", () => {
         onPay={state.pay}
       />,
     );
-    expect(screen.getByText("Private Mawee balance")).toBeInTheDocument();
+    expect(screen.getByText("Private Meaw balance")).toBeInTheDocument();
     expect(await screen.findByRole("status")).toHaveTextContent(
       /Checking the existing private payment/,
     );

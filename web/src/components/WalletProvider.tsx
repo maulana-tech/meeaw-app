@@ -338,7 +338,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         candidate.address.toLowerCase() === mapping.address.toLowerCase(),
     );
     if (!wallet) {
-      throw new Error("Your Mawee wallet is still loading. Try again.");
+      throw new Error("Your Meaw wallet is still loading. Try again.");
     }
     return privySigner(wallet);
   }, []);
@@ -415,7 +415,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (bytesToHex(viewPubkey) !== record.viewPubkeyHex.toLowerCase()) {
         master.fill(0);
         throw new Error(
-          "This passkey derived different keys than your account uses. Choose the passkey you created for Mawee.",
+          "This passkey derived different keys than your account uses. Choose the passkey you created for Meaw.",
         );
       }
       deriveAndStoreAccount(master);

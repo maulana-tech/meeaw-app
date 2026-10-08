@@ -62,7 +62,7 @@ async function relay<T>(send: () => Promise<T>): Promise<T> {
 async function boundWallet(privyUserId: string): Promise<`0x${string}`> {
   const wallet = await currentWallet(privyUserId);
   if (!wallet) {
-    throw new RelayRejectedError("No Mawee wallet is linked to this account.");
+    throw new RelayRejectedError("No Meaw wallet is linked to this account.");
   }
   return wallet.address as `0x${string}`;
 }

@@ -36,7 +36,7 @@ export function SettingsDashboard() {
     <>
       <DashboardPageHeader
         title="Settings"
-        description="The essentials for your Mawee account, explained without the crypto jargon."
+        description="The essentials for your Meaw account, explained without the crypto jargon."
       />
 
       <div className={`${dashLedger} max-w-3xl`}>
@@ -168,9 +168,9 @@ function RecoveryTile({
           </p>
           <p>
             {method === "passkey"
-              ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Mawee stores nothing secret."
+              ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Meaw stores nothing secret."
               : protectedRecovery
-                ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
+                ? "Your PIN lets you restore access on another device. Meaw never sees or stores the PIN itself."
                 : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
           </p>
         </>
@@ -214,7 +214,7 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent appearance="linen" size="sm">
           <DialogHeader>
-            <DialogTitle>Sign out of Mawee?</DialogTitle>
+            <DialogTitle>Sign out of Meaw?</DialogTitle>
             <DialogDescription>
               This removes access from this device. Your account and funds stay
               safe, and you can return with your passkey or recovery PIN.

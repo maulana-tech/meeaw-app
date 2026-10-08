@@ -109,7 +109,7 @@ export function CreateRequestDialog({
         <DialogHeader>
           <DialogTitle>Request a payment</DialogTitle>
           <DialogDescription>
-            Ask another Mawee user to pay you privately.
+            Ask another Meaw user to pay you privately.
           </DialogDescription>
         </DialogHeader>
         {!providedPool && (
@@ -127,7 +127,7 @@ export function CreateRequestDialog({
         ) : !wallet.accountUnlocked ? (
           <div className="grid gap-4">
             <p>Unlock your account to create a private request.</p>
-            <Button onClick={wallet.promptUnlock}>Unlock Mawee</Button>
+            <Button onClick={wallet.promptUnlock}>Unlock Meaw</Button>
           </div>
         ) : (
           <form className="grid gap-3" onSubmit={submit}>

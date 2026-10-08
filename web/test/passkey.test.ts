@@ -95,7 +95,7 @@ describe("passkey-derived privacy keys (Mera PRF)", () => {
     ]);
   });
 
-  it("uses a Mawee-specific salt and HKDF, not the raw PRF output", async () => {
+  it("uses a Meaw-specific salt and HKDF, not the raw PRF output", async () => {
     const seen: Uint8Array[] = [];
     const keychain = fakeKeychain();
     const base = keychain.device();
@@ -175,7 +175,7 @@ describe("passkey-derived privacy keys (Mera PRF)", () => {
         rpId: RP,
         webAuthnClient: lying,
       }),
-    ).rejects.toThrow("doesn't belong to your Mawee account");
+    ).rejects.toThrow("doesn't belong to your Meaw account");
   });
 
   it("explains authenticators without PRF support", async () => {

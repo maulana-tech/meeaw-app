@@ -150,7 +150,7 @@ export function PayRequestDialog({
             <div className="grid gap-2 border-t border-border pt-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Pay from</span>
-                <span className="font-medium">Private Mawee balance</span>
+                <span className="font-medium">Private Meaw balance</span>
               </div>
               {showBalance ? (
                 <div className="flex items-center justify-between gap-3">
