@@ -34,6 +34,15 @@ export const serverEnvSchema = z.object({
     emptyToUndefined,
     z.string().trim().url().optional(),
   ),
+  RELAYER_USER_ACTIONS_PER_DAY: optionalString,
+  RELAYER_GUEST_ACTIONS_PER_DAY: optionalString,
+  RELAYER_ANONYMOUS_ACTIONS_PER_DAY: optionalString,
+  RELAYER_DAILY_BUDGET_MON: optionalString,
+  RELAYER_ANONYMOUS_BUDGET_MON: optionalString,
+  RELAYER_ACTION_BUDGET_MON: optionalString,
+  RELAYER_BALANCE_FLOOR_MON: optionalString,
+  RELAYER_MAX_FEE_GWEI: optionalString,
+  RELAYER_MAX_ACTION_STEPS: optionalString,
   // Envio HyperIndex GraphQL endpoint (indexer/). When set, wallet scanning
   // and pool stats read from Envio instead of the eth_getLogs poller.
   ENVIO_GRAPHQL_URL: z.preprocess(
@@ -57,6 +66,16 @@ export function getServerEnv() {
     RELAYER_PRIVATE_KEY: process.env.RELAYER_PRIVATE_KEY,
     ENVIO_GRAPHQL_URL: process.env.ENVIO_GRAPHQL_URL,
     RELAYER_RPC_URL: process.env.RELAYER_RPC_URL,
+    RELAYER_USER_ACTIONS_PER_DAY: process.env.RELAYER_USER_ACTIONS_PER_DAY,
+    RELAYER_GUEST_ACTIONS_PER_DAY: process.env.RELAYER_GUEST_ACTIONS_PER_DAY,
+    RELAYER_ANONYMOUS_ACTIONS_PER_DAY:
+      process.env.RELAYER_ANONYMOUS_ACTIONS_PER_DAY,
+    RELAYER_DAILY_BUDGET_MON: process.env.RELAYER_DAILY_BUDGET_MON,
+    RELAYER_ANONYMOUS_BUDGET_MON: process.env.RELAYER_ANONYMOUS_BUDGET_MON,
+    RELAYER_ACTION_BUDGET_MON: process.env.RELAYER_ACTION_BUDGET_MON,
+    RELAYER_BALANCE_FLOOR_MON: process.env.RELAYER_BALANCE_FLOOR_MON,
+    RELAYER_MAX_FEE_GWEI: process.env.RELAYER_MAX_FEE_GWEI,
+    RELAYER_MAX_ACTION_STEPS: process.env.RELAYER_MAX_ACTION_STEPS,
     MONAD_LOGS_BLOCK_RANGE: process.env.MONAD_LOGS_BLOCK_RANGE,
   });
 }
