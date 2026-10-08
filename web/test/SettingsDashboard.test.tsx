@@ -54,6 +54,19 @@ vi.mock("../src/features/recovery/hooks/useChangeRecoveryPin", () => ({
   RecoveryPinChangeError: class extends Error {},
 }));
 vi.mock("sonner", () => ({ toast: { success: mocks.toastSuccess } }));
+vi.mock("../src/features/privacyKeys/usePrivacyKeyRotation", () => ({
+  usePrivacyKeyRotation: () => ({
+    state: null,
+    operation: null,
+    review: null,
+    isWorking: false,
+    error: null,
+    prepare: vi.fn(),
+    confirm: vi.fn(),
+    check: vi.fn(),
+    clear: vi.fn(),
+  }),
+}));
 
 import { SettingsDashboard } from "../src/components/dashboard/SettingsDashboard";
 

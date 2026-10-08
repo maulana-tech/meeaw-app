@@ -52,7 +52,7 @@ export function RecoveryDialog({
           <DialogDescription className="mx-auto">
             {choosing
               ? "Your payments are encrypted to keys only you hold. Choose how to restore them on another device."
-              : "Use the passkey you created for Mawee. Your keys are re-derived on this device — nothing is downloaded."}
+              : "Use the passkey you created for Meaw. Your keys are re-derived on this device — nothing is downloaded."}
           </DialogDescription>
         </DialogHeader>
 
@@ -83,7 +83,7 @@ export function RecoveryDialog({
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-foreground/60">
                   Face ID, Touch ID or your device PIN. Your keys come from the
-                  passkey itself — Mawee stores nothing secret.
+                  passkey itself — Meaw stores nothing secret.
                 </span>
               </span>
             </button>

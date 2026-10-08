@@ -10,6 +10,7 @@ import { maweePoolAbi } from "../../../lib/abi";
 import { resolvePool } from "../../../lib/pools";
 import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerConfigured } from "../../lib/relayer";
+import { accountSpendGate } from "../privacyKeys/spendGate";
 import {
   encodeTransferSubmission,
   verifyTransferReceipt,
@@ -196,6 +197,16 @@ async function advance(doc: TransferDoc, rebroadcast = true) {
   }
   const latest = await repo.collection.findOne({ _id: doc._id });
   if (!latest) throw new TransferNotFoundError();
+  if (
+    latest.operation.phase === "confirmed" ||
+    latest.operation.phase === "failed"
+  )
+    await (await accountSpendGate()).finish(
+      latest.sender.wallet,
+      `transfer:${latest.id}`,
+      latest.operation,
+      "terminal",
+    );
   return latest.operation;
 }
 export async function submitTransfer(
@@ -254,6 +265,31 @@ export async function submitTransfer(
   )
     throw new TransferConflictError();
   const now = new Date().toISOString();
+  if (!doc.operation.accountTicketId) {
+    const capture = await (await accountSpendGate()).admit(
+      wallet as `0x${string}`,
+      `transfer:${doc.id}`,
+      doc.sender,
+    );
+    if (capture.accountTicketId) {
+      await repo.collection.updateOne(
+        { _id: doc._id, "operation.accountTicketId": { $exists: false } },
+        {
+          $set: {
+            "operation.accountTicketId": capture.accountTicketId,
+            "operation.keyRevision": capture.keyRevision,
+            "operation.fundingGeneration": capture.fundingGeneration,
+          },
+        },
+      );
+      Object.assign(doc.operation, capture);
+    }
+  }
+  await (await accountSpendGate()).assert(
+    wallet as `0x${string}`,
+    `transfer:${doc.id}`,
+    doc.operation,
+  );
   await repo.steps.updateOne(
     { _id: stepId },
     {
@@ -330,10 +366,33 @@ export async function transferEvidence(
 }
 export async function resumeTransfer(user: string, id: string) {
   enforceTransferLimit(user, "submit");
-  const d = await (await transferRepo()).getDoc(await transferCaller(user), id);
+  const repo = await transferRepo(),
+    d = await repo.getDoc(await transferCaller(user), id);
   if (d.sender.wallet.toLowerCase() !== (await transferCaller(user)))
     throw new TransferRejectedError();
   if (d.currentSubmission) return advance(d);
+  if (d.status === "pending" && !d.operation.accountTicketId) {
+    const gate = await accountSpendGate();
+    const captured = await gate.admit(
+      d.sender.wallet,
+      `transfer:${d.id}`,
+      d.sender,
+      await gate.legacyCapture(d.sender.wallet, d.sender),
+    );
+    if (captured.accountTicketId) {
+      await repo.collection.updateOne(
+        { _id: d._id, "operation.accountTicketId": { $exists: false } },
+        {
+          $set: {
+            "operation.accountTicketId": captured.accountTicketId,
+            "operation.keyRevision": captured.keyRevision,
+            "operation.fundingGeneration": captured.fundingGeneration,
+          },
+        },
+      );
+      Object.assign(d.operation, captured);
+    }
+  }
   return d.operation;
 }
 export async function recoveryBatch(
@@ -393,21 +452,46 @@ export async function reconcilePendingTransfers({ limit }: { limit: number }) {
   }
   // Only idle preparation without an accepted submission can be safely ended.
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  await repo.collection.updateMany(
-    {
+  const idle = await repo.collection
+    .find({
       status: "pending",
       currentSubmission: null,
       "operation.phase": "preparing",
       updatedAt: { $lt: cutoff },
-    },
-    {
-      $set: {
-        status: "failed",
-        "operation.phase": "failed",
-        updatedAt: new Date().toISOString(),
+    })
+    .limit(20)
+    .toArray();
+  for (const doc of idle) {
+    if (
+      await repo.steps.countDocuments({
+        operationId: doc.operationId,
+        evidence: null,
+      })
+    )
+      continue;
+    const changed = await repo.collection.updateOne(
+      {
+        _id: doc._id,
+        revision: doc.revision,
+        currentSubmission: null,
+        "operation.phase": "preparing",
       },
-      $inc: { revision: 1 },
-    },
-  );
+      {
+        $set: {
+          status: "failed",
+          "operation.phase": "failed",
+          updatedAt: new Date().toISOString(),
+        },
+        $inc: { revision: 1 },
+      },
+    );
+    if (changed.modifiedCount)
+      await (await accountSpendGate()).finish(
+        doc.sender.wallet,
+        `transfer:${doc.id}`,
+        doc.operation,
+        "unsigned-abandoned",
+      );
+  }
   return { examined: docs.length, confirmed, unresolved };
 }

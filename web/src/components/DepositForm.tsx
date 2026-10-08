@@ -55,7 +55,7 @@ export function DepositForm() {
       if ((await usdcBalance(signer.address)) < units) {
         setStatus({
           kind: "err",
-          msg: "Not enough USDC in your Mawee wallet.",
+          msg: "Not enough USDC in your Meaw wallet.",
         });
         return;
       }

@@ -87,7 +87,7 @@ export default function SlugPayPage() {
           @{username} not found
         </h2>
         <p className="text-sm text-brand-linen/60">
-          No Mawee account is registered for this username on testnet.
+          No Meaw account is registered for this username on testnet.
         </p>
       </Card>
     );

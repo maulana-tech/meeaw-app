@@ -1,9 +1,11 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWallet } from "../../../components/WalletProvider";
-import { getAccount, scanMyNotes } from "../../../lib/notes";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../../lib/notes";
 import { resolvePool } from "../../../lib/pools";
 import { api } from "../../../trpc/client";
+import { accountForParticipant } from "../../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../../privacyKeys/session";
 import { runDirectTransfer } from "../directTransferRunner";
 import { buildTransferSubmission } from "../transferProofs";
 import type { TransferOperation, TransferRecord } from "../types";
@@ -27,34 +29,59 @@ export function useDirectTransfer(record: TransferRecord | null) {
   const continueSend = useCallback(async () => {
     if (!record || busy.current) return null;
     if (!wallet.accountUnlocked)
-      throw new Error("Unlock Mawee before continuing.");
+      throw new Error("Unlock Meaw before continuing.");
     const currentIdentity = session.current,
-      account = getAccount();
-    if (!account) throw new Error("Unlock Mawee before continuing.");
+      activeAccount = getAccount(),
+      keyring = getPrivacyKeyring();
+    if (!activeAccount) throw new Error("Unlock Meaw before continuing.");
     busy.current = true;
     auto.current = true;
     setWorking(true);
     setError(null);
     const current = () =>
-      session.current === currentIdentity && getAccount() === account;
+      session.current === currentIdentity &&
+      getAccount() === activeAccount &&
+      getPrivacyKeyring() === keyring;
     try {
       const pool = resolvePool(record.pool),
         signer = await wallet.getSigner();
       if (!current()) return null;
+      const account = keyring
+        ? await accountForParticipant(keyring, record.sender)
+        : activeAccount;
       return await runDirectTransfer(
-        { record, account, pool, signer },
+        { record, account, pool, signer, ...(keyring ? { keyring } : {}) },
         {
           isCurrent: current,
           operation: () => api.transfers.resume.mutate({ id: record.id }),
           scan: () =>
-            scanMyNotes(account, {
-              pool,
-              includeRequestRecovery: true,
-              includeTransferRecovery: true,
-            }),
+            keyring
+              ? scanKeyringNotes(keyring, pool, {
+                  includeRequestRecovery: true,
+                  includeTransferRecovery: true,
+                })
+              : scanMyNotes(account, {
+                  pool,
+                  includeRequestRecovery: true,
+                  includeTransferRecovery: true,
+                }),
           build: (operation, scan, action) =>
             buildTransferSubmission(
-              { record, operation, account, scan, pool, signer },
+              {
+                record,
+                operation,
+                account,
+                scan,
+                pool,
+                signer,
+                ...(keyring
+                  ? {
+                      keyring,
+                      fundingGeneration: operation.fundingGeneration ?? 0,
+                    }
+                  : {}),
+                isCurrent: current,
+              },
               action,
             ),
           submit: (s) =>

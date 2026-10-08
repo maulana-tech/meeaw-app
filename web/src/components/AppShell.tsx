@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         hideOnScroll={false}
       >
         <p role="status" aria-label="Network status">
-          Mawee is running on {chain.name}. Balances are test funds with no real
+          Meaw is running on {chain.name}. Balances are test funds with no real
           value.
         </p>
       </StickyBanner>
@@ -108,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <header className="mb-6">
             <Link
               href="/"
-              aria-label="Mawee home"
+              aria-label="Meaw home"
               className="font-heading text-3xl font-bold tracking-tight"
             >
               mawee
@@ -125,10 +125,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DashboardBackground>
           <DashboardShell contentClassName="flex min-h-svh max-w-3xl flex-col">
             <header className="mb-0 flex min-w-0 items-center justify-center">
-              <Link href="/" aria-label="Mawee home">
+              <Link href="/" aria-label="Meaw home">
                 <Image
                   src="/assets/mawee-white.svg"
-                  alt="Mawee"
+                  alt="Meaw"
                   width={40}
                   height={40}
                   className="size-16"

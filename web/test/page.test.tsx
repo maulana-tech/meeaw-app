@@ -170,7 +170,7 @@ describe("Dashboard route", () => {
     expect(
       await screen.findByRole("heading", {
         level: 1,
-        name: "Welcome to Mawee",
+        name: "Welcome to Meaw",
       }),
     ).toBeInTheDocument();
     expect(
@@ -290,7 +290,7 @@ describe("Dashboard route", () => {
       screen.getByRole("button", { name: /Get 100 test USDC/ }),
     ).toBeInTheDocument();
     // With the relayer on, users never see gas: no MON balance or faucet.
-    expect(await screen.findByText("Covered by Mawee")).toBeInTheDocument();
+    expect(await screen.findByText("Covered by Meaw")).toBeInTheDocument();
     expect(screen.queryByText("MON faucet")).not.toBeInTheDocument();
     expect(
       screen.getByLabelText("Move to private balance"),

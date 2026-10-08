@@ -4,6 +4,13 @@ import { isSpent } from "../../lib/chain";
 import { commitment, nullifier, ownerPk, toBE32 } from "../../lib/crypto";
 import type { LocalAccount, MyNote, ScanResult } from "../../lib/notes";
 import { api } from "../../trpc/client";
+import {
+  accountForGeneration,
+  accountForParticipants,
+  privacyAccountPubkeys,
+  samePublicKeys,
+} from "../privacyKeys/keyRing";
+import type { LocalPrivacyKeyring } from "../privacyKeys/types";
 import { localParticipantKeys } from "../requests/requestCrypto";
 import { SNARK_FIELD } from "../requests/validation";
 import { openTransfer, openTransferEnvelope } from "./transferCrypto";
@@ -32,6 +39,7 @@ const recoverySchema = z
       amount: integer(1n << 64n),
       salt: integer(SNARK_FIELD),
       commitment: z.string().regex(/^0x[0-9a-f]{64}$/),
+      generation: z.number().int().min(0).max(63).optional(),
     }),
   )
   .max(2);
@@ -40,6 +48,7 @@ export async function recoverTransferNotes(input: {
   submissions: readonly SignedTransferSubmission[];
   evidence: readonly ConfirmedTransferStep[];
   account: LocalAccount;
+  keyring?: LocalPrivacyKeyring;
   scan: ScanResult;
   pool: PoolDescriptor;
   isSpent?: (nf: Uint8Array) => Promise<boolean>;
@@ -62,14 +71,20 @@ export async function recoverTransferNotes(input: {
     leafIndex: number,
     at: string,
     internal = false,
+    owningAccount = account,
+    generation?: number,
   ) => {
     if (amount <= 0n) return;
-    const comm = await commitment(amount, pk, salt);
+    const comm = await commitment(
+      amount,
+      await ownerPk(owningAccount.ownerSecret),
+      salt,
+    );
     if (comm !== BigInt(expected) || scan.leaves[leafIndex] !== comm) return;
     const existing = scan.notes.find(
       (n) => n.scope === r.pool && n.leafIndex === leafIndex,
     );
-    const nf = toBE32(await nullifier(account.ownerSecret, leafIndex)),
+    const nf = toBE32(await nullifier(owningAccount.ownerSecret, leafIndex)),
       spent =
         existing?.spent ??
         (await (input.isSpent ? input.isSpent(nf) : isSpent(nf, pool)));
@@ -82,6 +97,7 @@ export async function recoverTransferNotes(input: {
       receivedAt: at,
       nullifierHex: toHex(nf),
       internal,
+      ...(generation === undefined ? {} : { keyGeneration: generation }),
     });
   };
   if (
@@ -115,9 +131,21 @@ export async function recoverTransferNotes(input: {
           }))
         )
           continue;
-        const outputs = recoverySchema.parse(
-          openTransferEnvelope(s.recoveryEnvelope, account, recoveryBinding(s)),
+        const decoded = openTransferEnvelope(
+          s.recoveryEnvelope,
+          account,
+          recoveryBinding(s),
         );
+        const outputs = Array.isArray(decoded)
+          ? recoverySchema.parse(decoded)
+          : z
+              .strictObject({
+                version: z.literal(2),
+                outputs: recoverySchema.refine((outputs) =>
+                  outputs.every((output) => output.generation !== undefined),
+                ),
+              })
+              .parse(decoded).outputs;
         for (const o of outputs) {
           const e = step.outputs.find((e) => e.position === o.position);
           if (
@@ -134,6 +162,16 @@ export async function recoverTransferNotes(input: {
             e.leafIndex,
             step.confirmedAt,
             true,
+            o.generation === undefined
+              ? account
+              : input.keyring
+                ? accountForGeneration(input.keyring, o.generation)
+                : o.generation === 0
+                  ? account
+                  : (() => {
+                      throw new Error("Owned output generation is unavailable");
+                    })(),
+            o.generation,
           );
         }
       } catch {
@@ -147,6 +185,7 @@ export async function recoverParticipantTransfers(
   pool: PoolDescriptor,
   scan: ScanResult,
   ports: TransferRecoveryPorts = defaultRecoveryPorts,
+  ring?: LocalPrivacyKeyring,
 ): Promise<ScanResult> {
   if (scan.scope !== pool.scope) return scan;
   let cursor: string | undefined,
@@ -158,9 +197,11 @@ export async function recoverParticipantTransfers(
     progress = pendingRecovery.get(account) ?? new Map<string, BatchProgress>();
   terminalRecovery.set(account, cache);
   pendingRecovery.set(account, progress);
+  const retained = ring
+    ? await Promise.all([...ring.accounts.values()].map(privacyAccountPubkeys))
+    : [keys];
   const ownSender = (r: TransferRecord) =>
-    r.sender.viewPubkey.toLowerCase() === keys.viewPubkey.toLowerCase() &&
-    r.sender.notePubkey.toLowerCase() === keys.notePubkey.toLowerCase();
+    retained.some((pair) => samePublicKeys(pair, r.sender));
   const cacheKey = (r: TransferRecord) =>
     `${r.pool}:${r.id}:${r.revision}:${r.status}`;
   do {
@@ -218,15 +259,34 @@ export async function recoverParticipantTransfers(
         ? (cache.get(cacheKey(record)) ??
           batch?.evidence.get(record.id) ?? { submissions: [], steps: [] })
         : { submissions: [], steps: [] };
+      let owned: LocalAccount;
+      try {
+        owned = await accountForParticipants(
+          account,
+          sender ? [record.sender] : [record.recipient],
+          ring ?? null,
+        );
+      } catch {
+        continue;
+      }
+      const generation = ring
+        ? [...ring.accounts].find(([, candidate]) => candidate === owned)?.[0]
+        : undefined;
       for (const note of await recoverTransferNotes({
         record,
         submissions: evidence.submissions,
         evidence: evidence.steps,
-        account,
+        account: owned,
+        keyring: ring,
         scan,
         pool,
       }))
-        recovered.set(note.leafIndex, note);
+        recovered.set(
+          note.leafIndex,
+          note.keyGeneration !== undefined || generation === undefined
+            ? note
+            : { ...note, keyGeneration: generation },
+        );
     }
     if (batch?.done) progress.delete(batchKey);
     cursor = page.nextCursor ?? undefined;

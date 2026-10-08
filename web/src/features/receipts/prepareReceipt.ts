@@ -2,6 +2,8 @@ import { commitment, ownerPk } from "../../lib/crypto";
 import { buildDisclosure } from "../../lib/disclosure";
 import type { LocalAccount, MyNote, ScanResult } from "../../lib/notes";
 import { resolvePool } from "../../lib/pools";
+import { accountForNote } from "../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../privacyKeys/session";
 import type { LoadReceiptSnapshot } from "./receiptChainTypes";
 import type { ReceiptV2 } from "./receiptTypes";
 import { verifyReceipt } from "./receiptVerification";
@@ -13,10 +15,16 @@ export async function prepareReceipt(params: {
   load: LoadReceiptSnapshot;
   isCurrent?: () => boolean;
 }): Promise<ReceiptV2> {
-  const { scan, note, acct } = params,
+  const { scan, note } = params,
     current = params.isCurrent ?? (() => true),
     pool = resolvePool(scan.scope),
     snapshot = scan.snapshot;
+  const ring = getPrivacyKeyring(),
+    acct = ring ? accountForNote(ring, note) : params.acct;
+  if (!ring && note.keyGeneration !== undefined && note.keyGeneration !== 0)
+    throw new Error(
+      "Unlock the retained privacy key history before preparing this receipt.",
+    );
   const fail = () => {
     throw new Error("Receipt could not be verified. Refresh and retry.");
   };

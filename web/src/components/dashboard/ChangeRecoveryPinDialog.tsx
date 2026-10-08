@@ -220,7 +220,7 @@ export function ChangeRecoveryPinDialog({
           <DialogTitle>Change recovery PIN</DialogTitle>
           <DialogDescription>
             Your funds and payment history stay unchanged. The new PIN will be
-            required when you restore Mawee on another device.
+            required when you restore Meaw on another device.
           </DialogDescription>
         </DialogHeader>
 

@@ -14,7 +14,7 @@ import { useWallet } from "../WalletProvider";
 import { pillSolidViolet } from "./primitives";
 
 export const LANDING_SECTIONS = [
-  { id: "why", label: "Why Mawee" },
+  { id: "why", label: "Why Meaw" },
   { id: "how", label: "How it works" },
   { id: "who", label: "Who it's for" },
   { id: "faq", label: "FAQ" },
@@ -40,10 +40,10 @@ export function EditionsTopNav() {
       <a
         className="flex flex-none items-center gap-2.5 rounded-full text-starlight hover:text-starlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-starlight"
         href="#top"
-        aria-label="Mawee home"
+        aria-label="Meaw home"
       >
         <Image src="/assets/mawee.svg" alt="" width={32} height={32} priority />
-        <span className="text-xl font-medium tracking-tight">Mawee</span>
+        <span className="text-xl font-medium tracking-tight">Meaw</span>
       </a>
 
       <nav

@@ -6,7 +6,8 @@ const deps = vi.hoisted(() => ({
   relays: { examined: 0, confirmed: 0, unresolved: 0 },
   requests: { examined: 0, confirmed: 0, unresolved: 0 },
   transfers: { examined: 0, confirmed: 0, unresolved: 0 },
-  spends:{examined:0,released:0,unresolved:0},
+  spends: { examined: 0, released: 0, unresolved: 0 },
+  rotations: { examined: 0, confirmed: 0, pending: 0, failed: 0 },
 }));
 
 vi.mock("../src/env.server", () => ({
@@ -27,12 +28,31 @@ vi.mock("../src/server/modules/requests/requestOperations", () => ({
     return deps.requests;
   }),
 }));
+vi.mock("../src/server/modules/privacyKeys/rotationOperations", () => ({
+  reconcilePendingPrivacyRotations: vi.fn(
+    async ({ limit }: { limit: number }) => {
+      expect(limit).toBe(20);
+      return deps.rotations;
+    },
+  ),
+}));
 
 import { GET } from "../src/app/api/cron/request-payments/route";
-vi.mock("../src/server/modules/transfers/transferOperations",()=>({reconcilePendingTransfers:vi.fn(async()=>deps.transfers)}));
-vi.mock("../src/server/db/mongo",()=>({getDb:async()=>({})}));
-vi.mock("../src/server/lib/spendReservations",()=>({SpendReservations:class {async reconcile(){return deps.spends;}}}));
+
+vi.mock("../src/server/modules/transfers/transferOperations", () => ({
+  reconcilePendingTransfers: vi.fn(async () => deps.transfers),
+}));
+vi.mock("../src/server/db/mongo", () => ({ getDb: async () => ({}) }));
+vi.mock("../src/server/lib/spendReservations", () => ({
+  SpendReservations: class {
+    async reconcile() {
+      return deps.spends;
+    }
+  },
+}));
+
 import { reconcileAllRelays } from "../src/server/lib/durableRelayer";
+import { reconcilePendingPrivacyRotations } from "../src/server/modules/privacyKeys/rotationOperations";
 import { reconcilePendingRequests } from "../src/server/modules/requests/requestOperations";
 
 describe("request payment reconciliation route", () => {
@@ -57,6 +77,7 @@ describe("request payment reconciliation route", () => {
     expect(wrong.status).toBe(401);
     expect(reconcileAllRelays).not.toHaveBeenCalled();
     expect(reconcilePendingRequests).not.toHaveBeenCalled();
+    expect(reconcilePendingPrivacyRotations).not.toHaveBeenCalled();
   });
 
   it("checks relays and at most twenty request operations per run", async () => {
@@ -73,13 +94,14 @@ describe("request payment reconciliation route", () => {
       relays: deps.relays,
       requests: deps.requests,
       transfers: deps.transfers,
-      spends:deps.spends,
+      spends: deps.spends,
+      rotations: deps.rotations,
     });
     expect(reconcileAllRelays).toHaveBeenCalledOnce();
     expect(reconcilePendingRequests).toHaveBeenCalledOnce();
   });
 
-  it("does not touch reconciliation while the relayer is unavailable", async () => {
+  it("checks wallet rotations while relayed payment reconciliation is unavailable", async () => {
     deps.configured = false;
     const response = await GET(
       new Request("http://localhost/api/cron/request-payments", {
@@ -87,7 +109,11 @@ describe("request payment reconciliation route", () => {
       }),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "unavailable" });
+    expect(await response.json()).toEqual({
+      status: "unavailable",
+      rotations: deps.rotations,
+    });
+    expect(reconcilePendingPrivacyRotations).toHaveBeenCalledOnce();
     expect(reconcileAllRelays).not.toHaveBeenCalled();
     expect(reconcilePendingRequests).not.toHaveBeenCalled();
   });

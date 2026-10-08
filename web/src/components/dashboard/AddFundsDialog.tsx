@@ -124,7 +124,7 @@ export function AddFundsDialog({
         <DialogHeader>
           <DialogTitle>Add funds</DialogTitle>
           <DialogDescription>
-            Send {asset} on Monad to your Mawee wallet, then move it into your
+            Send {asset} on Monad to your Meaw wallet, then move it into your
             private balance.
           </DialogDescription>
         </DialogHeader>
@@ -132,7 +132,7 @@ export function AddFundsDialog({
         <div className={`${linenInsetClass} grid gap-3 p-4`}>
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-foreground/60">
-              Your Mawee wallet
+              Your Meaw wallet
             </span>
             <button
               type="button"
@@ -166,7 +166,7 @@ export function AddFundsDialog({
               <div>
                 <span className="block text-foreground/60">Network fees</span>
                 <span className="text-sm text-foreground">
-                  Covered by Mawee
+                  Covered by Meaw
                 </span>
               </div>
             )}

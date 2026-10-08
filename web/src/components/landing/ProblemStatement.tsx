@@ -54,7 +54,7 @@ export function ProblemStatement() {
               {" "}
               how much you earn, who your clients are, and when they pay.
             </span>{" "}
-            Mawee keeps that between you and your client.
+            Meaw keeps that between you and your client.
           </ScrollReveal>
         </div>
       </Frame>

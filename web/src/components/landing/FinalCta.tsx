@@ -16,7 +16,7 @@ export function FinalCta() {
           id="cta-title"
           className="text-[clamp(4rem,13vw,11rem)] font-normal leading-[0.9] tracking-[-0.04em]"
         >
-          Mawee
+          Meaw
         </h2>
         <p className="mt-6 max-w-[40ch] text-lg leading-relaxed text-graphite/85 sm:text-xl">
           Private USDC payment links on Monad. Claim yours in under a minute.

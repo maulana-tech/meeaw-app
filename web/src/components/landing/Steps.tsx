@@ -37,7 +37,7 @@ const STEPS: {
   {
     icon: QrCode,
     title: "Share it with clients",
-    body: "Send the link or show the QR code. Clients pay USDC from any EVM wallet — no Mawee account, no gas.",
+    body: "Send the link or show the QR code. Clients pay USDC from any EVM wallet — no Meaw account, no gas.",
     mock: PayMock,
   },
   {
@@ -431,7 +431,7 @@ function PayMock() {
 
 function WithdrawMock() {
   return (
-    <MockWindow title="Mawee · Withdraw">
+    <MockWindow title="Meaw · Withdraw">
       <p className="text-sm text-starlight/55">Private balance</p>
       <p className="mt-1 text-3xl font-normal">$1,240.50</p>
       <ul className="mt-4 grid gap-1.5">

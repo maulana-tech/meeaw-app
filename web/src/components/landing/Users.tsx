@@ -76,7 +76,7 @@ export function Users() {
           </div>
           <p className="max-w-[48ch] self-end text-lg leading-relaxed text-graphite/75">
             If your invoices land on a public blockchain, so does your business.
-            Mawee gives you the speed of stablecoin payments without turning
+            Meaw gives you the speed of stablecoin payments without turning
             your income into public data.
           </p>
         </div>

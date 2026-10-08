@@ -11,7 +11,7 @@ describe("Faq", () => {
     render(<Faq />);
 
     const question = screen.getByRole("button", {
-      name: "Do my clients need to use Mawee?",
+      name: "Do my clients need to use Meaw?",
     });
     const answerId = question.getAttribute("aria-controls");
 

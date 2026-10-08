@@ -2,14 +2,18 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWallet } from "../../../components/WalletProvider";
-import { getAccount, scanMyNotes } from "../../../lib/notes";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../../lib/notes";
 import { resolvePool } from "../../../lib/pools";
 import { api } from "../../../trpc/client";
 import { trpc } from "../../../trpc/react";
+import { nextGenerationFundingAction } from "../../privacyKeys/generationFunding";
+import { accountForParticipant } from "../../privacyKeys/keyRing";
+import { getPrivacyKeyring } from "../../privacyKeys/session";
 import { readPaymentStatus, watchPaymentStatus } from "../paymentStatusMonitor";
 import {
   buildMergeSubmission,
   buildPaymentSubmission,
+  buildRequestKeyMigrationSubmission,
   buildSplitSubmission,
 } from "../requestProofs";
 import { selectFunding } from "../selectFunding";
@@ -141,12 +145,13 @@ export function useRequestPayment(request: PaymentRequest | null) {
       if (run.current === seq) setOperation(o);
     };
     try {
-      const account = getAccount(),
+      const activeAccount = getAccount(),
+        keyring = getPrivacyKeyring(),
         pool = resolvePool(request.pool),
         signer = await wallet.getSigner();
       if (run.current !== seq) return null;
       if (
-        !account ||
+        !activeAccount ||
         signer.address.toLowerCase() !==
           request.addressee.wallet.toLowerCase() ||
         pool.scope !== request.pool ||
@@ -172,13 +177,27 @@ export function useRequestPayment(request: PaymentRequest | null) {
         signature: live.signature,
       } as unknown as SignedRequest;
       const { openRequest } = await import("../requestCrypto");
+      const account = keyring
+        ? await accountForParticipant(keyring, signed.addressee)
+        : activeAccount;
+      const current = () =>
+        run.current === seq &&
+        getAccount() === activeAccount &&
+        getPrivacyKeyring() === keyring;
       const payload = await openRequest(signed, account, pool);
       if (run.current !== seq) return null;
-      let scan = await scanMyNotes(account, {
-        pool,
-        includeRequestRecovery: true,
-        includeTransferRecovery: true,
-      });
+      const scanBalance = () =>
+        keyring
+          ? scanKeyringNotes(keyring, pool, {
+              includeRequestRecovery: true,
+              includeTransferRecovery: true,
+            })
+          : scanMyNotes(account, {
+              pool,
+              includeRequestRecovery: true,
+              includeTransferRecovery: true,
+            });
+      let scan = await scanBalance();
       if (run.current !== seq) return null;
       if (scan.health !== "healthy")
         throw new Error(
@@ -189,7 +208,14 @@ export function useRequestPayment(request: PaymentRequest | null) {
           ? operation
           : null;
       if (!active && !live.operationId) {
-        selectFunding(scan.notes, BigInt(payload.amount), pool.scope);
+        if (keyring)
+          nextGenerationFundingAction(
+            scan.notes,
+            BigInt(payload.amount),
+            pool.scope,
+            keyring.activeGeneration,
+          );
+        else selectFunding(scan.notes, BigInt(payload.amount), pool.scope);
         active = (await api.requests.beginPayment.mutate({
           id: live.id,
           revision: live.revision,
@@ -224,6 +250,66 @@ export function useRequestPayment(request: PaymentRequest | null) {
       while (run.current === seq) {
         if (active.phase === "confirmed" || active.phase === "failed") break;
         if (active.phase === "preparing") {
+          if (keyring) {
+            const action = nextGenerationFundingAction(
+              scan.notes,
+              BigInt(payload.amount),
+              pool.scope,
+              active.fundingGeneration ?? 0,
+            );
+            const context: Parameters<
+              typeof buildRequestKeyMigrationSubmission
+            >[0] = {
+              record: signed,
+              operation: active,
+              account,
+              scan,
+              signer,
+              pool,
+              keyring,
+              fundingGeneration: active.fundingGeneration ?? 0,
+              isCurrent: current,
+            };
+            const body: SignedSubmission =
+              action.kind === "key-migrate"
+                ? await buildRequestKeyMigrationSubmission(context, action)
+                : action.kind === "merge"
+                  ? await buildMergeSubmission({
+                      ...context,
+                      inputIndices: action.inputIndices,
+                    })
+                  : action.kind === "split"
+                    ? await buildSplitSubmission({
+                        ...context,
+                        inputIndex: action.inputIndex,
+                        splitAmount: action.amount,
+                      })
+                    : await buildPaymentSubmission({
+                        ...context,
+                        payload,
+                        inputIndex: action.inputIndex,
+                      });
+            if (!current()) return active;
+            active = (await (body.kind === "payment"
+              ? api.requests.submitPayment.mutate(
+                  body as unknown as Parameters<
+                    typeof api.requests.submitPayment.mutate
+                  >[0],
+                )
+              : api.requests.submitConsolidation.mutate(
+                  body as unknown as Parameters<
+                    typeof api.requests.submitConsolidation.mutate
+                  >[0],
+                ))) as unknown as PaymentOperation;
+            tick(active);
+            if (active.phase === "preparing") {
+              scan = await scanBalance();
+              continue;
+            }
+            if (active.phase === "confirmed" || active.phase === "failed")
+              break;
+            continue;
+          }
           const chosen = selectFunding(
             scan.notes,
             BigInt(payload.amount),

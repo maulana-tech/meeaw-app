@@ -17,7 +17,7 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
         appearance: {
           theme: "dark",
           accentColor: "#91975b",
-          landingHeader: "Sign in to Mawee",
+          landingHeader: "Sign in to Meaw",
           loginMessage: "Use Email, Google, or a passkey.",
         },
         defaultChain: chain,

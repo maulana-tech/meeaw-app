@@ -60,7 +60,7 @@ export function useCreateRequest() {
           "Your @username could not be verified. Refresh and try again.",
         );
       if (!addressee)
-        throw new Error("That @username is not registered on Mawee.");
+        throw new Error("That @username is not registered on Meaw.");
       if (!current())
         throw new Error(
           "Your selection or account changed. Review the request again.",

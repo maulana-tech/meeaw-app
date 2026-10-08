@@ -133,7 +133,7 @@ function DashboardNavLayout({
         <div className="sticky top-14 ml-4 flex h-[calc(100svh-4.5rem)] w-14 flex-col items-center rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) py-4">
           <Link
             href="/"
-            aria-label="Mawee home"
+            aria-label="Meaw home"
             className={cn("rounded-(--dash-radius-sm) p-1", dashFocus)}
           >
             <LogoMark />
@@ -170,7 +170,7 @@ function DashboardNavLayout({
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              aria-label="Mawee home"
+              aria-label="Meaw home"
               className={cn("rounded-(--dash-radius-sm) lg:hidden", dashFocus)}
             >
               <LogoMark />

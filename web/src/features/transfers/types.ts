@@ -50,6 +50,9 @@ export type TransferPage = {
   nextCursor: string | null;
 };
 export type TransferOperation = {
+  fundingGeneration?: number;
+  keyRevision?: number;
+  accountTicketId?: string;
   id: string;
   transferId: string;
   phase:
@@ -117,4 +120,7 @@ export type TransferProofContext = {
   pool: PoolDescriptor;
   signer: Signer;
   artifactRoot?: string;
+  keyring?: import("../privacyKeys/types").LocalPrivacyKeyring;
+  fundingGeneration?: number;
+  isCurrent?: () => boolean;
 };

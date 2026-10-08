@@ -5,6 +5,11 @@ import { getAddress } from "viem";
 import { getUsers, type UserDoc } from "../../db/mongo";
 import { getPrivyUser } from "../../lib/privy";
 import {
+  assertRecoverySetupAllowed,
+  recoverFencedEscrowChange,
+  withFencedEscrowChange,
+} from "./privacyRecovery";
+import {
   WalletConflictError,
   WalletEscrowAlreadyInitializedError,
   WalletEscrowMissingError,
@@ -108,7 +113,7 @@ export async function restoreWallet(
     .toArray();
   if (matches.length > 1) {
     throw new WalletConflictError(
-      "Multiple Mawee accounts match wallets on this Privy identity.",
+      "Multiple Meaw accounts match wallets on this Privy identity.",
     );
   }
   const previous = matches[0];
@@ -181,6 +186,7 @@ export async function saveEscrow(
   privyUserId: string,
   input: SaveEscrowInput,
 ): Promise<void> {
+  await assertRecoverySetupAllowed(privyUserId);
   const users = await getUsers();
   const result = await users.updateOne(
     {
@@ -207,13 +213,19 @@ export async function saveEscrow(
   if (result.matchedCount === 1) return;
   if (!(await users.findOne({ privyUserId }))) {
     throw new WalletMigrationError(
-      "No Mawee wallet is linked to this Privy identity.",
+      "No Meaw wallet is linked to this Privy identity.",
     );
   }
   throw new WalletEscrowAlreadyInitializedError();
 }
 
 export async function rotateEscrow(
+  privyUserId: string,
+  input: RotateEscrowInput,
+): Promise<RotateEscrowOutput> {
+  return withFencedEscrowChange(privyUserId, input, rotateEscrowUnfenced);
+}
+async function rotateEscrowUnfenced(
   privyUserId: string,
   input: RotateEscrowInput,
 ): Promise<RotateEscrowOutput> {
@@ -247,6 +259,7 @@ export async function rotateEscrow(
 }
 
 export async function getEscrow(privyUserId: string): Promise<EscrowOutput> {
+  await recoverFencedEscrowChange(privyUserId, rotateEscrowUnfenced);
   const doc = await (await getUsers()).findOne({ privyUserId });
   if (!doc?.encryptedMaster || !doc.masterSalt || !doc.kdfParams) return null;
   return {
@@ -266,6 +279,7 @@ export async function savePasskey(
   privyUserId: string,
   input: PasskeyRecord,
 ): Promise<void> {
+  await assertRecoverySetupAllowed(privyUserId);
   const users = await getUsers();
   const result = await users.updateOne(
     {
@@ -285,7 +299,7 @@ export async function savePasskey(
   if (result.matchedCount === 1) return;
   if (!(await users.findOne({ privyUserId }))) {
     throw new WalletMigrationError(
-      "No Mawee wallet is linked to this Privy identity.",
+      "No Meaw wallet is linked to this Privy identity.",
     );
   }
   throw new WalletEscrowAlreadyInitializedError();

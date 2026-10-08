@@ -1,6 +1,6 @@
 export class WalletConflictError extends Error {
   constructor(
-    message = "This Privy identity or wallet is already linked to another Mawee account.",
+    message = "This Privy identity or wallet is already linked to another Meaw account.",
   ) {
     super(message);
     this.name = "WalletConflictError";

@@ -59,11 +59,29 @@ export const requestPageOutput = z.strictObject({
 
 export const pendingCountOutput = z.number().int().nonnegative();
 
-export const beginPaymentInput=z.strictObject({id:requestIdSchema,revision:z.number().int().nonnegative(),attemptId:requestIdSchema});
-export const submitPaymentInput=signedSubmissionSchema;
-export const paymentOperationOutput=z.strictObject({
-  id:requestIdSchema,requestId:requestIdSchema,pool:poolScopeSchema,
-  phase:z.enum(["preparing","submitting","submitted","confirmed","failed","needsReconciliation"]),
-  completedMerges:z.number().int().nonnegative(),nextStep:z.number().int().nonnegative(),
-  txHash:hex.nullable(),updatedAt:z.string(),
+export const beginPaymentInput = z.strictObject({
+  id: requestIdSchema,
+  revision: z.number().int().nonnegative(),
+  attemptId: requestIdSchema,
+});
+export const submitPaymentInput = signedSubmissionSchema;
+export const paymentOperationOutput = z.strictObject({
+  fundingGeneration: z.number().int().min(0).max(63).optional(),
+  keyRevision: z.number().int().positive().optional(),
+  accountTicketId: z.string().uuid().optional(),
+  id: requestIdSchema,
+  requestId: requestIdSchema,
+  pool: poolScopeSchema,
+  phase: z.enum([
+    "preparing",
+    "submitting",
+    "submitted",
+    "confirmed",
+    "failed",
+    "needsReconciliation",
+  ]),
+  completedMerges: z.number().int().nonnegative(),
+  nextStep: z.number().int().nonnegative(),
+  txHash: hex.nullable(),
+  updatedAt: z.string(),
 });

@@ -318,7 +318,8 @@ have 6 decimals, support EIP-2612 permit, and can be minted by anyone.
 | Contract | Address | Deploy block |
 | --- | --- | --- |
 | MaweeRegistry | [`0xa3024964732bf324256c3dbb3be314e254cb6a70`](https://testnet.monadexplorer.com/address/0xa3024964732bf324256c3dbb3be314e254cb6a70) | — |
-| MaweePool · USDC (payment requests) | [`0xfdfcb53eeb148709510bbd4e7d164065605baea5`](https://testnet.monadexplorer.com/address/0xfdfcb53eeb148709510bbd4e7d164065605baea5) | 68160915 |
+| MaweePool · USDC | [`0x7539d7585dbd7b49f23d23549d65cc995346838b`](https://testnet.monadexplorer.com/address/0x7539d7585dbd7b49f23d23549d65cc995346838b) | 69152788 |
+| MaweePool · USDC (legacy, withdraw-only) | [`0xfdfcb53eeb148709510bbd4e7d164065605baea5`](https://testnet.monadexplorer.com/address/0xfdfcb53eeb148709510bbd4e7d164065605baea5) | 68160915 |
 | MockUSDC | [`0x8912cd818eb3f69dc7eee43101349e332ec06c7a`](https://testnet.monadexplorer.com/address/0x8912cd818eb3f69dc7eee43101349e332ec06c7a) | — |
 | MaweePool · AUSD | [`0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092`](https://testnet.monadexplorer.com/address/0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092) | 68589168 |
 | MockStablecoin · AUSD | [`0x2079ff55905b71b6b1bd9675d49e319a7cd9b317`](https://testnet.monadexplorer.com/address/0x2079ff55905b71b6b1bd9675d49e319a7cd9b317) | — |
@@ -327,12 +328,14 @@ have 6 decimals, support EIP-2612 permit, and can be minted by anyone.
 | MaweePool · MUSD | [`0x8df03a1b169dda861d633035b945a484bcf234ca`](https://testnet.monadexplorer.com/address/0x8df03a1b169dda861d633035b945a484bcf234ca) | 68589368 |
 | MockStablecoin · MUSD | [`0x706fbe38d0806ef7092fa8e2582cad2841ec1494`](https://testnet.monadexplorer.com/address/0x706fbe38d0806ef7092fa8e2582cad2841ec1494) | — |
 
-The matching `NEXT_PUBLIC_MAWEE_POOLS` manifest lists the USDC pool as the only
-`requestCapable` pool; AUSD, USDT0 and MUSD pools take payments and cash-outs.
+In the matching `NEXT_PUBLIC_MAWEE_POOLS` manifest every active pool is both
+`requestCapable` and `transferCapable`. The first USDC pool predates the Merge
+verifier, so it was replaced on 2026-10-08 and is now legacy: balances there can
+only be cashed out (choose "Previous pool" on the Cash out page).
 
 ```sh
 # web/.env.local
-NEXT_PUBLIC_MAWEE_POOLS=[{"chainId":10143,"address":"0xfdfcb53eeb148709510bbd4e7d164065605baea5","deployBlock":68160915,"token":"0x8912cd818eb3f69dc7eee43101349e332ec06c7a","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":true,"asset":"USDC"},{"chainId":10143,"address":"0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092","deployBlock":68589168,"token":"0x2079ff55905b71b6b1bd9675d49e319a7cd9b317","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":false,"asset":"AUSD","mintable":true},{"chainId":10143,"address":"0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d","deployBlock":68589289,"token":"0xb14e77bd5d715195e222768446fddc2bc2a7b932","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":false,"asset":"USDT0","mintable":true},{"chainId":10143,"address":"0x8df03a1b169dda861d633035b945a484bcf234ca","deployBlock":68589368,"token":"0x706fbe38d0806ef7092fa8e2582cad2841ec1494","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","asset":"MUSD","mintable":true,"requestCapable":false}]
+NEXT_PUBLIC_MAWEE_POOLS=[{"chainId":10143,"address":"0xfdfcb53eeb148709510bbd4e7d164065605baea5","deployBlock":68160915,"token":"0x8912cd818eb3f69dc7eee43101349e332ec06c7a","tokenDecimals":6,"depth":20,"confirmations":1,"role":"legacy","requestCapable":false,"transferCapable":false,"asset":"USDC"},{"chainId":10143,"address":"0x8b0015711517e2b2b7cdd430e11bc2a0e9cca092","deployBlock":68589168,"token":"0x2079ff55905b71b6b1bd9675d49e319a7cd9b317","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":true,"transferCapable":true,"asset":"AUSD","mintable":true},{"chainId":10143,"address":"0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d","deployBlock":68589289,"token":"0xb14e77bd5d715195e222768446fddc2bc2a7b932","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":true,"transferCapable":true,"asset":"USDT0","mintable":true},{"chainId":10143,"address":"0x8df03a1b169dda861d633035b945a484bcf234ca","deployBlock":68589368,"token":"0x706fbe38d0806ef7092fa8e2582cad2841ec1494","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","requestCapable":true,"transferCapable":true,"asset":"MUSD","mintable":true},{"chainId":10143,"address":"0x7539d7585dbd7b49f23d23549d65cc995346838b","deployBlock":69152788,"token":"0x8912cd818eb3f69dc7eee43101349e332ec06c7a","tokenDecimals":6,"depth":20,"confirmations":1,"role":"active","asset":"USDC","transferCapable":true,"requestCapable":true}]
 ```
 
 ## Testnet Payment Notes

@@ -7,11 +7,17 @@ import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
 import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
-import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import {
+  getAccount,
+  type MyNote,
+  scanKeyringNotes,
+  scanMyNotes,
+} from "../../lib/notes";
 import { unlockLabel } from "../../lib/passkey";
 import {
   activePools,
@@ -171,7 +177,17 @@ export function WithdrawDashboard() {
       const account = getAccount();
       if (!account) throw new Error("Unlock your private account to continue.");
       // Scan the pool the selected payments live in; never mix pools.
-      const scan = await scanMyNotes(account, { pool,includeRequestRecovery:true,includeTransferRecovery:true });
+      const ring = getPrivacyKeyring();
+      const scan = ring
+        ? await scanKeyringNotes(ring, pool, {
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : await scanMyNotes(account, {
+            pool,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
 
       if (target.kind === "all") {
         const batch = await withdrawAll({
@@ -487,7 +503,7 @@ function PoolSelector({
       </fieldset>
       {funded.length ? (
         <p className="text-xs text-brand-linen/65">
-          You still have funds in a previous Mawee pool. They can only be
+          You still have funds in a previous Meaw pool. They can only be
           withdrawn, and are not used to pay requests.
         </p>
       ) : null}
@@ -727,8 +743,8 @@ function WalletWithdrawal({
           >
             Enter the Monad address that should receive the funds.{" "}
             {gasless === false
-              ? "The transaction is sent from your Mawee wallet, which pays the gas."
-              : "Network fees are covered, and your Mawee wallet never appears in the withdrawal."}
+              ? "The transaction is sent from your Meaw wallet, which pays the gas."
+              : "Network fees are covered, and your Meaw wallet never appears in the withdrawal."}
           </p>
           <ToastFeedback
             message={fieldError}

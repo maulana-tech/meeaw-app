@@ -47,7 +47,7 @@ export async function createPasskeyMaster(options: {
   webAuthnClient?: WebAuthnClient;
 }): Promise<{ master: Uint8Array; record: PasskeyRecord }> {
   const result = await createPasskeyWithPrfOutput({
-    rp: { id: options.rpId ?? currentRpId(), name: "Mawee" },
+    rp: { id: options.rpId ?? currentRpId(), name: "Meaw" },
     user: { name: options.userName, displayName: options.userName },
     prfSalt: MASTER_PRF_SALT,
     webAuthnClient: options.webAuthnClient,
@@ -93,7 +93,7 @@ export async function unlockPasskeyMaster(options: {
 export class PasskeyMismatchError extends Error {
   constructor() {
     super(
-      "This passkey doesn't belong to your Mawee account. Choose the passkey you created for Mawee.",
+      "This passkey doesn't belong to your Meaw account. Choose the passkey you created for Meaw.",
     );
     this.name = "PasskeyMismatchError";
   }

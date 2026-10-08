@@ -59,7 +59,8 @@ unanchored receipts remain locally checkable. See [receipt verification](receipt
 ## Settings
 
 Manage your account: your username keys, PIN, and account recovery. This is also
-where re-keying lives if you ever need to rotate your keys.
+where [routine privacy-key rotation](privacy-key-rotation.md) lives: new incoming
+payments use a new key while existing balances remain accessible with the same recovery.
 
 {% hint style="info" %}
 **Receiving needs nothing up front.** You don't need to hold any USDC or do any

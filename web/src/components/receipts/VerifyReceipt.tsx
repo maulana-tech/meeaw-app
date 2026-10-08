@@ -9,7 +9,7 @@ import { Button } from "../ui/button";
 const explanations: Record<string, string> = {
   "file-too-large":
     "This file is too large. Choose a receipt JSON under 64 KiB.",
-  "malformed-receipt": "The file does not contain a valid Mawee receipt.",
+  "malformed-receipt": "The file does not contain a valid Meaw receipt.",
   "proof-shape-mismatch":
     "The proof path, payment index, or identifiers do not agree.",
   "asset-label-mismatch": "The amount or asset label does not match the proof.",
@@ -70,7 +70,7 @@ export function VerifyReceipt() {
     >
       <div className="mb-7 max-w-xl">
         <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-linen/60">
-          Mawee Verify
+          Meaw Verify
         </p>
         <h1 className="font-heading text-3xl font-semibold">
           Check a payment receipt

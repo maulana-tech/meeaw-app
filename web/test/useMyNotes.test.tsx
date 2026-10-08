@@ -6,11 +6,17 @@ import { useMyNotes } from "../src/components/dashboard/useMyNotes";
 
 const mocks = vi.hoisted(() => ({
   scanMyNotes: vi.fn(),
+  scanKeyringNotes: vi.fn(),
+  ring: null as unknown,
 }));
 
 vi.mock("../src/lib/notes", () => ({
   getAccount: vi.fn(() => ({ ownerSecret: 1n, viewSk: new Uint8Array(32) })),
   scanMyNotes: mocks.scanMyNotes,
+  scanKeyringNotes: mocks.scanKeyringNotes,
+}));
+vi.mock("../src/features/privacyKeys/session", () => ({
+  getPrivacyKeyring: () => mocks.ring,
 }));
 
 const result = {
@@ -36,6 +42,8 @@ function Harness() {
 describe("useMyNotes", () => {
   beforeEach(() => {
     mocks.scanMyNotes.mockReset();
+    mocks.scanKeyringNotes.mockReset();
+    mocks.ring = null;
   });
 
   it("keeps the previous balance visible during a background refresh", async () => {
@@ -63,5 +71,35 @@ describe("useMyNotes", () => {
     expect(screen.getByTestId("balance")).toHaveTextContent("5000000");
 
     await act(async () => resolveRefresh(result));
+  });
+  it("scans retained generations and invalidates their results when the key session changes", async () => {
+    mocks.ring = {
+      owner: "0x1111111111111111111111111111111111111111",
+      registry: "31337:0x4444444444444444444444444444444444444444",
+      revision: 2,
+      activeGeneration: 1,
+    };
+    mocks.scanKeyringNotes.mockResolvedValue({
+      ...result,
+      claimable: 20_000_000n,
+    });
+    render(<Harness />);
+    await waitFor(() =>
+      expect(screen.getByTestId("balance")).toHaveTextContent("20000000"),
+    );
+    expect(mocks.scanKeyringNotes).toHaveBeenCalled();
+    expect(mocks.scanMyNotes).not.toHaveBeenCalled();
+    mocks.ring = null;
+    mocks.scanMyNotes.mockResolvedValue({
+      ...result,
+      claimable: 0n,
+      notes: [],
+    });
+    await act(async () =>
+      window.dispatchEvent(new Event("mawee:privacy-keys-changed")),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("balance")).toHaveTextContent("0"),
+    );
   });
 });

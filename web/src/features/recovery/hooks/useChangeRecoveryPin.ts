@@ -21,6 +21,14 @@ export class RecoveryRevisionConflictError extends Error {
     this.name = "RecoveryRevisionConflictError";
   }
 }
+export class RecoveryPrivacyKeyBusyError extends Error {
+  constructor() {
+    super(
+      "Privacy key rotation or another account operation is pending. Check its status before changing your PIN.",
+    );
+    this.name = "RecoveryPrivacyKeyBusyError";
+  }
+}
 
 export class RecoveryPinChangeError extends Error {
   constructor() {
@@ -102,6 +110,11 @@ export function useChangeRecoveryPin() {
         });
       } catch (error) {
         if (errorCode(error) === "CONFLICT") {
+          if (
+            error instanceof Error &&
+            error.message.toLowerCase().includes("privacy key")
+          )
+            throw new RecoveryPrivacyKeyBusyError();
           throw new RecoveryRevisionConflictError();
         }
         if (errorCode(error) === "PRECONDITION_FAILED") {

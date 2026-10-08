@@ -122,7 +122,7 @@ function drawPageFooter(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED);
-  doc.text(`Mawee  •  ${reference}`, MARGIN, height - 25);
+  doc.text(`Meaw  •  ${reference}`, MARGIN, height - 25);
   doc.text(`Page ${page} of ${total}`, width - MARGIN, height - 25, {
     align: "right",
   });
@@ -179,14 +179,14 @@ export async function renderDisclosurePdf(
   const reference = identity?.reference ?? receiptReference(bundle);
   const recipient = bundle.username
     ? `@${bundle.username}`
-    : "Private Mawee account";
+    : "Private Meaw account";
 
   doc.setProperties({
-    title: `Mawee payment receipt ${reference}`,
+    title: `Meaw payment receipt ${reference}`,
     subject: "Confirmation of a received private payment",
-    author: "Mawee",
-    creator: "Mawee",
-    keywords: `Mawee, payment receipt, ${assetLabelFor(bundle.asset ?? "USDC")}, Monad`,
+    author: "Meaw",
+    creator: "Meaw",
+    keywords: `Meaw, payment receipt, ${assetLabelFor(bundle.asset ?? "USDC")}, Monad`,
   });
 
   // Page 1: friendly receipt
@@ -202,7 +202,7 @@ export async function renderDisclosurePdf(
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Generated with Mawee", pageWidth - MARGIN, 76, { align: "right" });
+  doc.text("Generated with Meaw", pageWidth - MARGIN, 76, { align: "right" });
 
   doc.setFillColor(PANEL);
   doc.roundedRect(MARGIN, 180, contentWidth, 176, 14, 14, "F");
@@ -230,7 +230,7 @@ export async function renderDisclosurePdf(
   doc.setFontSize(9.5);
   doc.setTextColor(MUTED);
   doc.text(
-    `${ASSETS[bundle.asset ?? "USDC"].name} note disclosed through Mawee`,
+    `${ASSETS[bundle.asset ?? "USDC"].name} note disclosed through Meaw`,
     MARGIN + 22,
     325,
   );
@@ -306,7 +306,7 @@ export async function renderDisclosurePdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   const confirmation = doc.splitTextToSize(
-    "The proof discloses one private note. Check its JSON against the pool using Mawee Verify. The username is provided by the receipt issuer; this receipt does not prove identity, current ownership, or available balance.",
+    "The proof discloses one private note. Check its JSON against the pool using Meaw Verify. The username is provided by the receipt issuer; this receipt does not prove identity, current ownership, or available balance.",
     contentWidth - 68,
   ) as string[];
   doc.text(confirmation, MARGIN + 44, 635);
@@ -352,7 +352,7 @@ export async function renderDisclosurePdf(
     ["Private payment index", `#${bundle.leafIndex}`],
     ["Commitment", truncMiddle(bundle.commitmentHex, 16)],
     ["Proof root", truncMiddle(bundle.rootHex, 16)],
-    ["Mawee pool contract", truncMiddle(bundle.pool, 16)],
+    ["Meaw pool contract", truncMiddle(bundle.pool, 16)],
     ["Network", displayNetwork(bundle.network)],
   ];
   for (const [label, value] of technicalFacts) {

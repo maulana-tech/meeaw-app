@@ -83,7 +83,7 @@ export function TransferDetailsDialog({
           </p>
         )}
         {!wallet.accountUnlocked && (
-          <Button onClick={wallet.promptUnlock}>Unlock Mawee</Button>
+          <Button onClick={wallet.promptUnlock}>Unlock Meaw</Button>
         )}
       </DialogContent>
     </Dialog>

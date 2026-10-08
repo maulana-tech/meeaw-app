@@ -3,6 +3,7 @@
 import { Loader, LockKeyhole, LogOut } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { usePrivacyKeyRotation } from "../../features/privacyKeys/usePrivacyKeyRotation";
 import { useChangeRecoveryPin } from "../../features/recovery/hooks/useChangeRecoveryPin";
 import { trpc } from "../../trpc/react";
 import { Badge } from "../ui/badge";
@@ -19,12 +20,15 @@ import {
 import { useWallet } from "../WalletProvider";
 import { ChangeRecoveryPinDialog } from "./ChangeRecoveryPinDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
+import { RotatePrivacyKeyDialog } from "./RotatePrivacyKeyDialog";
 import { dashButtonPrimary, dashCell, dashLedger } from "./styles";
 
 export function SettingsDashboard() {
   const { username, disconnect, recoveryMethod, openUsernameModal } =
     useWallet();
   const [changePinOpen, setChangePinOpen] = useState(false);
+  const [rotationOpen, setRotationOpen] = useState(false);
+  const privacy = usePrivacyKeyRotation();
   const { changeRecoveryPin, validateCurrentPin, isChanging } =
     useChangeRecoveryPin();
   const escrowQuery = trpc.wallets.getEscrow.useQuery();
@@ -36,7 +40,7 @@ export function SettingsDashboard() {
     <>
       <DashboardPageHeader
         title="Settings"
-        description="The essentials for your Mawee account, explained without the crypto jargon."
+        description="The essentials for your Meaw account, explained without the crypto jargon."
       />
 
       <div className={`${dashLedger} max-w-3xl`}>
@@ -47,6 +51,51 @@ export function SettingsDashboard() {
           loading={escrowQuery.isLoading || passkeyQuery.isLoading}
           onChangePin={() => setChangePinOpen(true)}
         />
+        <SettingsRow
+          title="Privacy keys"
+          description="Rotate the key used for new incoming payments while keeping your existing payments accessible."
+        >
+          <p className="mb-4 text-sm text-(--dash-ash)">
+            {privacy.state
+              ? `Active key version ${privacy.state.activeGeneration + 1}`
+              : "Your initial privacy key is in use."}
+          </p>
+          {privacy.state?.generations?.[privacy.state.activeGeneration]
+            ?.rotatedAt && (
+            <p className="mb-4 text-sm text-(--dash-ash)">
+              Last confirmed change:{" "}
+              {new Date(
+                privacy.state.generations[privacy.state.activeGeneration]
+                  .rotatedAt ?? "",
+              ).toLocaleDateString()}
+            </p>
+          )}
+          {privacy.error && (
+            <p className="mb-4 text-sm" role="status">
+              Privacy key history is currently unavailable. Check again before
+              rotating.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => setRotationOpen(true)}
+            disabled={
+              !username ||
+              !(passkeyProtected || Boolean(escrowQuery.data)) ||
+              privacy.state?.activeGeneration === 63
+            }
+          >
+            {privacy.state?.pending
+              ? "Check key rotation"
+              : "Rotate privacy key"}
+          </Button>
+          {privacy.state?.activeGeneration === 63 && (
+            <p className="mt-3 text-sm">
+              This account has reached its rotation limit. Every previous key is
+              retained.
+            </p>
+          )}
+        </SettingsRow>
         <SessionTile onSignOut={disconnect} />
       </div>
 
@@ -60,6 +109,10 @@ export function SettingsDashboard() {
           void escrowQuery.refetch();
           toast.success("Recovery PIN changed");
         }}
+      />
+      <RotatePrivacyKeyDialog
+        open={rotationOpen}
+        onOpenChange={setRotationOpen}
       />
     </>
   );
@@ -168,9 +221,9 @@ function RecoveryTile({
           </p>
           <p>
             {method === "passkey"
-              ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Mawee stores nothing secret."
+              ? "Your private keys are derived from your passkey on each device. Use the same synced passkey anywhere — Meaw stores nothing secret."
               : protectedRecovery
-                ? "Your PIN lets you restore access on another device. Mawee never sees or stores the PIN itself."
+                ? "Your PIN lets you restore access on another device. Meaw never sees or stores the PIN itself."
                 : "Without a recovery PIN, moving to a new device could leave you unable to access your funds."}
           </p>
         </>
@@ -214,7 +267,7 @@ function SessionTile({ onSignOut }: { onSignOut: () => Promise<void> }) {
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent appearance="linen" size="sm">
           <DialogHeader>
-            <DialogTitle>Sign out of Mawee?</DialogTitle>
+            <DialogTitle>Sign out of Meaw?</DialogTitle>
             <DialogDescription>
               This removes access from this device. Your account and funds stay
               safe, and you can return with your passkey or recovery PIN.
