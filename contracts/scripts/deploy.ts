@@ -327,9 +327,9 @@ async function main() {
   const candidateIndexer = renderIndexerCandidate(
     sourceIndexer,
     chainId,
-    // A new USDC pool replaces the old one; an added asset must not skip the
-    // history of pools that stay active.
-    isUsdc ? firstBlock : null,
+    // Keep the configured start block: older pools stay indexed, whether they
+    // remain active (other assets) or become withdrawal-only (same asset).
+    null,
     { Pool: [...new Set(knownPools)], Registry: registry.address },
   );
 
