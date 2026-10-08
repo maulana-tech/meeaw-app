@@ -1,7 +1,7 @@
 # Gasless action quotas and relayer budget
 
 Date: 2026-10-08
-Stage: design direction agreed; written spec awaiting review.
+Stage: written spec approved by the user; implementation plan awaiting review.
 Base: `monad-migration`, `5d7917d`, matching fetched origin. Design branch:
 `feature/gasless-sponsorship-budget`.
 
