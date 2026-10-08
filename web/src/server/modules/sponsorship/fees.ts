@@ -136,3 +136,53 @@ export async function validateSignedTx(
     reject();
   }
 }
+
+export async function readFrozenSignedTx(bytes: Hex): Promise<FrozenTx> {
+  try {
+    const tx = parseTransaction(bytes);
+    if (
+      (tx.type !== "legacy" && tx.type !== "eip1559") ||
+      !tx.to ||
+      tx.gas === undefined ||
+      tx.nonce === undefined ||
+      tx.chainId === undefined ||
+      (tx.value ?? 0n) !== 0n
+    )
+      reject();
+    const from = await recoverTransactionAddress({
+      serializedTransaction: bytes as Parameters<
+        typeof recoverTransactionAddress
+      >[0]["serializedTransaction"],
+    });
+    let fee: FrozenTx["fee"];
+    if (tx.type === "legacy") {
+      if (tx.gasPrice === undefined) reject();
+      fee = { type: 0, gasPrice: tx.gasPrice };
+    } else {
+      if (
+        tx.maxFeePerGas === undefined ||
+        tx.maxPriorityFeePerGas === undefined
+      )
+        reject();
+      fee = {
+        type: 2,
+        maxFeePerGas: tx.maxFeePerGas,
+        maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      };
+    }
+    const frozen: FrozenTx = {
+      chainId: tx.chainId,
+      from,
+      to: tx.to,
+      data: tx.data ?? "0x",
+      nonce: tx.nonce,
+      gas: tx.gas,
+      value: 0n,
+      fee,
+    };
+    maximumLiability(frozen);
+    return frozen;
+  } catch {
+    reject();
+  }
+}

@@ -454,7 +454,9 @@ export function reduceSponsorCommand(
   } else if (cmd.kind === "release") {
     const { c } = child(s, cmd.ticket);
     if (
-      c.walletFence !== cmd.retiredWalletFence ||
+      (c.walletFence !== cmd.retiredWalletFence && c.walletFence !== null) ||
+      !Number.isSafeInteger(cmd.retiredWalletFence) ||
+      cmd.retiredWalletFence < 1 ||
       !["signing", "allocated"].includes(c.phase)
     )
       error("budget");

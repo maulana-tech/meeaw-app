@@ -1,27 +1,38 @@
 import "server-only";
 import {
+  type Chain,
   createPublicClient,
   createWalletClient,
   decodeFunctionData,
   encodeAbiParameters,
+  type Hex,
   http,
   keccak256,
-  type Chain,
-  type Hex,
   type TransactionReceipt,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { getServerEnv } from "../../env.server";
+import type {
+  ChildTicket,
+  FrozenTx,
+  SponsorBinding,
+} from "../../features/sponsorship/types";
+import { maweePoolAbi } from "../../lib/abi";
 import { chain, rpcUrl } from "../../lib/chain";
 import { getDb } from "../db/mongo";
+import { validateSignedTx } from "../modules/sponsorship/fees";
+import { SponsorLedger } from "../modules/sponsorship/ledger.service";
+import { loadSponsorPolicy } from "../modules/sponsorship/policy";
+import { sponsorFeeEvidence } from "../modules/sponsorship/reconcile";
+import type { SponsorBudgetPort } from "../modules/sponsorship/senderBudget";
+import { SponsorshipError } from "../modules/sponsorship/sponsorship.errors";
 import {
   RelayBusyError,
   RelayConflictError,
   RelayJournal,
   type RelaySend,
 } from "./relayJournal";
-import { maweePoolAbi } from "../../lib/abi";
-import { SpendReservations, type SpendOwner } from "./spendReservations";
+import { type SpendOwner, SpendReservations } from "./spendReservations";
 
 export type RelayIntent = {
   operationKey: string;
@@ -30,12 +41,17 @@ export type RelayIntent = {
   to: Hex;
   data: Hex;
   confirmations: number;
+  sponsorship?: SponsorBinding;
 };
 export type RelayPort = {
   pendingNonce(): Promise<number>;
   blockNumber(): Promise<bigint>;
   receipt(hash: Hex): Promise<TransactionReceipt | null>;
-  prepareAndSign(intent: RelayIntent, nonce: number): Promise<Hex>;
+  prepareAndSign?(intent: RelayIntent, nonce: number): Promise<Hex>;
+  prepare?(intent: RelayIntent, nonce: number): Promise<FrozenTx>;
+  sign?(tx: FrozenTx): Promise<Hex>;
+  block?(number: bigint): Promise<{ hash: Hex | null; timestamp: bigint }>;
+  balance?(wallet: Hex): Promise<bigint>;
   broadcast(bytes: Hex): Promise<Hex>;
 };
 export type RelayResult = {
@@ -45,7 +61,7 @@ export type RelayResult = {
 };
 const walletKey = (i: RelayIntent) => `${i.chainId}:${i.wallet.toLowerCase()}`;
 function digest(i: RelayIntent) {
-  return keccak256(
+  const original = keccak256(
     encodeAbiParameters(
       [
         { type: "uint256" },
@@ -57,6 +73,26 @@ function digest(i: RelayIntent) {
       [BigInt(i.chainId), i.wallet, i.to, i.data, BigInt(i.confirmations)],
     ),
   );
+  return i.sponsorship
+    ? keccak256(
+        encodeAbiParameters(
+          [
+            { type: "bytes32" },
+            { type: "string" },
+            { type: "uint256" },
+            { type: "uint256" },
+            { type: "string" },
+          ],
+          [
+            original,
+            i.sponsorship.action.actionId,
+            BigInt(i.sponsorship.action.chainId),
+            BigInt(i.sponsorship.action.fence),
+            i.sponsorship.childId,
+          ],
+        ),
+      )
+    : original;
 }
 
 /** RPC is an injected boundary; the real journal owns cross-process atomicity. */
@@ -64,6 +100,7 @@ export function makeDurableSender(
   journal: RelayJournal,
   port: RelayPort,
   reservations?: SpendReservations,
+  budget?: SponsorBudgetPort,
 ) {
   function spend(
     i: RelayIntent,
@@ -129,6 +166,13 @@ export function makeDurableSender(
     )
       return { state: "unknown", txHash: send.txHash, receipt: null };
     const state = receipt.status === "success" ? "confirmed" : "reverted";
+    if (budget && send.budgetChild) {
+      if (!port.block) throw new SponsorshipError("rpc");
+      await budget.ledger.settleChild(
+        send.budgetChild,
+        await sponsorFeeEvidence(send, receipt, port.block),
+      );
+    }
     await journal.finish(send, state);
     if (send.intent) await releaseSpend(send.intent, state);
     return { state, txHash: send.txHash, receipt };
@@ -166,6 +210,7 @@ export function makeDurableSender(
     const spending = spend(i);
     let spendClaim: Awaited<ReturnType<SpendReservations["claim"]>> | null =
       null;
+    let budgetChild: ChildTicket | undefined;
     try {
       if (spending && reservations) {
         spendClaim = await reservations.claim(
@@ -174,13 +219,60 @@ export function makeDurableSender(
         );
         await reservations.enterDispatch(spendClaim);
       }
-      const serializedTransaction = await port.prepareAndSign(i, claim.nonce);
+      let serializedTransaction: Hex;
+      if (budget) {
+        if (!i.sponsorship || !port.prepare || !port.sign || !port.balance)
+          throw new SponsorshipError("configuration");
+        const policy = budget.policy();
+        if (!policy.ready) throw new SponsorshipError("configuration");
+        const prepared = await port.prepare(i, claim.nonce);
+        if (
+          prepared.chainId !== i.chainId ||
+          prepared.from.toLowerCase() !== i.wallet.toLowerCase() ||
+          prepared.to.toLowerCase() !== i.to.toLowerCase() ||
+          prepared.data.toLowerCase() !== i.data.toLowerCase() ||
+          prepared.nonce !== claim.nonce
+        )
+          throw new SponsorshipError("cost");
+        budgetChild = await budget.ledger.allocate(
+          i.sponsorship.action,
+          i.sponsorship.childId,
+          digest(i),
+          prepared,
+        );
+        const state = await budget.ledger.repo.snapshot(i.chainId);
+        let liability = 0n;
+        for (const action of Object.values(state.actions))
+          for (const child of Object.values(action.children)) {
+            if (
+              child.tx.from.toLowerCase() === i.wallet.toLowerCase() &&
+              !["settled", "abandoned"].includes(child.phase)
+            )
+              liability += BigInt(child.maximumWei);
+          }
+        if (
+          (await port.balance(i.wallet)) <
+          liability + policy.policy.balanceFloorWei
+        )
+          throw new SponsorshipError("balance");
+        await budget.ledger.enterSigning(budgetChild, claim.fence);
+        serializedTransaction = await port.sign(prepared);
+        await validateSignedTx(serializedTransaction, prepared);
+        await budget.ledger.pinSigned(
+          budgetChild,
+          keccak256(serializedTransaction),
+        );
+      } else {
+        if (!port.prepareAndSign) throw new RelayConflictError();
+        serializedTransaction = await port.prepareAndSign(i, claim.nonce);
+      }
       if (spendClaim && reservations)
         await reservations.assertOwned(spendClaim);
       const signed = await journal.persistSigned({
         ...claim,
         serializedTransaction,
         txHash: keccak256(serializedTransaction),
+        ...(budgetChild ? { budgetChild } : {}),
       });
       if (spendClaim && reservations)
         await reservations.pinSigned(spendClaim, i.operationKey);
@@ -188,6 +280,9 @@ export function makeDurableSender(
     } catch (e) {
       const saved = await journal.read(walletKey(i), i.operationKey);
       const abandoned = await journal.abandonUnsigned(claim);
+      if (abandoned && !saved?.serializedTransaction && budgetChild && budget) {
+        await budget.ledger.releaseUnsigned(budgetChild, claim.fence);
+      }
       if (
         abandoned &&
         !saved?.serializedTransaction &&
@@ -208,6 +303,10 @@ export function makeDurableSender(
     const active = await journal.active(walletKey(i));
     if (active?.fence !== send.fence || active.operationKey !== i.operationKey)
       throw new RelayBusyError();
+    if (budget) {
+      if (!send.budgetChild) throw new SponsorshipError("initializing");
+      await budget.ledger.assertBroadcast(send.budgetChild, send.txHash);
+    }
     await journal.uncertain(send);
     try {
       const hash = await port.broadcast(send.serializedTransaction);
@@ -243,6 +342,15 @@ export async function runtimeSender() {
   });
   const db = await getDb(),
     journal = new RelayJournal(db);
+  const sponsorshipPolicy = () => loadSponsorPolicy(getServerEnv());
+  const budget: SponsorBudgetPort = {
+    ledger: new SponsorLedger({
+      db,
+      policy: sponsorshipPolicy,
+      chainId: chain.id,
+    }),
+    policy: sponsorshipPolicy,
+  };
   const port: RelayPort = {
     pendingNonce: () =>
       reader.getTransactionCount({
@@ -259,7 +367,7 @@ export async function runtimeSender() {
         throw e;
       }
     },
-    prepareAndSign: async (i, nonce) => {
+    prepare: async (i, nonce) => {
       if (
         i.chainId !== chain.id ||
         i.wallet.toLowerCase() !== account.address.toLowerCase()
@@ -271,16 +379,64 @@ export async function runtimeSender() {
         data: i.data,
         nonce,
       });
-      return wallet.signTransaction(prepared);
+      if (prepared.gas === undefined || (prepared.value ?? 0n) !== 0n)
+        throw new SponsorshipError("cost");
+      let fee: FrozenTx["fee"];
+      if (prepared.type === "legacy") {
+        if (prepared.gasPrice === undefined) throw new SponsorshipError("cost");
+        fee = { type: 0, gasPrice: prepared.gasPrice };
+      } else {
+        if (
+          prepared.maxFeePerGas === undefined ||
+          prepared.maxPriorityFeePerGas === undefined
+        )
+          throw new SponsorshipError("cost");
+        fee = {
+          type: 2,
+          maxFeePerGas: prepared.maxFeePerGas,
+          maxPriorityFeePerGas: prepared.maxPriorityFeePerGas,
+        };
+      }
+      return {
+        chainId: i.chainId,
+        from: account.address,
+        to: i.to,
+        data: i.data,
+        nonce,
+        gas: prepared.gas,
+        value: 0n,
+        fee,
+      };
     },
+    sign: (tx) =>
+      wallet.signTransaction({
+        account,
+        chain: configuredChain,
+        chainId: tx.chainId,
+        to: tx.to,
+        data: tx.data,
+        nonce: tx.nonce,
+        gas: tx.gas,
+        value: 0n,
+        ...(tx.fee.type === 0
+          ? { type: "legacy", gasPrice: tx.fee.gasPrice }
+          : {
+              type: "eip1559",
+              maxFeePerGas: tx.fee.maxFeePerGas,
+              maxPriorityFeePerGas: tx.fee.maxPriorityFeePerGas,
+            }),
+      }),
+    block: (number) => reader.getBlock({ blockNumber: number }),
+    balance: (address) => reader.getBalance({ address, blockTag: "latest" }),
     broadcast: (bytes) =>
       wallet.sendRawTransaction({ serializedTransaction: bytes }),
   };
   return {
-    sender: makeDurableSender(journal, port, new SpendReservations(db)),
+    sender: makeDurableSender(journal, port, new SpendReservations(db), budget),
     journal,
     account,
     reader,
+    budget,
   };
 }
 export async function prepareRelay(i: RelayIntent) {
