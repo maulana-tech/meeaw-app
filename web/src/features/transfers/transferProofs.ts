@@ -8,8 +8,12 @@ import {
   viewPubkey,
 } from "../../lib/crypto";
 import { proveMerge, proveTransfer } from "../../lib/prover";
-import type { FundingAction } from "../payments/funding";
 import { createNoteOutput, proofWire } from "../payments/proofOutputs";
+import type { GenerationFundingAction } from "../privacyKeys/generationFunding";
+import {
+  fundingAccount,
+  noteProofAccount,
+} from "../privacyKeys/generationProofContext";
 import { localParticipantKeys } from "../requests/requestCrypto";
 import { openTransfer, sealTransferEnvelope } from "./transferCrypto";
 import { transferSubmissionTypedData } from "./transferTypedData";
@@ -24,6 +28,7 @@ export type OwnedRecoveryOutput = {
   amount: string;
   salt: string;
   commitment: `0x${string}`;
+  generation?: number;
 };
 export function recoveryBinding(s: {
   pool: string;
@@ -45,16 +50,27 @@ export function recoveryBinding(s: {
 }
 export async function buildTransferSubmission(
   c: TransferProofContext,
-  action: FundingAction,
+  action: GenerationFundingAction,
 ): Promise<SignedTransferSubmission> {
-  const { record: r, operation: op, account, scan, pool, signer } = c,
-    keys = await localParticipantKeys(account);
+  const {
+      record: r,
+      operation: op,
+      account: recordAccount,
+      scan,
+      pool,
+      signer,
+    } = c,
+    keys = await localParticipantKeys(recordAccount);
+  const targetAccount = fundingAccount(c);
+  let account = targetAccount;
   if (
     scan.scope !== r.pool ||
     pool.scope !== r.pool ||
     pool.role !== "active" ||
     !(pool.transferCapable ?? pool.requestCapable) ||
     scan.health !== "healthy" ||
+    (c.keyring &&
+      c.keyring.owner.toLowerCase() !== signer.address.toLowerCase()) ||
     op.transferId !== r.id ||
     op.id !== r.operationId ||
     op.phase !== "preparing" ||
@@ -63,8 +79,7 @@ export async function buildTransferSubmission(
     keys.viewPubkey.toLowerCase() !== r.sender.viewPubkey.toLowerCase()
   )
     throw new Error("Unlock the sending account and refresh its balance.");
-  const payload = await openTransfer(r, account, pool),
-    pk = await ownerPk(account.ownerSecret);
+  const payload = await openTransfer(r, recordAccount, pool);
   const owned = (index: number) => {
     const n = scan.notes.find(
       (n) =>
@@ -82,7 +97,7 @@ export async function buildTransferSubmission(
     operationId: op.id,
     step: op.nextStep,
     pool: r.pool,
-    kind: action.kind,
+    kind: action.kind === "key-migrate" ? ("split" as const) : action.kind,
   };
   let body: Omit<TransferSubmissionBody, "recoveryEnvelope">;
   let recovery: OwnedRecoveryOutput[];
@@ -93,6 +108,9 @@ export async function buildTransferSubmission(
       b = owned(bi),
       sum = a.amount + b.amount,
       salt = randomFieldElement();
+    account = await noteProofAccount(c, a);
+    await noteProofAccount(c, b);
+    const pk = await ownerPk(account.ownerSecret);
     if (sum > (1n << 64n) - 1n)
       throw new Error("Split this balance before combining it.");
     const paths = await Promise.all([
@@ -142,20 +160,37 @@ export async function buildTransferSubmission(
         amount: String(sum),
         salt: String(salt),
         commitment: output.commitment,
+        ...(c.keyring ? { generation: c.fundingGeneration ?? 0 } : {}),
       },
     ];
   } else {
     const n = owned(action.inputIndex),
       amount =
         action.kind === "payment" ? BigInt(payload.amount) : action.amount;
+    account = await noteProofAccount(c, n, action.kind === "key-migrate");
+    const pk = await ownerPk(account.ownerSecret);
+    if (
+      action.kind === "key-migrate" &&
+      (!c.keyring ||
+        action.fromGeneration !== (n.keyGeneration ?? 0) ||
+        action.toGeneration !== c.fundingGeneration ||
+        action.fromGeneration === action.toGeneration)
+    )
+      throw new Error("Privacy key preparation target changed.");
     if (amount <= 0n || amount > n.amount)
       throw new Error("Your private balance is too low.");
     const recipientPk =
-        action.kind === "payment" ? BigInt(r.recipient.notePubkey) : pk,
+        action.kind === "payment"
+          ? BigInt(r.recipient.notePubkey)
+          : action.kind === "key-migrate"
+            ? await ownerPk(targetAccount.ownerSecret)
+            : pk,
       recipientView =
         action.kind === "payment"
           ? hexToBytes(r.recipient.viewPubkey)
-          : viewPubkey(account.viewSk),
+          : viewPubkey(
+              (action.kind === "key-migrate" ? targetAccount : account).viewSk,
+            ),
       salt =
         action.kind === "payment" ? BigInt(payload.salt) : randomFieldElement(),
       changeSalt = randomFieldElement();
@@ -205,13 +240,14 @@ export async function buildTransferSubmission(
       outputs: [recipient, change],
     };
     recovery = [
-      ...(action.kind === "split"
+      ...(action.kind === "split" || action.kind === "key-migrate"
         ? [
             {
               position: 0,
               amount: String(amount),
               salt: String(salt),
               commitment: recipient.commitment,
+              ...(c.keyring ? { generation: c.fundingGeneration ?? 0 } : {}),
             },
           ]
         : []),
@@ -220,20 +256,28 @@ export async function buildTransferSubmission(
         amount: String(n.amount - amount),
         salt: String(changeSalt),
         commitment: change.commitment,
+        ...(c.keyring ? { generation: n.keyGeneration ?? 0 } : {}),
       },
     ];
   }
   const full: TransferSubmissionBody = {
     ...body,
     recoveryEnvelope: sealTransferEnvelope(
-      recovery,
+      c.keyring ? { version: 2, outputs: recovery } : recovery,
       r.sender.viewPubkey,
       recoveryBinding(body),
     ),
   };
+  fundingAccount(c);
   const signature = await signer.walletClient.signTypedData({
     account: signer.walletClient.account ?? signer.address,
     ...transferSubmissionTypedData(full),
   });
   return { ...full, signature };
+}
+export async function buildTransferKeyMigrationSubmission(
+  c: TransferProofContext,
+  action: Extract<GenerationFundingAction, { kind: "key-migrate" }>,
+): Promise<SignedTransferSubmission> {
+  return buildTransferSubmission(c, action);
 }

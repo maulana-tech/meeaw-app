@@ -7,11 +7,17 @@ import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
 import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
 import { fromBaseUnits } from "../../lib/crypto";
-import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
+import {
+  getAccount,
+  type MyNote,
+  scanKeyringNotes,
+  scanMyNotes,
+} from "../../lib/notes";
 import { unlockLabel } from "../../lib/passkey";
 import {
   activePools,
@@ -171,7 +177,17 @@ export function WithdrawDashboard() {
       const account = getAccount();
       if (!account) throw new Error("Unlock your private account to continue.");
       // Scan the pool the selected payments live in; never mix pools.
-      const scan = await scanMyNotes(account, { pool,includeRequestRecovery:true,includeTransferRecovery:true });
+      const ring = getPrivacyKeyring();
+      const scan = ring
+        ? await scanKeyringNotes(ring, pool, {
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : await scanMyNotes(account, {
+            pool,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
 
       if (target.kind === "all") {
         const batch = await withdrawAll({

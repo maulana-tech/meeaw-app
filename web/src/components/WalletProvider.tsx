@@ -17,6 +17,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { unlockPrivacyKeyring } from "../features/privacyKeys/reauthenticate";
+import { getPrivacyKeyring } from "../features/privacyKeys/session";
+import type { PrivacyKeyState } from "../features/privacyKeys/types";
 import { DASHBOARD_PATH } from "../lib/auth-routes";
 import {
   registerUsernameCache,
@@ -79,6 +82,10 @@ type WalletState = {
   chooseRecovery: (method: RecoveryMethod) => Promise<void>;
   unlockWithPasskey: () => Promise<void>;
   closeRecoveryModal: () => void;
+  privacyGeneration: number | null;
+  privacyRevision: number | null;
+  privacyStateStatus: "legacy" | "locked" | "ready" | "pending";
+  refreshPrivacyState: () => Promise<PrivacyKeyState | null>;
 };
 
 export type RecoveryMethod = "passkey" | "pin";
@@ -128,6 +135,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const pendingMasterRef = useRef<Uint8Array | null>(null);
   const revisionRef = useRef(0);
   const sessionAbortedRef = useRef(false);
+  const [privacyMetadata, setPrivacyMetadata] =
+    useState<PrivacyKeyState | null>(null);
   const walletsRef = useRef<readonly ConnectedWallet[]>(wallets);
   const createWalletRef = useRef(createWallet);
   const setupRef = useRef<{
@@ -137,6 +146,44 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   walletsRef.current = wallets;
   createWalletRef.current = createWallet;
+
+  const refreshPrivacyState = useCallback(async () => {
+    const owner = mappingRef.current?.address.toLowerCase(),
+      revision = revisionRef.current;
+    if (!owner) throw new Error("Sign in first.");
+    const state = await api.privacyKeys.state.query();
+    if (
+      sessionAbortedRef.current ||
+      revisionRef.current !== revision ||
+      mappingRef.current?.address.toLowerCase() !== owner
+    )
+      throw new Error("Wallet changed while checking privacy keys.");
+    if (state && state.owner.toLowerCase() !== owner)
+      throw new Error("Privacy key history belongs to another wallet.");
+    setPrivacyMetadata(state);
+    return state;
+  }, []);
+
+  const restoreRoot = useCallback(async (master: Uint8Array) => {
+    const revision = revisionRef.current,
+      owner = mappingRef.current?.address.toLowerCase();
+    if (!owner) throw new Error("Sign in first.");
+    const isCurrent = () =>
+      !sessionAbortedRef.current &&
+      revisionRef.current === revision &&
+      mappingRef.current?.address.toLowerCase() === owner;
+    const state = await api.privacyKeys.state.query();
+    if (!isCurrent())
+      throw new Error("Wallet changed during privacy key recovery.");
+    if (state) {
+      if (state.owner.toLowerCase() !== owner)
+        throw new Error("Privacy key history belongs to another wallet.");
+      await unlockPrivacyKeyring(master, state, isCurrent);
+    } else deriveAndStoreAccount(master);
+    if (!isCurrent())
+      throw new Error("Wallet changed during privacy key recovery.");
+    setPrivacyMetadata(state);
+  }, []);
 
   useEffect(() => {
     setPasskeySupported(passkeysAvailable());
@@ -165,21 +212,43 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const activateMapping = useCallback(
     async (mapping: WalletMapping) => {
       if (sessionAbortedRef.current) return;
-      const [escrow, passkey] = await Promise.all([
+      const [escrow, passkey, privacyState] = await Promise.all([
         api.wallets.getEscrow.query(),
         api.wallets.getPasskey.query(),
+        api.privacyKeys.state.query(),
       ]);
       if (sessionAbortedRef.current) return;
       mappingRef.current = mapping;
       setAddress(mapping.address);
       passkeyRef.current = passkey;
+      if (
+        privacyState &&
+        privacyState.owner.toLowerCase() !== mapping.address.toLowerCase()
+      )
+        throw new Error("Privacy key history belongs to another wallet.");
+      setPrivacyMetadata(privacyState);
+      if (privacyState && !escrow && !passkey)
+        throw new Error(
+          "Restore your existing recovery before opening retained privacy keys.",
+        );
+      const ring = getPrivacyKeyring();
+      const locallyUnlocked =
+        hasLocalAccount() &&
+        (!privacyState ||
+          Boolean(
+            ring &&
+              ring.owner === privacyState.owner &&
+              ring.registry === privacyState.registry &&
+              ring.revision === privacyState.revision,
+          ));
+      setAccountUnlocked(Boolean((escrow || passkey) && locallyUnlocked));
       if (passkey) {
         setRecoveryMethod("passkey");
-        if (hasLocalAccount()) setAccountUnlocked(true);
+        if (locallyUnlocked) setAccountUnlocked(true);
         else openRecoveryModal("passkey-unlock");
       } else if (escrow) {
         setRecoveryMethod("pin");
-        if (hasLocalAccount()) setAccountUnlocked(true);
+        if (locallyUnlocked) setAccountUnlocked(true);
         else openPinModal("unlock");
       } else if (passkeysAvailable()) {
         // New account: let the user pick passkey (no secret leaves the
@@ -207,6 +276,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       mappingRef.current = null;
       setAddress("");
       setAccountUnlocked(false);
+      setPrivacyMetadata(null);
       setSessionReady(true);
       return;
     }
@@ -347,6 +417,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async (method: RecoveryMethod) => {
       if (!mappingRef.current) return;
       setRecoveryError("");
+      try {
+        if (await api.privacyKeys.state.query()) {
+          setRecoveryError(
+            "Unlock with your existing recovery. Retained privacy keys cannot be replaced during setup.",
+          );
+          return;
+        }
+      } catch {
+        setRecoveryError(
+          "Privacy key history could not be checked. Try again with your existing recovery.",
+        );
+        return;
+      }
       if (method === "pin") {
         // Existing PIN flow: a random master now, the PIN escrow after the
         // username is claimed (see the "set" effect above).
@@ -359,6 +442,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
       setRecoveryBusy(true);
+      let createdMaster: Uint8Array | undefined;
       try {
         const { master, record } = await createPasskeyMaster({
           userName:
@@ -366,6 +450,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             user?.google?.email ??
             mappingRef.current.address,
         });
+        createdMaster = master;
         const account = deriveNoteSecrets(master);
         const { notePubkey, viewPubkey } = await accountPubkeys(account);
         const viewPubkeyHex = bytesToHex(viewPubkey);
@@ -395,6 +480,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       } catch (cause) {
         setRecoveryError(passkeyErrorMessage(cause));
       } finally {
+        createdMaster?.fill(0);
         setRecoveryBusy(false);
       }
     },
@@ -406,8 +492,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (!record) return;
     setRecoveryBusy(true);
     setRecoveryError("");
+    let master: Uint8Array | undefined;
     try {
-      const master = await unlockPasskeyMaster({ record });
+      master = await unlockPasskeyMaster({ record });
       const account = deriveNoteSecrets(master);
       const { viewPubkey } = await accountPubkeys(account);
       // The passkey must reproduce the keys this account registered; any
@@ -418,16 +505,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           "This passkey derived different keys than your account uses. Choose the passkey you created for Meaw.",
         );
       }
-      deriveAndStoreAccount(master);
+      await restoreRoot(master);
       master.fill(0);
       setRecoveryModal(null);
       setAccountUnlocked(true);
     } catch (cause) {
       setRecoveryError(passkeyErrorMessage(cause));
     } finally {
+      master?.fill(0);
       setRecoveryBusy(false);
     }
-  }, []);
+  }, [restoreRoot]);
 
   const closeRecoveryModal = useCallback(() => {
     // Choosing a method is mandatory for a new account; unlocking can wait.
@@ -444,9 +532,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (!mappingRef.current) return;
       setPinSubmitting(true);
       setPinError("");
+      let restoredMaster: Uint8Array | undefined;
       try {
         if (pinMode === "secure") {
+          if (await api.privacyKeys.state.query())
+            throw new Error(
+              "Restore your existing recovery. Privacy key history cannot be reset from Settings.",
+            );
           const master = randomMaster();
+          restoredMaster = master;
           if (username) {
             const account = deriveNoteSecrets(master);
             const { notePubkey, viewPubkey } = await accountPubkeys(account);
@@ -471,6 +565,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           deriveAndStoreAccount(master);
         } else if (pinMode === "set") {
           const master = pendingMasterRef.current ?? randomMaster();
+          restoredMaster = master;
           const { serializeEscrow, encryptMaster } = await import(
             "../lib/keys"
           );
@@ -488,13 +583,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           const { decryptMaster, deserializeEscrow } = await import(
             "../lib/keys"
           );
-          let master: Uint8Array;
           try {
-            master = decryptMaster(deserializeEscrow(wire), pin);
+            restoredMaster = decryptMaster(deserializeEscrow(wire), pin);
           } catch {
             throw new BadPinError();
           }
-          deriveAndStoreAccount(master);
+          await restoreRoot(restoredMaster);
         }
         setAccountUnlocked(true);
         setPinModalOpen(false);
@@ -507,10 +601,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
               : "Something went wrong.",
         );
       } finally {
+        if (restoredMaster !== pendingMasterRef.current)
+          restoredMaster?.fill(0);
         setPinSubmitting(false);
       }
     },
-    [pinMode, username, openPinModal, getSigner],
+    [pinMode, username, openPinModal, getSigner, restoreRoot],
   );
 
   const disconnect = useCallback(async () => {
@@ -518,8 +614,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     sessionAbortedRef.current = true;
     setupRef.current = null;
     mappingRef.current = null;
+    pendingMasterRef.current?.fill(0);
     pendingMasterRef.current = null;
     passkeyRef.current = null;
+    setPrivacyMetadata(null);
     setRecoveryModal(null);
     setRecoveryMethod(null);
     clearLocalAccount();
@@ -580,6 +678,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       chooseRecovery,
       unlockWithPasskey,
       closeRecoveryModal,
+      privacyGeneration: privacyMetadata?.activeGeneration ?? null,
+      privacyRevision: privacyMetadata?.revision ?? null,
+      privacyStateStatus: !accountUnlocked
+        ? "locked"
+        : privacyMetadata?.pending
+          ? "pending"
+          : privacyMetadata
+            ? "ready"
+            : "legacy",
+      refreshPrivacyState,
     }),
     [
       address,
@@ -611,6 +719,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       chooseRecovery,
       unlockWithPasskey,
       closeRecoveryModal,
+      privacyMetadata,
+      refreshPrivacyState,
     ],
   );
 

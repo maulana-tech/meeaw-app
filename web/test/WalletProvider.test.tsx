@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   usernameOf: vi.fn(),
   clearLocalAccount: vi.fn(),
   syncLocalAccountIdentity: vi.fn(),
+  privacyState: vi.fn(),
+  restorePrivacyRing: vi.fn(),
 }));
 
 vi.mock("@privy-io/react-auth", () => ({
@@ -66,6 +68,7 @@ vi.mock("../src/lib/privy-wallet", () => ({
 
 vi.mock("../src/trpc/client", () => ({
   api: {
+    privacyKeys: { state: { query: mocks.privacyState } },
     wallets: {
       current: { query: mocks.current },
       restore: { mutate: mocks.restore },
@@ -76,6 +79,9 @@ vi.mock("../src/trpc/client", () => ({
       savePasskey: { mutate: mocks.savePasskey },
     },
   },
+}));
+vi.mock("../src/features/privacyKeys/reauthenticate", () => ({
+  unlockPrivacyKeyring: mocks.restorePrivacyRing,
 }));
 
 vi.mock("../src/lib/passkey", () => ({
@@ -175,13 +181,59 @@ beforeEach(() => {
   mocks.savePasskey.mockResolvedValue({ ok: true });
   mocks.passkeysAvailable = false;
   mocks.hasLocal = true;
+  mocks.privacyState.mockResolvedValue(null);
+  mocks.restorePrivacyRing.mockResolvedValue({
+    activeGeneration: 1,
+    revision: 2,
+  });
 });
 
 describe("WalletProvider Privy session", () => {
+  it("restores an established rotated passkey account through its retained key history", async () => {
+    mocks.hasLocal = false;
+    mocks.privacyState.mockResolvedValue({
+      owner: WALLET.toLowerCase(),
+      registry: "31337:0x4444444444444444444444444444444444444444",
+      activeGeneration: 1,
+      revision: 2,
+      pending: null,
+    });
+    mocks.getPasskey.mockResolvedValue({
+      credentialId: "existing",
+      transports: [],
+      viewPubkeyHex: "09".repeat(32),
+    });
+    mocks.unlockPasskeyMaster.mockResolvedValue(new Uint8Array(32).fill(9));
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("recovery-modal")).toHaveTextContent(
+        "passkey-unlock",
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Unlock passkey" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("unlocked")).toHaveTextContent("yes"),
+    );
+    expect(mocks.restorePrivacyRing).toHaveBeenCalledOnce();
+    expect(mocks.deriveAndStoreAccount).not.toHaveBeenCalled();
+    expect(mocks.savePasskey).not.toHaveBeenCalled();
+  });
   it("keeps an authenticated visitor on Verify without wallet bootstrap", async () => {
     mocks.pathname = "/verify";
-    render(<WalletProvider><Probe /></WalletProvider>);
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("yes"));
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("yes"),
+    );
     expect(mocks.restore).not.toHaveBeenCalled();
     expect(mocks.bootstrap).not.toHaveBeenCalled();
     expect(mocks.replace).not.toHaveBeenCalled();

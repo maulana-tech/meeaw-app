@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getAccount, type MyNote, scanMyNotes } from "../../lib/notes";
-import type { PoolDescriptor } from "../../lib/pools";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
+import {
+  getAccount,
+  type MyNote,
+  scanKeyringNotes,
+  scanMyNotes,
+} from "../../lib/notes";
+import { activePool, type PoolDescriptor } from "../../lib/pools";
 
 type NotesState = {
   notes: MyNote[];
@@ -30,10 +36,11 @@ export function useMyNotes(
   const [tick, setTick] = useState(0);
   const hasResult = useRef(false);
   const previousKey = useRef<string>(`${address}|${pool?.scope}`);
+  const ring = getPrivacyKeyring();
 
   useEffect(() => {
     void tick;
-    const key = `${address}|${pool?.scope}`;
+    const key = `${address}|${pool?.scope}|${ring?.owner}|${ring?.registry}|${ring?.revision}|${ring?.activeGeneration}`;
     if (previousKey.current !== key) {
       hasResult.current = false;
       previousKey.current = key;
@@ -51,6 +58,21 @@ export function useMyNotes(
       return;
     }
     let cancelled = false;
+    const isCurrent = () =>
+      !cancelled && getPrivacyKeyring() === ring && getAccount() !== null;
+    const scan = (refresh: boolean) =>
+      ring
+        ? scanKeyringNotes(ring, pool ?? activePool(), {
+            refresh,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : scanMyNotes(account, {
+            refresh,
+            pool,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
     const initiallyLoaded = hasResult.current;
     setLoading(!initiallyLoaded);
     setRefreshing(initiallyLoaded);
@@ -67,30 +89,21 @@ export function useMyNotes(
     void (async () => {
       try {
         if (!initiallyLoaded) {
-          const cached = await scanMyNotes(account, {
-            refresh: false,
-            pool,
-            includeRequestRecovery: true,
-            includeTransferRecovery: true,
-          });
-          if (!cancelled && cached.mirrorAvailable) {
+          const cached = await scan(false);
+          if (isCurrent() && cached.mirrorAvailable) {
             applyResult(cached);
             setLoading(false);
             setRefreshing(true);
           }
         }
-        const result = await scanMyNotes(account, {
-          pool,
-          includeRequestRecovery: true,
-          includeTransferRecovery: true,
-        });
-        if (!cancelled) applyResult(result);
+        const result = await scan(true);
+        if (isCurrent()) applyResult(result);
       } catch (e) {
-        if (cancelled) return;
+        if (!isCurrent()) return;
         setError(e instanceof Error ? e.message : "Failed to load notes");
         setStale(hasResult.current);
       } finally {
-        if (!cancelled) {
+        if (isCurrent()) {
           setLoading(false);
           setRefreshing(false);
         }
@@ -99,7 +112,7 @@ export function useMyNotes(
     return () => {
       cancelled = true;
     };
-  }, [address, tick, pool]);
+  }, [address, tick, pool, ring]);
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
@@ -110,11 +123,13 @@ export function useMyNotes(
     };
     window.addEventListener("focus", onFocus);
     window.addEventListener("mawee:balance-changed", refresh);
+    window.addEventListener("mawee:privacy-keys-changed", refresh);
     document.addEventListener("visibilitychange", onFocus);
     const id = window.setInterval(onFocus, 20_000);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("mawee:balance-changed", refresh);
+      window.removeEventListener("mawee:privacy-keys-changed", refresh);
       document.removeEventListener("visibilitychange", onFocus);
       window.clearInterval(id);
     };

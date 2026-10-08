@@ -7,6 +7,8 @@ import {
   it,
   vi,
 } from "vitest";
+import { AccountSpendGate } from "../src/server/modules/privacyKeys/spendGate";
+
 const deps = vi.hoisted(() => ({
   db: null as unknown,
   wallets: new Map<string, string>(),
@@ -69,21 +71,24 @@ vi.mock("../src/server/lib/durableRelayer", () => ({
     account: { address: "0x1111111111111111111111111111111111111111" },
   }),
 }));
-import { openIsolatedRequestDb } from "./helpers/requestDb";
-import { makeRequestFixture, testSigner } from "./helpers/requestFixtures";
+
 import {
   requestDigest,
   submissionTypedData,
 } from "../src/features/requests/requestTypedData";
-import { toRequestDoc } from "../src/server/modules/requests/requests.repository";
+import type { SignedSubmission } from "../src/features/requests/types";
 import { __resetRateLimit } from "../src/server/lib/rateLimit";
 import {
   beginPayment,
-  submitPayment,
   reconcilePendingRequests,
+  reconcileRequestOperation,
+  submitPayment,
 } from "../src/server/modules/requests/requestOperations";
+import { toRequestDoc } from "../src/server/modules/requests/requests.repository";
 import { cancelRequest } from "../src/server/modules/requests/requests.service";
-import type { SignedSubmission } from "../src/features/requests/types";
+import { openIsolatedRequestDb } from "./helpers/requestDb";
+import { makeRequestFixture, testSigner } from "./helpers/requestFixtures";
+
 describe("request reservations and uncertain submissions", () => {
   let db: Awaited<ReturnType<typeof openIsolatedRequestDb>>,
     f: Awaited<ReturnType<typeof makeRequestFixture>>;
@@ -117,7 +122,7 @@ describe("request reservations and uncertain submissions", () => {
     const rows = Array.from({ length: 21 }, (_, i) => ({
       ...base,
       _id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
-      recipientCommitment: `0x${(i+1).toString(16).padStart(64,"0")}`,
+      recipientCommitment: `0x${(i + 1).toString(16).padStart(64, "0")}`,
       digest: "invalid",
       operationId: `op-${i}`,
       reservation: {
@@ -181,6 +186,34 @@ describe("request reservations and uncertain submissions", () => {
         attemptId: "00000000-0000-4000-8000-000000000098",
       }),
     ).rejects.toThrow();
+  });
+  it("releases the account ticket when an unsigned idle request is reconciled", async () => {
+    await beginPayment("payer", {
+      id: f.record.id,
+      revision: 0,
+      attemptId: attempt,
+    });
+    await db.requests.updateOne(
+      { _id: f.record.id },
+      { $set: { "reservation.updatedAt": new Date(Date.now() - 601000) } },
+    );
+    const finish = vi
+      .spyOn(AccountSpendGate.prototype, "finish")
+      .mockResolvedValue();
+    try {
+      expect((await reconcileRequestOperation(attempt))?.phase).toBe("failed");
+      expect(finish).toHaveBeenCalledWith(
+        f.record.addressee.wallet,
+        `request:${attempt}`,
+        expect.objectContaining({ id: attempt }),
+        "terminal",
+      );
+      expect(
+        (await db.requests.findOne({ _id: f.record.id }))?.operationId,
+      ).toBeNull();
+    } finally {
+      finish.mockRestore();
+    }
   });
   it("keeps Pending and the reservation after an uncertain broadcast", async () => {
     await beginPayment("payer", {
