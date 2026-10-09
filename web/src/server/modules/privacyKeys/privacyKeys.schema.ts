@@ -125,6 +125,7 @@ export const markPrivacyRotationInput = z.strictObject({
   txHash: hash,
 });
 export const cashoutCaptureInput = z.strictObject({
+  sponsorBatchId: z.uuid().optional(),
   operationId: z.uuid(),
   fundingGeneration: generation,
   keyRevision: revision,

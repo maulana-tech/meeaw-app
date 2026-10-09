@@ -616,11 +616,14 @@ export async function mintTestUsdc(
   signer: Signer,
   amount: bigint,
   pool: PoolDescriptor = activePool(),
+  actionId: string = crypto.randomUUID(),
 ): Promise<string> {
   if (!pool.mintable) throw new Error("Test tokens are not available here.");
   if (await gaslessEnabled()) {
     // The relayer mints a fixed amount to the caller's bound wallet.
-    return (await api.relay.mintTestUsdc.mutate({ pool: pool.scope })).txHash;
+    return (
+      await api.relay.mintTestUsdc.mutate({ pool: pool.scope, id: actionId })
+    ).txHash;
   }
   const { hash } = await send(signer, {
     address: pool.token,
@@ -660,9 +663,11 @@ export async function poolWithdraw(
   nullifier: Uint8Array,
   proof: EvmProof,
   pool: PoolDescriptor = activePool(),
+  batchId?: string,
 ): Promise<string> {
   if (await gaslessEnabled()) {
     const { txHash } = await api.relay.withdraw.mutate({
+      batchId,
       pool: pool.scope,
       recipient: getAddress(recipient),
       amount: amount.toString(),
@@ -672,6 +677,10 @@ export async function poolWithdraw(
     });
     return txHash;
   }
+  if (batchId)
+    throw new Error(
+      "Gas sponsorship is temporarily unavailable. Resume this cash-out when it returns.",
+    );
   if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { hash } = await send(signer, {
     address: pool.address,

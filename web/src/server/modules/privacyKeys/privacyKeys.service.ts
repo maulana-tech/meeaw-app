@@ -261,6 +261,7 @@ export async function admitCashout(
     keyRevision: number;
     pool: string;
     nullifier: Hex;
+    sponsorBatchId?: string;
   },
 ) {
   return (await cashoutOperations()).admit(await cashoutOwner(user), input);

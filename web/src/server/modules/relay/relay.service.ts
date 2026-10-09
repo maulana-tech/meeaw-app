@@ -1,6 +1,7 @@
 import "server-only";
 
 import { parseEventLogs } from "viem";
+import type { ActionKind } from "../../../features/sponsorship/types";
 import { erc20Abi, maweePoolAbi, maweeRegistryAbi } from "../../../lib/abi";
 import {
   poolAddress,
@@ -9,7 +10,12 @@ import {
 } from "../../../lib/chain";
 import { USDC_DECIMALS } from "../../../lib/crypto";
 import { activePool, findPool } from "../../../lib/pools";
+import type { Context } from "../../context";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
+import { ordinaryBusinessIdentity } from "../sponsorship/ordinaryIdentity";
+import { principalFromContext } from "../sponsorship/principals";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
+import { withdrawBatches } from "../sponsorship/sponsorship.service";
 import {
   currentWallet,
   verifiedPrivyWallets,
@@ -23,6 +29,25 @@ import type {
 } from "./relay.schema";
 
 export const TEST_USDC_MINT_UNITS = 100n * 10n ** BigInt(USDC_DECIMALS);
+const guest: Context = {
+  ip: null,
+  authToken: null,
+  privyUserId: null,
+  privyClaim: null,
+  authError: null,
+};
+function sponsorship(
+  ctx: Context,
+  kind: ActionKind,
+  input: Record<string, unknown>,
+  payer?: `0x${string}`,
+) {
+  return {
+    kind,
+    principal: principalFromContext(ctx, payer),
+    identity: ordinaryBusinessIdentity(kind, input),
+  };
+}
 
 // Contract reverts a user can hit, translated for the UI. Anything else is a
 // relayer/RPC problem and surfaces as a generic failure.
@@ -50,6 +75,7 @@ async function relay<T>(send: () => Promise<T>): Promise<T> {
   try {
     return await send();
   } catch (error) {
+    if (isSponsorshipError(error)) throw error;
     const name = revertErrorName(error);
     if (name && REJECTIONS[name]) {
       throw new RelayRejectedError(REJECTIONS[name]);
@@ -71,28 +97,36 @@ async function boundWallet(privyUserId: string): Promise<`0x${string}`> {
 export async function relayRegister(
   privyUserId: string,
   input: RegisterInput,
+  ctx: Context = guest,
 ): Promise<{ txHash: string }> {
   const owner = await boundWallet(privyUserId);
   const { hash } = await relay(() =>
-    relayWrite({
-      address: registryAddress,
-      abi: maweeRegistryAbi,
-      functionName: input.rotate ? "setPubkeysFor" : "registerFor",
-      args: [
+    relayWrite(
+      {
+        address: registryAddress,
+        abi: maweeRegistryAbi,
+        functionName: input.rotate ? "setPubkeysFor" : "registerFor",
+        args: [
+          owner,
+          input.username,
+          input.notePubkey,
+          input.viewPubkey,
+          input.deadline,
+          input.signature,
+        ],
+      },
+      sponsorship(ctx, input.rotate ? "rotation" : "register", {
+        ...input,
         owner,
-        input.username,
-        input.notePubkey,
-        input.viewPubkey,
-        input.deadline,
-        input.signature,
-      ],
-    }),
+      }),
+    ),
   );
   return { txHash: hash };
 }
 
 export async function relayDeposit(
   input: DepositInput,
+  ctx: Context = guest,
 ): Promise<{ txHash: string; leafIndex: number }> {
   const permit = input.permit ?? {
     value: 0n,
@@ -107,22 +141,25 @@ export async function relayDeposit(
     throw new RelayRejectedError("This pool no longer takes deposits.");
   }
   const { hash, receipt } = await relay(() =>
-    relayWrite({
-      address: pool.address,
-      abi: maweePoolAbi,
-      functionName: "depositWithAuthorization",
-      args: [
-        input.payer,
-        input.commitment,
-        input.amount,
-        input.proof,
-        input.ephemeralPk,
-        input.ciphertext,
-        input.deadline,
-        input.signature,
-        permit,
-      ],
-    }),
+    relayWrite(
+      {
+        address: pool.address,
+        abi: maweePoolAbi,
+        functionName: "depositWithAuthorization",
+        args: [
+          input.payer,
+          input.commitment,
+          input.amount,
+          input.proof,
+          input.ephemeralPk,
+          input.ciphertext,
+          input.deadline,
+          input.signature,
+          permit,
+        ],
+      },
+      sponsorship(ctx, "deposit", { ...input, pool: pool.scope }, input.payer),
+    ),
   );
   const [event] = parseEventLogs({
     abi: maweePoolAbi,
@@ -135,43 +172,58 @@ export async function relayDeposit(
 
 export async function relayWithdraw(
   input: WithdrawInput,
+  ctx: Context = guest,
 ): Promise<{ txHash: string }> {
   // Legacy pools stay withdrawable; anything outside the manifest is refused.
   const pool = input.pool ? findPool(input.pool) : activePool();
   if (!pool) throw new RelayRejectedError("Unknown pool.");
+  const binding = input.batchId
+    ? await (await withdrawBatches()).binding(ctx, input.batchId, {
+        pool: pool.scope,
+        recipient: input.recipient,
+        nullifier: input.nullifier,
+      })
+    : sponsorship(ctx, "withdraw", { ...input, pool: pool.scope });
   const { hash } = await relay(() =>
-    relayWrite({
-      address: pool.address,
-      abi: maweePoolAbi,
-      functionName: "withdraw",
-      args: [
-        input.recipient,
-        input.amount,
-        input.root,
-        input.nullifier,
-        input.proof,
-      ],
-    }),
+    relayWrite(
+      {
+        address: pool.address,
+        abi: maweePoolAbi,
+        functionName: "withdraw",
+        args: [
+          input.recipient,
+          input.amount,
+          input.root,
+          input.nullifier,
+          input.proof,
+        ],
+      },
+      binding,
+    ),
   );
   return { txHash: hash };
 }
 
 export async function relayTransfer(
   input: TransferInput,
+  ctx: Context = guest,
 ): Promise<{ txHash: string; recipientIndex: number; changeIndex: number }> {
   const { hash, receipt } = await relay(() =>
-    relayWrite({
-      address: poolAddress,
-      abi: maweePoolAbi,
-      functionName: "transfer",
-      args: [
-        input.root,
-        input.nullifier,
-        input.proof,
-        input.recipientNote,
-        input.changeNote,
-      ],
-    }),
+    relayWrite(
+      {
+        address: poolAddress,
+        abi: maweePoolAbi,
+        functionName: "transfer",
+        args: [
+          input.root,
+          input.nullifier,
+          input.proof,
+          input.recipientNote,
+          input.changeNote,
+        ],
+      },
+      sponsorship(ctx, "legacy-transfer", { ...input, pool: poolAddress }),
+    ),
   );
   const deposits = parseEventLogs({
     abi: maweePoolAbi,
@@ -193,6 +245,8 @@ export async function relayTransfer(
 export async function relayMintTestUsdc(
   privyUserId: string,
   poolScope?: string,
+  actionId?: string,
+  ctx: Context = guest,
 ): Promise<{ txHash: string }> {
   const pool = poolScope ? findPool(poolScope) : activePool();
   if (!pool?.mintable) {
@@ -211,12 +265,20 @@ export async function relayMintTestUsdc(
     throw new RelayRejectedError("No wallet is linked to this account.");
   }
   const { hash } = await relay(() =>
-    relayWrite({
-      address: pool.token,
-      abi: erc20Abi,
-      functionName: "mint",
-      args: [to, TEST_USDC_MINT_UNITS],
-    }),
+    relayWrite(
+      {
+        address: pool.token,
+        abi: erc20Abi,
+        functionName: "mint",
+        args: [to, TEST_USDC_MINT_UNITS],
+      },
+      sponsorship(ctx, "faucet", {
+        id: actionId,
+        pool: pool.scope,
+        recipient: to,
+        amount: TEST_USDC_MINT_UNITS,
+      }),
+    ),
   );
   return { txHash: hash };
 }

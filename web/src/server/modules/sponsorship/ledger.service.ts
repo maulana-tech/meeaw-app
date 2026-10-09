@@ -15,6 +15,7 @@ import {
   type SponsorClock,
   SponsorLedgerRepository,
 } from "./ledger.repository";
+import { ledgerKey } from "./ledgerModel";
 
 export type { SponsorClock };
 export class SponsorLedger {
@@ -38,6 +39,15 @@ export class SponsorLedger {
       kind: "admit",
       intent,
     })) as ActionTicket;
+  }
+  async readAction(chainId: number, actionId: string) {
+    const doc = await this.repo.snapshot(chainId);
+    return (
+      doc.actions[ledgerKey(actionId)] ??
+      (await this.repo.archives.findOne({ _id: `${chainId}:${actionId}` }))
+        ?.action ??
+      null
+    );
   }
   async allocate(
     ticket: ActionTicket,

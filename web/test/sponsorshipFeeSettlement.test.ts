@@ -31,3 +31,13 @@ it("keeps fee liability when a receipt points at a noncanonical block", async ()
   await expect(f.sender.reconcile(f.intent)).rejects.toThrow();
   expect(await f.a.status(f.principal)).toMatchObject({ used: 0, reserved: 1 });
 });
+it("replays a terminal send after its action has been archived", async () => {
+  f = await createSponsorSenderFixture();
+  const signed = await f.sender.prepare(f.intent);
+  await f.sender.broadcast(f.intent);
+  f.setReceipt(signed.txHash);
+  await f.sender.reconcile(f.intent);
+  await f.a.closeAction(f.action);
+  expect((await f.sender.reconcile(f.intent)).state).toBe("confirmed");
+  expect(await f.a.status(f.principal)).toMatchObject({ used: 1, reserved: 0 });
+});

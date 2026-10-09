@@ -166,7 +166,12 @@ export function makeDurableSender(
     )
       return { state: "unknown", txHash: send.txHash, receipt: null };
     const state = receipt.status === "success" ? "confirmed" : "reverted";
-    if (budget && send.budgetChild) {
+    if (
+      budget &&
+      send.budgetChild &&
+      send.phase !== "confirmed" &&
+      send.phase !== "reverted"
+    ) {
       if (!port.block) throw new SponsorshipError("rpc");
       await budget.ledger.settleChild(
         send.budgetChild,

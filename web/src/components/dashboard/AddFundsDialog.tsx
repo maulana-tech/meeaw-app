@@ -4,6 +4,10 @@ import { Check, Copy, ExternalLink, Loader } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  completeFaucet,
+  pendingFaucetId,
+} from "../../features/sponsorship/pendingFaucet";
+import {
   type AccountStatus,
   accountStatus,
   gasFaucetUrl,
@@ -73,7 +77,12 @@ export function AddFundsDialog({
   const mint = async () => {
     setBusy("mint");
     try {
-      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS, pool);
+      const signer = await getSigner();
+      if (signer.address.toLowerCase() !== address.toLowerCase())
+        throw new Error("Wallet changed during the test token request.");
+      const attempt = pendingFaucetId(localStorage, address, pool.scope);
+      await mintTestUsdc(signer, TEST_MINT_UNITS, pool, attempt);
+      completeFaucet(localStorage, address, pool.scope, attempt);
       toast.success(`Minted ${fromBaseUnits(TEST_MINT_UNITS)} test ${asset}`);
       await refresh();
     } catch (error) {
@@ -131,9 +140,7 @@ export function AddFundsDialog({
 
         <div className={`${linenInsetClass} grid gap-3 p-4`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-foreground/60">
-              Your Meaw wallet
-            </span>
+            <span className="text-sm text-foreground/60">Your Meaw wallet</span>
             <button
               type="button"
               onClick={copy}
@@ -165,9 +172,7 @@ export function AddFundsDialog({
             ) : (
               <div>
                 <span className="block text-foreground/60">Network fees</span>
-                <span className="text-sm text-foreground">
-                  Covered by Meaw
-                </span>
+                <span className="text-sm text-foreground">Covered by Meaw</span>
               </div>
             )}
           </div>

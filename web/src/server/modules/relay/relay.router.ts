@@ -7,6 +7,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "../../trpc";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import {
   RelayerUnavailableError,
   RelayRateLimitedError,
@@ -39,6 +40,12 @@ function limit(key: string, max: number, windowMs: number): void {
 }
 
 function mapError(error: unknown): never {
+  if (isSponsorshipError(error))
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
   if (error instanceof RelayRateLimitedError) {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: error.message });
   }
@@ -69,7 +76,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:register:${ctx.privyUserId}`, 5, 10 * MINUTE);
-        return await relayRegister(ctx.privyUserId, input);
+        return await relayRegister(ctx.privyUserId, input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -81,7 +88,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:deposit:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
-        return await relayDeposit(input);
+        return await relayDeposit(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -93,7 +100,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:withdraw:${ctx.ip ?? "unknown"}`, 30, 10 * MINUTE);
-        return await relayWithdraw(input);
+        return await relayWithdraw(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -105,7 +112,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:transfer:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
-        return await relayTransfer(input);
+        return await relayTransfer(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -117,7 +124,12 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:mint:${ctx.privyUserId}`, 3, 60 * MINUTE);
-        return await relayMintTestUsdc(ctx.privyUserId, input?.pool);
+        return await relayMintTestUsdc(
+          ctx.privyUserId,
+          input.pool,
+          input.id,
+          ctx,
+        );
       } catch (error) {
         mapError(error);
       }

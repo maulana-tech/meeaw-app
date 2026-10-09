@@ -83,6 +83,7 @@ export const depositInput = z.object({
 });
 
 export const withdrawInput = z.object({
+  batchId: z.string().uuid().optional(),
   // The note's pool; legacy pools stay withdrawable.
   pool: poolScope,
   recipient: address,
@@ -116,4 +117,7 @@ export type DepositInput = z.infer<typeof depositInput>;
 export type WithdrawInput = z.infer<typeof withdrawInput>;
 export type TransferInput = z.infer<typeof transferInput>;
 
-export const mintTestUsdcInput = z.object({ pool: poolScope }).optional();
+export const mintTestUsdcInput = z.object({
+  pool: poolScope,
+  id: z.string().uuid(),
+});

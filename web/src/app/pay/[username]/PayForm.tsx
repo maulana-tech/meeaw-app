@@ -13,6 +13,10 @@ import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
 import { parseRequestAmount } from "../../../features/requests/validation";
+import {
+  completeFaucet,
+  pendingFaucetId,
+} from "../../../features/sponsorship/pendingFaucet";
 import { ASSETS } from "../../../lib/assets";
 import {
   chain,
@@ -112,7 +116,18 @@ function PayFormContent({
     setStatus(null);
     setMinting(true);
     try {
-      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS, pool);
+      if (!address) throw new Error("Connect your wallet first.");
+      const payer = address,
+        at = identity,
+        signer = await getSigner();
+      if (
+        current.current !== at ||
+        signer.address.toLowerCase() !== payer.toLowerCase()
+      )
+        throw new Error("Wallet changed during the test token request.");
+      const attempt = pendingFaucetId(localStorage, address, pool.scope);
+      await mintTestUsdc(signer, TEST_MINT_UNITS, pool, attempt);
+      completeFaucet(localStorage, address, pool.scope, attempt);
       await refreshBalance();
       setStatus({
         kind: "ok",

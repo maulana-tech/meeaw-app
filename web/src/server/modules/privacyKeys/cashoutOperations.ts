@@ -7,6 +7,7 @@ import { PrivacyKeyConflictError } from "./privacyKeys.repository";
 import type { AccountSpendGate } from "./spendGate";
 
 type CashoutInput = {
+  sponsorBatchId?: string;
   operationId: string;
   fundingGeneration: number;
   keyRevision: number;
@@ -14,6 +15,7 @@ type CashoutInput = {
   nullifier: Hex;
 };
 type Cashout = {
+  sponsorBatchId?: string;
   _id: string;
   operationId: string;
   owner: Hex;
@@ -46,6 +48,7 @@ export class CashoutOperations {
       {
         $setOnInsert: {
           operationId: input.operationId,
+          sponsorBatchId: input.sponsorBatchId,
           owner,
           registry: this.gate.registry,
           pool: input.pool,
@@ -59,6 +62,14 @@ export class CashoutOperations {
       { upsert: true },
     );
     let record = await this.records.findOne({ _id: id, owner });
+    if (
+      record?.sponsorBatchId &&
+      record.sponsorBatchId !== input.sponsorBatchId &&
+      record.phase !== "cancelled"
+    )
+      throw new PrivacyKeyConflictError(
+        "Resume this note in its original cash-out batch.",
+      );
     if (!record || record.phase === "confirmed")
       throw new PrivacyKeyConflictError(
         "This cash-out is already confirmed. Refresh your balance.",
@@ -70,6 +81,7 @@ export class CashoutOperations {
         {
           $set: {
             operationId: input.operationId,
+            sponsorBatchId: input.sponsorBatchId,
             phase: "prepared",
             released: false,
             keyRevision: input.keyRevision,
