@@ -14,6 +14,7 @@ import { fromBaseUnits } from "../../lib/crypto";
 import type { MyNote } from "../../lib/notes";
 import { findPool } from "../../lib/pools";
 import { cn } from "../../lib/utils";
+import { MeawMascot } from "../MeawMascot";
 import { Card } from "../ui/card";
 import { DiscloseDialog } from "./DiscloseDialog";
 import { dashButtonSecondary, dashFocus, dashIconButton } from "./styles";
@@ -171,6 +172,7 @@ export function ActivityFeed({
 
           {!loading && filtered.length === 0 && (
             <li className="py-10">
+              <MeawMascot size={56} className="mb-4" />
               <p className="max-w-sm text-sm leading-6 text-(--dash-ash)">
                 {tab === "Cashed out"
                   ? "Nothing cashed out yet."

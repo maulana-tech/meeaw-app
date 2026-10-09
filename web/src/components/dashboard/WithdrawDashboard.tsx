@@ -34,6 +34,7 @@ import {
   withdrawAll,
   withdrawNote,
 } from "../../lib/withdraw";
+import { MeawMascot } from "../MeawMascot";
 import { PrivacyPoolStat } from "../PrivacyPoolStat";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -868,6 +869,7 @@ function EmptyState() {
     <DashboardNotice
       label="Nothing yet"
       title="No payments to cash out"
+      art={<MeawMascot size={64} />}
       action={
         <Link href={LINKS_PATH} className={dashButtonSecondary}>
           View payment links

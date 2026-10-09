@@ -5,6 +5,7 @@ import { Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { MeawMascot } from "../../../components/MeawMascot";
 import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -310,6 +311,19 @@ function PayFormContent({
           variant="error"
           toastId="payment-amount-error"
         />
+        {status?.kind === "ok" && status.url ? (
+          <div className="flex items-center gap-3 pt-2">
+            <MeawMascot
+              key={status.url}
+              mood="success"
+              size={56}
+              tone="white"
+            />
+            <p className="text-sm text-brand-linen/80">
+              Paid. Meaw tucked it away privately for @{username}.
+            </p>
+          </div>
+        ) : null}
         <ToastFeedback
           message={status?.msg}
           content={
