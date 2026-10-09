@@ -912,3 +912,13 @@ body:has(.landing-paper) {
   background: rgb(250 247 240);
 }
 
+/* Hairline figures on the landing paper. */
+.landing-paper .hairline-figure {
+  --hairline-plate: rgb(250 247 240);
+  --hairline-hi: rgb(21 19 16);
+  --hairline-edge: rgb(21 19 16 / 0.45);
+  --hairline-mid: rgb(21 19 16 / 0.28);
+  --hairline-lo: rgb(21 19 16 / 0.12);
+  --hairline-stroke: 1;
+}
+

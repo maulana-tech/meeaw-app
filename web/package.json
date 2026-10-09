@@ -28,6 +28,7 @@
     "@category-labs/mera": "0.2.0",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "^5.4.0",
+    "@lucasmarkes/hairline": "0.5.0",
     "@noble/ciphers": "^2.2.0",
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
