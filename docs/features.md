@@ -24,7 +24,7 @@ Every link comes with a QR code for in-person or mobile payments.
 
 Use **Send** on your private balance card to pay another registered `@username`
 without waiting for a payment request. Enter an amount in the selected eligible asset and an optional private
-note, review the recipient, then confirm. Mawee combines fragmented active-pool
+note, review the recipient, then confirm. Meaw combines fragmented active-pool
 balance automatically. The note is encrypted for both participants.
 
 A pending send can be reopened from the dashboard or History after closing its
@@ -64,6 +64,6 @@ payments use a new key while existing balances remain accessible with the same r
 
 {% hint style="info" %}
 **Receiving needs nothing up front.** You don't need to hold any USDC or do any
-setup to *receive* a payment — just your Mawee account. You only interact with the
+setup to *receive* a payment — just your Meaw account. You only interact with the
 chain when you decide to cash out.
 {% endhint %}

@@ -1,9 +1,9 @@
 # Monad Metropolis Hackathon
 
-Mawee's submission notes: which track we're in, which bounties we claim, and
+Meaw's submission notes: which track we're in, which bounties we claim, and
 where each deliverable stands. This page is the checklist we work from —
 the product docs live in [Quickstart](quickstart.md) and
-[How Mawee Works](how-it-works.md).
+[How Meaw Works](how-it-works.md).
 
 ## Track: Consumer Products & Payments
 
@@ -14,7 +14,7 @@ onchain rails are leveraged as an advantage to design?"* It belongs to products
 whose primary user is a consumer — someone who may not identify as a crypto
 user — and whose core value is a financial experience rather than trading.
 
-**Why Mawee fits.** The person we serve is a freelancer or small business that
+**Why Meaw fits.** The person we serve is a freelancer or small business that
 invoices in USDC and does not want their income history public. The flow we
 design around is not "use a shielded pool" — it is *share a link, get paid,
 money lands in your private balance, cash out whenever*. The blockchain part

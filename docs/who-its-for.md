@@ -1,12 +1,12 @@
-# Who Mawee Is For
+# Who Meaw Is For
 
-Mawee is built for people who get paid in crypto and would rather not turn their
+Meaw is built for people who get paid in crypto and would rather not turn their
 income into public entertainment.
 
 ## Freelancers & creators
 
 You send invoices. You'd rather each client not see what every other client pays
-you. Share one Mawee link (or a per-project link with a fixed price), get paid,
+you. Share one Meaw link (or a per-project link with a fixed price), get paid,
 keep your rates between you and each client.
 
 ## Small businesses & shops
@@ -17,7 +17,7 @@ the world.
 
 ## DAOs, teams & contributors
 
-Paying contributors from a shared treasury? Mawee lets people receive funds
+Paying contributors from a shared treasury? Meaw lets people receive funds
 privately instead of exposing every contributor's wallet and pay.
 
 ## Anyone who values privacy
@@ -27,7 +27,7 @@ every payment you've ever received. That's reason enough.
 
 ## The common thread
 
-If any of these sound like you, Mawee fits:
+If any of these sound like you, Meaw fits:
 
 * "I want to accept crypto but not broadcast my finances."
 * "I'd like a simple link or QR code, not a wallet-address-copy-paste dance."
@@ -35,9 +35,9 @@ If any of these sound like you, Mawee fits:
 * "I don't want to babysit gas fees and network tokens."
 
 {% hint style="info" %}
-Mawee handles the network fees for you, so you don't need to hold any special
+Meaw handles the network fees for you, so you don't need to hold any special
 "gas" token just to get paid or cash out. More on that in
-[How Mawee Works](how-it-works.md).
+[How Meaw Works](how-it-works.md).
 {% endhint %}
 
 Ready? → [Quickstart](quickstart.md)

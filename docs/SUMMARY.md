@@ -1,12 +1,12 @@
 # Table of contents
 
-* [Welcome to Mawee](README.md)
+* [Welcome to Meaw](README.md)
 
-## Is Mawee for You?
+## Is Meaw for You?
 
 * [Why Privacy Matters](why-privacy-matters.md)
-* [Who Mawee Is For](who-its-for.md)
-* [Mawee's Practical Privacy](practical-privacy.md)
+* [Who Meaw Is For](who-its-for.md)
+* [Meaw's Practical Privacy](practical-privacy.md)
 
 ## New to Crypto? Start Here
 
@@ -20,7 +20,7 @@
 
 ## Under the Hood
 
-* [How Mawee Works](how-it-works.md)
+* [How Meaw Works](how-it-works.md)
 * [Concepts](concepts.md)
 * [Security & Recovery](security.md)
 

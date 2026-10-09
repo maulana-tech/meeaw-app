@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Mawee is a private USDC payments app on Monad (testnet). Payers deposit into a shielded pool via payment links; recipients scan, decrypt and spend notes with zero-knowledge proofs generated in the browser. See `README.md` for the product/privacy model and `docs/` (GitBook) for deeper reference — `docs/local-setup.md` covers first-time setup.
+Meaw is a private USDC payments app on Monad (testnet). Payers deposit into a shielded pool via payment links; recipients scan, decrypt and spend notes with zero-knowledge proofs generated in the browser. See `README.md` for the product/privacy model and `docs/` (GitBook) for deeper reference — `docs/local-setup.md` covers first-time setup.
 
 ## Commands
 
