@@ -9,6 +9,8 @@ import {
 import { useEffect, useState } from "react";
 import type { RequestRow } from "../../features/requests/hooks/useRequests";
 import type { PaymentOperation } from "../../features/requests/types";
+import { SponsorshipNotice } from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { ASSETS } from "../../lib/assets";
 import { fromBaseUnits } from "../../lib/crypto";
 import { findPool } from "../../lib/pools";
@@ -47,6 +49,7 @@ export function PayRequestDialog({
   statusError?: string | null;
 }) {
   const { address, accountUnlocked, promptUnlock } = useWallet();
+  const sponsorship = useSponsorship({ enabled: open });
   const record = request?.record ?? null,
     amount = request?.amount ?? null;
   const pool = record ? findPool(record.pool) : null;
@@ -68,6 +71,7 @@ export function PayRequestDialog({
   const confirmed = status === "paid" || operation?.phase === "confirmed";
   const waiting =
     !confirmed &&
+    !operation?.sponsorshipPause &&
     (operation?.phase === "submitting" ||
       operation?.phase === "submitted" ||
       operation?.phase === "needsReconciliation" ||
@@ -80,27 +84,33 @@ export function PayRequestDialog({
     return () => clearTimeout(timer);
   }, [record?.id, waiting]);
   const progress = operation
-    ? operation.phase === "preparing"
+    ? operation.sponsorshipPause
       ? {
-          title: "Preparing payment",
-          detail: `${operation.completedMerges} balance merge${operation.completedMerges === 1 ? "" : "s"} complete. Keep this window open.`,
+          title: "Gasless payment paused",
+          detail:
+            "Your progress is saved. Resume this payment when gasless returns.",
         }
-      : operation.phase === "confirmed"
-        ? { title: "Payment confirmed", detail: "Settled on Monad." }
-        : operation.phase === "failed"
-          ? {
-              title: "This attempt failed",
-              detail: "Your funds remain available. You can try again.",
-            }
-          : operation.txHash
+      : operation.phase === "preparing"
+        ? {
+            title: "Preparing payment",
+            detail: `${operation.completedMerges} balance merge${operation.completedMerges === 1 ? "" : "s"} complete. Keep this window open.`,
+          }
+        : operation.phase === "confirmed"
+          ? { title: "Payment confirmed", detail: "Settled on Monad." }
+          : operation.phase === "failed"
             ? {
-                title: "Payment sent",
-                detail: "Waiting for confirmation on Monad.",
+                title: "This attempt failed",
+                detail: "Your funds remain available. You can try again.",
               }
-            : {
-                title: "Submitting payment",
-                detail: "Checking the submission.",
-              }
+            : operation.txHash
+              ? {
+                  title: "Payment sent",
+                  detail: "Waiting for confirmation on Monad.",
+                }
+              : {
+                  title: "Submitting payment",
+                  detail: "Checking the submission.",
+                }
     : record?.operationId
       ? {
           title: "Checking your earlier payment",
@@ -135,6 +145,17 @@ export function PayRequestDialog({
         </DialogHeader>
         {request && record && amount !== null ? (
           <div className="grid gap-4">
+            {!confirmed && !waiting && (
+              <SponsorshipNotice
+                status={sponsorship.status}
+                loading={sponsorship.loading}
+                pause={operation?.sponsorshipPause}
+                captured={Boolean(operation?.sponsorshipAction)}
+                onRefresh={() => {
+                  void sponsorship.refresh();
+                }}
+              />
+            )}
             <div className="py-2 text-center">
               <p className="text-sm text-muted-foreground">
                 Requested by @{record.requester.username}
@@ -248,15 +269,20 @@ export function PayRequestDialog({
             ) : null}
             {accountUnlocked &&
             record.status === "pending" &&
-            (!record.operationId || operation?.phase === "preparing") &&
-            operation?.phase !== "submitted" &&
-            operation?.phase !== "needsReconciliation" &&
-            operation?.phase !== "submitting" &&
+            (!record.operationId ||
+              operation?.phase === "preparing" ||
+              operation?.sponsorshipPause) &&
+            (operation?.sponsorshipPause ||
+              (operation?.phase !== "submitted" &&
+                operation?.phase !== "needsReconciliation" &&
+                operation?.phase !== "submitting")) &&
             operation?.phase !== "confirmed" ? (
               <Button
                 className="min-h-11"
                 disabled={
                   working ||
+                  (!record.operationId &&
+                    (sponsorship.loading || !sponsorship.status?.available)) ||
                   !balanceReady ||
                   balance < amount ||
                   notes.error !== null
@@ -266,9 +292,11 @@ export function PayRequestDialog({
                 {working || notes.refreshing ? (
                   <Loader className="size-4 animate-spin" aria-hidden="true" />
                 ) : null}
-                {operation?.completedMerges
-                  ? "Continue payment"
-                  : `Pay ${fromBaseUnits(amount)} ${asset}`}
+                {operation?.sponsorshipPause
+                  ? "Resume payment"
+                  : operation?.completedMerges
+                    ? "Continue payment"
+                    : `Pay ${fromBaseUnits(amount)} ${asset}`}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             ) : null}

@@ -16,6 +16,7 @@ import { chain, rpcUrl } from "../../lib/chain";
 import type { ordinaryBusinessIdentity } from "../modules/sponsorship/ordinaryIdentity";
 import { type RelayIntent, runtimeSender } from "./durableRelayer";
 import { RelayConflictError } from "./relayJournal";
+import { RelayRevertedError } from "./relayOutcome.errors";
 
 export type OrdinarySponsor = {
   kind: ActionKind;
@@ -58,16 +59,38 @@ export function relayWrite<
       transport: http(env.RELAYER_RPC_URL ?? rpcUrl),
     });
     const { sender, journal, budget } = await runtimeSender();
-    const operationKey = `ordinary:${sponsor.identity.actionId}${sponsor.closeParent === false ? `:${sponsor.identity.childId}` : ""}`;
-    const prior = await journal.read(
+    let operationKey = `ordinary:${sponsor.identity.actionId}${sponsor.closeParent === false ? `:${sponsor.identity.childId}` : ""}`;
+    let prior = await journal.read(
       `${chain.id}:${account.address.toLowerCase()}`,
       operationKey,
     );
+    if (
+      !prior &&
+      (sponsor.kind === "withdraw" || sponsor.kind === "legacy-transfer")
+    ) {
+      const sibling = await budget.ledger.findOrdinaryAction(
+        chain.id,
+        sponsor.kind,
+        sponsor.identity.businessDigest,
+      );
+      if (sibling) {
+        if (
+          sibling.intent.principal.kind !== sponsor.principal.kind ||
+          sibling.intent.principal.key !== sponsor.principal.key
+        )
+          throw new RelayConflictError();
+        operationKey = `ordinary:${sibling.intent.actionId}`;
+        prior = await journal.read(
+          `${chain.id}:${account.address.toLowerCase()}`,
+          operationKey,
+        );
+      }
+    }
     let intent: RelayIntent;
     if (prior?.serializedTransaction && prior.intent?.sponsorship) {
       const action = await budget.ledger.readAction(
         chain.id,
-        sponsor.identity.actionId,
+        prior.intent.sponsorship.action.actionId,
       );
       if (
         !action ||
@@ -91,19 +114,27 @@ export function relayWrite<
         businessDigest: sponsor.identity.businessDigest,
         maximumChildren: sponsor.maximumChildren ?? 1,
       });
-      intent = {
+      operationKey = `ordinary:${action.actionId}${sponsor.closeParent === false ? `:${sponsor.identity.childId}` : ""}`;
+      const accepted = await journal.read(
+        `${chain.id}:${account.address.toLowerCase()}`,
         operationKey,
-        chainId: chain.id,
-        wallet: account.address,
-        to: request.address,
-        data: encodeFunctionData({
-          abi: request.abi,
-          functionName: request.functionName,
-          args: request.args,
-        } as Parameters<typeof encodeFunctionData>[0]),
-        confirmations: 1,
-        sponsorship: { action, childId: sponsor.identity.childId },
-      };
+      );
+      if (accepted?.serializedTransaction && accepted.intent)
+        intent = accepted.intent;
+      else
+        intent = {
+          operationKey,
+          chainId: chain.id,
+          wallet: account.address,
+          to: request.address,
+          data: encodeFunctionData({
+            abi: request.abi,
+            functionName: request.functionName,
+            args: request.args,
+          } as Parameters<typeof encodeFunctionData>[0]),
+          confirmations: 1,
+          sponsorship: { action, childId: sponsor.identity.childId },
+        };
     }
     const prepared = await sender.prepare(intent);
     await sender.broadcast(intent);
@@ -120,7 +151,7 @@ export function relayWrite<
     )
       await budget.ledger.closeAction(intent.sponsorship.action);
     if (result.state === "reverted")
-      throw new Error("Relayed transaction reverted.");
+      throw new RelayRevertedError(result.txHash);
     if (result.state !== "confirmed")
       throw new Error("Transaction confirmation is still being checked.");
     return { hash: prepared.txHash, receipt };

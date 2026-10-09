@@ -113,6 +113,39 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 describe("public relay with authoritative sponsorship ledger", () => {
+  it("ends a canonical failed click but admits a fresh explicit cash-out action", async () => {
+    const caller = relayRouter.createCaller(guest),
+      id = "11111111-1111-4111-8111-111111111111";
+    state.wait = async (hash) => {
+      fixture().setReceipt(hash, "reverted");
+      return {
+        ...(await fixture().port.receipt(hash)),
+        logs: [],
+      } as TransactionReceipt;
+    };
+    await expect(caller.withdraw({ ...withdrawal, id })).rejects.toMatchObject({
+      cause: { name: "RelayRevertedError" },
+    });
+    await expect(caller.withdraw({ ...withdrawal, id })).rejects.toMatchObject({
+      cause: { name: "RelayRevertedError" },
+    });
+    expect(fixture().port.sign).toHaveBeenCalledTimes(1);
+    state.wait = async (hash) => {
+      fixture().setReceipt(hash);
+      return {
+        ...(await fixture().port.receipt(hash)),
+        logs: [],
+      } as TransactionReceipt;
+    };
+    await caller.withdraw({
+      ...withdrawal,
+      id: "22222222-2222-4222-8222-222222222222",
+    });
+    expect(fixture().port.sign).toHaveBeenCalledTimes(2);
+    expect(
+      await fixture().a.status({ kind: "anonymous", key: "shared" }),
+    ).toMatchObject({ used: 2, reserved: 0 });
+  });
   it("keeps anonymous withdrawals inside the shared daily quota across destinations", async () => {
     fixture().policy.anonymousLimit = 1;
     const caller = relayRouter.createCaller(guest);

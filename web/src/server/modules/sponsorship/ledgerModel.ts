@@ -424,7 +424,28 @@ export function reduceSponsorCommand(
     validIntent(i, policy, s);
     const key = ledgerKey(i.actionId),
       prior = s.actions[key];
-    if (prior) {
+    const sibling =
+      i.kind === "withdraw" || i.kind === "legacy-transfer"
+        ? Object.values(s.actions).find(
+            (a) =>
+              !a.legacy &&
+              live(a) &&
+              a.intent.kind === i.kind &&
+              a.intent.businessDigest === i.businessDigest,
+          )
+        : undefined;
+    if (!prior && sibling) {
+      if (
+        sibling.intent.principal.kind !== i.principal.kind ||
+        sibling.intent.principal.key !== i.principal.key
+      )
+        error("budget");
+      result = {
+        chainId: s.chainId,
+        actionId: sibling.intent.actionId,
+        fence: sibling.fence,
+      };
+    } else if (prior) {
       if (!sameActionIntent(prior.intent, i) || prior.phase === "cancelled")
         error("budget");
       result = { chainId: s.chainId, actionId: i.actionId, fence: prior.fence };

@@ -1,14 +1,23 @@
+import { sponsorshipUiFixture } from "./helpers/sponsorshipUiFixture";
+
+vi.mock("../src/features/sponsorship/useSponsorship", () => ({
+  useSponsorship: sponsorshipUiFixture,
+}));
+
 // @vitest-environment happy-dom
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PaymentLink } from "../src/features/paymentLinks/types";
+import type { MaweeAccount } from "../src/lib/chain";
+import type { PoolDescriptor } from "../src/lib/pools";
 import { assetPool } from "./helpers/multiAssetFixtures";
 
 const mock = vi.hoisted(() => ({
   pay: vi.fn(),
   signer: vi.fn(),
   balance: vi.fn(),
-  pools: [] as any[],
+  pools: [] as PoolDescriptor[],
 }));
 vi.mock("../src/lib/pools", () => ({
   activePools: () => mock.pools,
@@ -40,14 +49,19 @@ vi.mock("../src/components/ui/toast-feedback", () => ({
 
 import { PayForm } from "../src/app/pay/[username]/PayForm";
 
-const account = { note_pubkey: "0x01", view_pubkey: "0x02" } as any;
+const account: MaweeAccount = {
+  owner: "0x1111111111111111111111111111111111111111",
+  note_pubkey: new Uint8Array(32),
+  view_pubkey: new Uint8Array(32),
+  created: 0n,
+};
 const link = {
   id: "l",
   owner: "alice",
   asset: "AUSD",
   tokenDecimals: 6,
   amount: null,
-} as any;
+} as unknown as PaymentLink;
 describe("managed checkout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,10 +91,16 @@ describe("managed checkout", () => {
   });
   it("discards a balance result from the previously selected token", async () => {
     let finishOld!: (balance: bigint) => void;
-    mock.balance.mockImplementation((_address, pool) => pool.asset === "USDC" ? new Promise<bigint>(resolve => { finishOld = resolve; }) : Promise.resolve(7_000_000n));
+    mock.balance.mockImplementation((_address, pool) =>
+      pool.asset === "USDC"
+        ? new Promise<bigint>((resolve) => {
+            finishOld = resolve;
+          })
+        : Promise.resolve(7_000_000n),
+    );
     const user = userEvent.setup();
     render(<PayForm account={account} username="alice" />);
-    await user.click(screen.getByRole("button", {name:"AUSD"}));
+    await user.click(screen.getByRole("button", { name: "AUSD" }));
     await screen.findByText(/Balance: 7 AUSD/);
     await act(async () => finishOld(99_000_000n));
     expect(screen.getByText(/Balance: 7 AUSD/)).toBeInTheDocument();
@@ -88,7 +108,10 @@ describe("managed checkout", () => {
   });
   it("rejects rotation while preparing the signer", async () => {
     mock.signer.mockImplementation(async () => {
-      mock.pools = [assetPool("USDC"), {...assetPool("USDT0"),asset:"AUSD"}];
+      mock.pools = [
+        assetPool("USDC"),
+        { ...assetPool("USDT0"), asset: "AUSD" },
+      ];
       return { address: "0x1234567890123456789012345678901234567890" };
     });
     const user = userEvent.setup();

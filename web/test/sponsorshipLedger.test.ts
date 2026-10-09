@@ -3,6 +3,19 @@ import type { FeeEvidence, FrozenTx } from "../src/features/sponsorship/types";
 import { createSponsorFixture } from "./helpers/sponsorshipFixtures";
 
 let f: Awaited<ReturnType<typeof createSponsorFixture>> | undefined;
+it("uses one live ordinary action when duplicate proof submissions carry different click markers", async () => {
+  f = await createSponsorFixture();
+  const original = {
+    ...f.intent("proof"),
+    kind: "withdraw" as const,
+    maximumChildren: 1,
+  };
+  const first = await f.a.admit(original);
+  expect(
+    await f.b.admit({ ...original, actionId: "withdraw:other-click" }),
+  ).toEqual(first);
+  expect(await f.a.status(f.principal)).toMatchObject({ reserved: 1 });
+});
 afterEach(async () => {
   await f?.close();
   f = undefined;

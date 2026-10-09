@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { usdcMintable } from "../../../lib/chain";
 import { rateLimit } from "../../lib/rateLimit";
 import { relayerConfigured } from "../../lib/relayer";
+import { RelayRevertedError } from "../../lib/relayOutcome.errors";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -40,6 +41,12 @@ function limit(key: string, max: number, windowMs: number): void {
 }
 
 function mapError(error: unknown): never {
+  if (error instanceof RelayRevertedError)
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
   if (isSponsorshipError(error))
     throw new TRPCError({
       code: "PRECONDITION_FAILED",

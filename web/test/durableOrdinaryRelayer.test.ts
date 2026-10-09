@@ -12,6 +12,7 @@ vi.mock("../src/server/lib/durableRelayer", () => ({
     journal: { read: async () => state.replay },
     budget: {
       ledger: {
+        findOrdinaryAction: async () => null,
         readAction: async () => ({
           intent: {
             businessDigest: `0x${"11".repeat(32)}`,

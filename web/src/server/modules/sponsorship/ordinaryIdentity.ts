@@ -66,7 +66,7 @@ export function ordinaryBusinessIdentity(
     )
     .digest("hex");
   return {
-    actionId: `${kind}:${hash}`,
+    actionId: `${kind}:${hash}${(kind === "withdraw" || kind === "legacy-transfer") && typeof input.id === "string" ? `:${input.id}` : ""}`,
     businessDigest: `0x${hash}` as `0x${string}`,
     childId: "one",
   };

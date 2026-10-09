@@ -1,9 +1,10 @@
 import "server-only";
+import { createPublicClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { getServerEnv } from "../../../env.server";
-import { chain } from "../../../lib/chain";
+import { chain, rpcUrl } from "../../../lib/chain";
 import type { Context } from "../../context";
 import { getDb } from "../../db/mongo";
-import { relayerConfigured } from "../../lib/relayer";
 import { RelayConflictError } from "../../lib/relayJournal";
 import { SponsorLedger } from "./ledger.service";
 import { loadSponsorPolicy } from "./policy";
@@ -17,17 +18,43 @@ export async function sponsorshipLedger() {
   });
 }
 export async function sponsorshipStatus(ctx: Context) {
-  const status = await (await sponsorshipLedger()).status(
-    principalFromContext(ctx),
-  );
-  return relayerConfigured()
-    ? status
-    : {
-        ...status,
-        configured: false,
-        available: false,
-        reason: "configuration" as const,
-      };
+  const ledger = await sponsorshipLedger(),
+    status = await ledger.status(principalFromContext(ctx)),
+    env = getServerEnv();
+  if (!env.RELAYER_PRIVATE_KEY)
+    return {
+      ...status,
+      configured: false,
+      available: false,
+      reason: "configuration" as const,
+    };
+  if (!status.available) return status;
+  try {
+    const policy = loadSponsorPolicy(env);
+    if (!policy.ready)
+      return { ...status, available: false, reason: "configuration" as const };
+    const account = privateKeyToAccount(
+        env.RELAYER_PRIVATE_KEY as `0x${string}`,
+      ),
+      snapshot = await ledger.repo.snapshot(chain.id);
+    const held = Object.values(snapshot.actions)
+      .flatMap((a) => Object.values(a.children))
+      .filter(
+        (c) =>
+          c.tx.from.toLowerCase() === account.address.toLowerCase() &&
+          !["settled", "abandoned"].includes(c.phase),
+      )
+      .reduce((sum, c) => sum + BigInt(c.maximumWei), 0n);
+    const balance = await createPublicClient({
+      chain,
+      transport: http(env.RELAYER_RPC_URL ?? rpcUrl),
+    }).getBalance({ address: account.address });
+    return balance <= policy.policy.balanceFloorWei + held
+      ? { ...status, available: false, reason: "balance" as const }
+      : status;
+  } catch {
+    return { ...status, available: false, reason: "rpc" as const };
+  }
 }
 export async function withdrawBatches() {
   return new WithdrawBatches(await sponsorshipLedger(), chain.id);

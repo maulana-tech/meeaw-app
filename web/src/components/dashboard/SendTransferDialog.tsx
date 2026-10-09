@@ -1,5 +1,10 @@
 "use client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  SponsorshipNotice,
+  sponsorshipMessage,
+} from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { createSignedTransfer } from "../../features/transfers/transferCrypto";
 import type {
   TransferParticipant,
@@ -62,6 +67,7 @@ export function SendTransferDialog({
     [review, setReview] = useState<Review | null>(null),
     [error, setError] = useState<string | null>(null),
     [working, setWorking] = useState(false);
+  const sponsorship = useSponsorship({ enabled: open });
   const chosenPool = providedPool ?? requestPool(),
     asset = chosenPool ? ASSETS[chosenPool.asset ?? "USDC"].label : "USDC";
   const busy = useRef(false),
@@ -150,6 +156,12 @@ export function SendTransferDialog({
         pool = chosenPool;
       if (!account || !pool || at !== review.identity)
         throw new Error("Unlock this account and review the transfer again.");
+      const allowance = await sponsorship.refresh();
+      if (session.current !== at) return;
+      if (!allowance?.available)
+        throw new Error(
+          sponsorshipMessage(allowance?.reason ?? "rpc", allowance?.resetAt),
+        );
       const currentRecipient = await resolve(review.recipient.username);
       if (session.current !== at) return;
       if (
@@ -203,6 +215,15 @@ export function SendTransferDialog({
             Send {asset} from your private balance to another Meaw user.
           </DialogDescription>
         </DialogHeader>
+        {wallet.accountUnlocked && (
+          <SponsorshipNotice
+            status={sponsorship.status}
+            loading={sponsorship.loading}
+            onRefresh={() => {
+              void sponsorship.refresh();
+            }}
+          />
+        )}
         {!wallet.accountUnlocked ? (
           <div className="grid gap-4">
             <p>Unlock Meaw to send a private payment.</p>
@@ -248,7 +269,11 @@ export function SendTransferDialog({
               </Button>
               <Button
                 className="min-h-11 flex-1"
-                disabled={working}
+                disabled={
+                  working ||
+                  sponsorship.loading ||
+                  !sponsorship.status?.available
+                }
                 onClick={() => void confirm()}
               >
                 {working ? "Preparing transfer…" : "Confirm send"}

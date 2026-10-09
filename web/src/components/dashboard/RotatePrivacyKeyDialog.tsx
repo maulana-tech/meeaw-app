@@ -2,6 +2,8 @@
 import { useEffect, useId, useState } from "react";
 import type { RotationReview } from "../../features/privacyKeys/rotationController";
 import { usePrivacyKeyRotation } from "../../features/privacyKeys/usePrivacyKeyRotation";
+import { SponsorshipNotice } from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -48,6 +50,7 @@ export function RotatePrivacyKeyDialogView({
   rotation: ReturnType<typeof usePrivacyKeyRotation>;
 }) {
   const pinId = useId();
+  const sponsorship = useSponsorship({ enabled: open });
   const [pin, setPin] = useState(""),
     [review, setReview] = useState<RotationReview | null>(null);
   useEffect(() => {
@@ -86,6 +89,15 @@ export function RotatePrivacyKeyDialogView({
             stay accessible with the same recovery.
           </DialogDescription>
         </DialogHeader>
+        <SponsorshipNotice
+          status={sponsorship.status}
+          loading={sponsorship.loading}
+          pause={operation?.sponsorshipPause}
+          captured={Boolean(operation?.sponsorshipAction)}
+          onRefresh={() => {
+            void sponsorship.refresh();
+          }}
+        />
         <div className="space-y-4 text-sm leading-6">
           <p>No private funds are moved during rotation.</p>
           <p className="text-(--dash-ash)">

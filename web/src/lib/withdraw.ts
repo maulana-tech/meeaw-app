@@ -66,6 +66,7 @@ export async function withdrawNote(params: {
   note: MyNote;
   destination: string;
   sponsorBatchId?: string;
+  isCurrent?: () => boolean;
 }): Promise<WithdrawResult> {
   const { signer, acct, scan, note, destination } = params;
   if (!isValidDestination(destination)) {
@@ -78,6 +79,7 @@ export async function withdrawNote(params: {
     note,
     dest: getAddress(destination.trim()),
     sponsorBatchId: params.sponsorBatchId,
+    isCurrent: params.isCurrent,
   });
 }
 
@@ -87,6 +89,7 @@ export async function withdrawAll(params: {
   scan: ScanResult;
   notes: MyNote[];
   destination: string;
+  isCurrent?: () => boolean;
 }): Promise<BatchWithdrawResult> {
   const { signer, acct, scan, notes, destination } = params;
   if (!isValidDestination(destination)) {
@@ -125,6 +128,8 @@ export async function withdrawAll(params: {
       recipient: dest,
       nullifiers: pending.nullifiers,
     });
+    if (params.isCurrent && !params.isCurrent())
+      throw new Error("The private account changed during cash-out.");
     sponsorBatchId = pending.id;
   }
 
@@ -138,6 +143,7 @@ export async function withdrawAll(params: {
           note,
           dest,
           sponsorBatchId,
+          isCurrent: params.isCurrent,
         }),
       );
       total += note.amount;
@@ -168,8 +174,11 @@ async function directWithdraw(params: {
   note: MyNote;
   dest: string;
   sponsorBatchId?: string;
+  isCurrent?: () => boolean;
 }): Promise<WithdrawResult> {
   const { signer, scan, note, dest } = params;
+  if (params.isCurrent && !params.isCurrent())
+    throw new Error("The private account changed during cash-out.");
   const ring = getPrivacyKeyring();
   const acct = ring ? accountForNote(ring, note) : params.acct;
   // A note's Merkle path and nullifier are only meaningful in its own pool.
@@ -211,6 +220,8 @@ async function directWithdraw(params: {
   };
 
   const { proof, ms } = await proveWithdraw(input);
+  if (params.isCurrent && !params.isCurrent())
+    throw new Error("The private account changed during cash-out.");
   if (ring && getPrivacyKeyring() !== ring)
     throw new Error("Privacy key session changed during cash-out.");
   const operationId = crypto.randomUUID();
@@ -251,6 +262,7 @@ async function directWithdraw(params: {
     proof,
     pool,
     params.sponsorBatchId,
+    () => getPrivacyKeyring() === ring && (params.isCurrent?.() ?? true),
   );
   if (
     capture?.accountTicketId &&

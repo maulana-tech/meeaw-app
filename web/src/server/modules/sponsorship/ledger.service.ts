@@ -74,6 +74,18 @@ export class SponsorLedger {
       null
     );
   }
+  async findOrdinaryAction(chainId: number, kind: string, businessDigest: Hex) {
+    const doc = await this.repo.snapshot(chainId);
+    return (
+      Object.values(doc.actions).find(
+        (a) =>
+          !a.legacy &&
+          (a.phase === "active" || a.phase === "paused") &&
+          a.intent.kind === kind &&
+          a.intent.businessDigest === businessDigest,
+      ) ?? null
+    );
+  }
   async allocate(
     ticket: ActionTicket,
     childId: string,

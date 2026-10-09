@@ -12,6 +12,7 @@ import { USDC_DECIMALS } from "../../../lib/crypto";
 import { activePool, findPool } from "../../../lib/pools";
 import type { Context } from "../../context";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
+import { RelayRevertedError } from "../../lib/relayOutcome.errors";
 import { ordinaryBusinessIdentity } from "../sponsorship/ordinaryIdentity";
 import { principalFromContext } from "../sponsorship/principals";
 import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
@@ -75,12 +76,16 @@ async function relay<T>(send: () => Promise<T>): Promise<T> {
   try {
     return await send();
   } catch (error) {
-    if (isSponsorshipError(error)) throw error;
+    if (isSponsorshipError(error) || error instanceof RelayRevertedError)
+      throw error;
     const name = revertErrorName(error);
     if (name && REJECTIONS[name]) {
       throw new RelayRejectedError(REJECTIONS[name]);
     }
-    console.error("[relay] submission failed", error);
+    console.error(
+      "[relay] submission failed",
+      error instanceof Error ? error.name : typeof error,
+    );
     throw new Error("The transaction could not be submitted. Try again.");
   }
 }

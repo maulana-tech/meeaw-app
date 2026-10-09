@@ -1,12 +1,19 @@
+import { sponsorshipUiFixture } from "./helpers/sponsorshipUiFixture";
+
+vi.mock("../src/features/sponsorship/useSponsorship", () => ({
+  useSponsorship: sponsorshipUiFixture,
+}));
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SendTransferDialog } from "../src/components/dashboard/SendTransferDialog";
 import {
   testAccount,
   testParticipant,
   testSigner,
 } from "./helpers/requestFixtures";
+
 const state = vi.hoisted(() => ({
   resolve: vi.fn(),
   create: vi.fn(),
