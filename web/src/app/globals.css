@@ -721,7 +721,9 @@ body:has(.dashboard-app) {
   --dash-accent: var(--dash-fg);
   --dash-accent-ink: var(--dash-fg);
   --dash-radius: 0px;
-  --dash-radius-sm: 0px;
+  /* Panels stay square; controls and their hover fills keep a small radius
+     so they match the rounded fields beside them. */
+  --dash-radius-sm: 6px;
   color-scheme: light;
 }
 
@@ -909,3 +911,4 @@ body:has(.landing-paper) {
   color-scheme: light;
   background: rgb(250 247 240);
 }
+
