@@ -93,3 +93,38 @@ it("resumes partial cash-out with the original parent and full membership", asyn
   expect(mocks.withdraw.mock.calls[2][7]).toBe(original.id);
   expect(mocks.finish).toHaveBeenCalledWith({ id: original.id });
 });
+it("does not retain a rejected oversized or budget-denied selection", async () => {
+  const oversized = Array.from({ length: 17 }, (_, i) => ({
+    ...notes[0],
+    leafIndex: i,
+  }));
+  await expect(
+    withdrawAll({
+      ...params,
+      notes: oversized,
+      scan: { ...params.scan, leaves: Array(17).fill(1n) },
+    }),
+  ).rejects.toThrow();
+  mocks.admit.mockRejectedValueOnce({ data: { sponsorshipReason: "budget" } });
+  await expect(withdrawAll(params)).rejects.toBeDefined();
+  const added = { ...notes[0], leafIndex: 2 };
+  await expect(
+    withdrawAll({
+      ...params,
+      notes: [...notes, added],
+      scan: { ...params.scan, leaves: [1n, 1n, 1n] },
+    }),
+  ).resolves.toMatchObject({ failed: [] });
+});
+it("closes a canonically reverted batch and retries the unspent note with a new parent", async () => {
+  mocks.withdraw.mockResolvedValueOnce("0xfirst").mockRejectedValueOnce({
+    data: {
+      relayOutcome: { state: "reverted", txHash: `0x${"a".repeat(64)}` },
+    },
+  });
+  expect((await withdrawAll(params)).failed).toHaveLength(1);
+  const first = mocks.admit.mock.calls[0][0];
+  expect(mocks.finish).toHaveBeenCalledWith({ id: first.id });
+  await withdrawAll({ ...params, notes: [notes[1]] });
+  expect(mocks.admit.mock.calls[1][0].id).not.toBe(first.id);
+});

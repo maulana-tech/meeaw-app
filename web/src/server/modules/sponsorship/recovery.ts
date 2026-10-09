@@ -55,7 +55,11 @@ export class SponsorshipRecovery {
         ),
       );
     }
-    return Object.values(action.children).some((c) => c.phase === "settled");
+    const children = Object.values(action.children);
+    return (
+      children.some((c) => c.phase === "settled") ||
+      children.every((c) => c.phase === "abandoned" || c.phase === "allocated")
+    );
   }
   async matches(child: LedgerChild, bytes: `0x${string}`) {
     const tx = await readFrozenSignedTx(bytes),
@@ -184,7 +188,7 @@ export class SponsorshipRecovery {
           latest &&
           latest.phase !== "closed" &&
           Object.values(latest.children).every((c) =>
-            ["settled", "abandoned"].includes(c.phase),
+            ["settled", "abandoned", "allocated"].includes(c.phase),
           ) &&
           (await this.businessTerminal(latest))
         )

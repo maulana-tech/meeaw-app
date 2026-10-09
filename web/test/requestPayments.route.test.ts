@@ -13,6 +13,12 @@ const deps = vi.hoisted(() => ({
 vi.mock("../src/env.server", () => ({
   getServerEnv: () => ({ CRON_SECRET: deps.secret }),
 }));
+vi.mock("../src/server/modules/sponsorship/reconcile", () => ({
+  reconcileSponsorship: vi.fn(async ({ limit }: { limit: number }) => {
+    expect(limit).toBe(20);
+    return { examined: 0 };
+  }),
+}));
 vi.mock("../src/server/lib/relayer", () => ({
   relayerConfigured: () => deps.configured,
 }));
@@ -91,6 +97,7 @@ describe("request payment reconciliation route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       status: "checked",
+      sponsorship: { examined: 0 },
       relays: deps.relays,
       requests: deps.requests,
       transfers: deps.transfers,
@@ -111,6 +118,7 @@ describe("request payment reconciliation route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       status: "unavailable",
+      sponsorship: { examined: 0 },
       rotations: deps.rotations,
     });
     expect(reconcilePendingPrivacyRotations).toHaveBeenCalledOnce();
@@ -132,6 +140,7 @@ describe("request payment reconciliation route", () => {
       });
     const first = GET(request()),
       second = GET(request());
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     finish(deps.relays);
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);

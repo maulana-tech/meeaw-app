@@ -1,5 +1,7 @@
 "use client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
+import { assertFundingSteps } from "../../features/sponsorship/fundingSteps";
 import {
   SponsorshipNotice,
   sponsorshipMessage,
@@ -15,7 +17,7 @@ import {
   validateTransferNote,
 } from "../../features/transfers/validation";
 import { ASSETS } from "../../lib/assets";
-import { getAccount, scanMyNotes } from "../../lib/notes";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../lib/notes";
 import { formatAssetUnits } from "../../lib/paymentAsset";
 import { type PoolDescriptor, requestPool } from "../../lib/pools";
 import { api } from "../../trpc/client";
@@ -172,6 +174,32 @@ export function SendTransferDialog({
       }
       const signer = await wallet.getSigner();
       if (session.current !== at || getAccount() !== account) return;
+      const ring = getPrivacyKeyring();
+      const funding = ring
+        ? await scanKeyringNotes(ring, pool, {
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : await scanMyNotes(account, {
+            pool,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
+      if (
+        session.current !== at ||
+        getAccount() !== account ||
+        getPrivacyKeyring() !== ring
+      )
+        return;
+      if (funding.health !== "healthy")
+        throw new Error("Refresh your balance before sending.");
+      assertFundingSteps(
+        funding.notes,
+        review.amount,
+        pool.scope,
+        16,
+        ring?.activeGeneration,
+      );
       const record = await createSignedTransfer({
         id: crypto.randomUUID(),
         pool,

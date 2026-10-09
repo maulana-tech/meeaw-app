@@ -94,6 +94,7 @@ export type RequestEnvelopeDoc = { ephemeralPk: Binary; ciphertext: Binary };
 
 /** Active payment reservation, embedded so reserve/cancel races are one atomic write. */
 export type RequestReservationDoc = {
+  sponsorshipStepLimit?: number;
   sponsorshipAction?: import("../../features/sponsorship/types").ActionTicket;
   sponsorshipPause?: import("../../features/sponsorship/types").UnavailableReason;
   fundingGeneration?: number;

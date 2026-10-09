@@ -9,6 +9,7 @@ import { trpc } from "../../../trpc/react";
 import { nextGenerationFundingAction } from "../../privacyKeys/generationFunding";
 import { accountForParticipant } from "../../privacyKeys/keyRing";
 import { getPrivacyKeyring } from "../../privacyKeys/session";
+import { assertFundingSteps } from "../../sponsorship/fundingSteps";
 import { readPaymentStatus, watchPaymentStatus } from "../paymentStatusMonitor";
 import {
   buildMergeSubmission,
@@ -208,6 +209,13 @@ export function useRequestPayment(request: PaymentRequest | null) {
           ? operation
           : null;
       if (!active && !live.operationId) {
+        assertFundingSteps(
+          scan.notes,
+          BigInt(payload.amount),
+          pool.scope,
+          16,
+          keyring?.activeGeneration,
+        );
         if (keyring)
           nextGenerationFundingAction(
             scan.notes,
@@ -260,6 +268,21 @@ export function useRequestPayment(request: PaymentRequest | null) {
         if (active.sponsorshipPause) break;
         if (active.phase === "confirmed" || active.phase === "failed") break;
         if (active.phase === "preparing") {
+          try {
+            assertFundingSteps(
+              scan.notes,
+              BigInt(payload.amount),
+              pool.scope,
+              (active.sponsorshipStepLimit ?? 16) - active.nextStep,
+              keyring ? (active.fundingGeneration ?? 0) : undefined,
+            );
+          } catch (error) {
+            if (current() && active.nextStep === 0 && active.sponsorshipAction)
+              await api.sponsorship.cancelUnsigned.mutate({
+                actionId: active.sponsorshipAction.actionId,
+              });
+            throw error;
+          }
           if (keyring) {
             const action = nextGenerationFundingAction(
               scan.notes,

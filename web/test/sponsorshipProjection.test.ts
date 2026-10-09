@@ -8,6 +8,25 @@ afterEach(async () => {
   await f?.close();
   f = undefined;
 });
+it("recovers an ordinary guest envelope abandoned before any child was signed", async () => {
+  f = await createSponsorSenderFixture();
+  const ticket = await f.a.admit({
+    ...(await f.a.readAction(143, f.action.actionId))?.intent,
+    actionId: "guest-crash",
+    kind: "deposit",
+    principal: { kind: "guest-wallet", key: `0x${"3".repeat(40)}` },
+  });
+  await new SponsorshipRecovery(f.a, f.journal, f.port, 143).reconcile();
+  expect((await f.a.readAction(143, ticket.actionId))?.phase).toBe("closed");
+  await expect(
+    f.a.admit({
+      ...(await f.a.readAction(143, f.action.actionId))?.intent,
+      actionId: "next-guest",
+      kind: "deposit",
+      principal: { kind: "guest-wallet", key: `0x${"4".repeat(40)}` },
+    }),
+  ).resolves.toBeDefined();
+});
 it("releases a pinned signature only after its wallet fence retired without published bytes", async () => {
   f = await createSponsorSenderFixture();
   vi.spyOn(f.journal, "persistSigned").mockRejectedValueOnce(

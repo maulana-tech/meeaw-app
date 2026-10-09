@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import {
   type Abi,
   type ContractFunctionArgs,
@@ -14,6 +15,10 @@ import { getServerEnv } from "../../env.server";
 import type { ActionKind, Principal } from "../../features/sponsorship/types";
 import { chain, rpcUrl } from "../../lib/chain";
 import type { ordinaryBusinessIdentity } from "../modules/sponsorship/ordinaryIdentity";
+import {
+  isSponsorshipError,
+  SponsorshipError,
+} from "../modules/sponsorship/sponsorship.errors";
 import { type RelayIntent, runtimeSender } from "./durableRelayer";
 import { RelayConflictError } from "./relayJournal";
 import { RelayRevertedError } from "./relayOutcome.errors";
@@ -64,10 +69,7 @@ export function relayWrite<
       `${chain.id}:${account.address.toLowerCase()}`,
       operationKey,
     );
-    if (
-      !prior &&
-      (sponsor.kind === "withdraw" || sponsor.kind === "legacy-transfer")
-    ) {
+    if (!prior && sponsor.closeParent !== false) {
       const sibling = await budget.ledger.findOrdinaryAction(
         chain.id,
         sponsor.kind,
@@ -106,9 +108,22 @@ export function relayWrite<
       await reader.simulateContract({ ...request, account } as Parameters<
         typeof reader.simulateContract
       >[0]);
+      const previousAction = await budget.ledger.readAction(
+        chain.id,
+        sponsor.identity.actionId,
+      );
+      const abandoned =
+        previousAction?.phase === "cancelled" ||
+        (previousAction?.phase === "closed" &&
+          !previousAction.charged &&
+          Object.values(previousAction.children).every(
+            (c) => c.phase === "abandoned",
+          ));
       const action = await budget.ledger.admit({
         chainId: chain.id,
-        actionId: sponsor.identity.actionId,
+        actionId: abandoned
+          ? `${sponsor.identity.actionId}:retry:${randomUUID()}`
+          : sponsor.identity.actionId,
         kind: sponsor.kind,
         principal: sponsor.principal,
         businessDigest: sponsor.identity.businessDigest,
@@ -136,25 +151,48 @@ export function relayWrite<
           sponsorship: { action, childId: sponsor.identity.childId },
         };
     }
-    const prepared = await sender.prepare(intent);
-    await sender.broadcast(intent);
-    const receipt = await reader.waitForTransactionReceipt({
-      hash: prepared.txHash,
-      confirmations: 1,
-      timeout: 30_000,
-    });
-    const result = await sender.reconcile(intent);
-    if (
-      result.state !== "unknown" &&
-      intent.sponsorship &&
-      sponsor.closeParent !== false
-    )
-      await budget.ledger.closeAction(intent.sponsorship.action);
-    if (result.state === "reverted")
-      throw new RelayRevertedError(result.txHash);
-    if (result.state !== "confirmed")
-      throw new Error("Transaction confirmation is still being checked.");
-    return { hash: prepared.txHash, receipt };
+    try {
+      const prepared = await sender.prepare(intent);
+      await sender.broadcast(intent);
+      const receipt = await reader.waitForTransactionReceipt({
+        hash: prepared.txHash,
+        confirmations: 1,
+        timeout: 30_000,
+      });
+      const result = await sender.reconcile(intent);
+      if (
+        result.state !== "unknown" &&
+        intent.sponsorship &&
+        sponsor.closeParent !== false
+      )
+        await budget.ledger.closeAction(intent.sponsorship.action);
+      if (result.state === "reverted")
+        throw new RelayRevertedError(result.txHash);
+      if (result.state !== "confirmed")
+        throw new Error("Transaction confirmation is still being checked.");
+      return { hash: prepared.txHash, receipt };
+    } catch (error) {
+      if (sponsor.closeParent !== false && intent.sponsorship) {
+        const saved = await journal.read(
+          `${chain.id}:${account.address.toLowerCase()}`,
+          intent.operationKey,
+        );
+        if (!saved?.serializedTransaction) {
+          try {
+            await budget.ledger.cancelUnsigned(intent.sponsorship.action);
+            const unavailable = isSponsorshipError(error)
+              ? error
+              : new SponsorshipError("rpc");
+            unavailable.released = true;
+            throw unavailable;
+          } catch (releaseError) {
+            if (isSponsorshipError(releaseError) && releaseError.released)
+              throw releaseError;
+          }
+        }
+      }
+      throw error;
+    }
   };
   const next = queue.then(run, run);
   queue = next.catch(() => {});

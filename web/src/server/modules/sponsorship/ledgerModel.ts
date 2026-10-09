@@ -424,16 +424,22 @@ export function reduceSponsorCommand(
     validIntent(i, policy, s);
     const key = ledgerKey(i.actionId),
       prior = s.actions[key];
-    const sibling =
-      i.kind === "withdraw" || i.kind === "legacy-transfer"
-        ? Object.values(s.actions).find(
-            (a) =>
-              !a.legacy &&
-              live(a) &&
-              a.intent.kind === i.kind &&
-              a.intent.businessDigest === i.businessDigest,
-          )
-        : undefined;
+    const sibling = [
+      "withdraw",
+      "legacy-transfer",
+      "deposit",
+      "register",
+      "rotation",
+      "faucet",
+    ].includes(i.kind)
+      ? Object.values(s.actions).find(
+          (a) =>
+            !a.legacy &&
+            live(a) &&
+            a.intent.kind === i.kind &&
+            a.intent.businessDigest === i.businessDigest,
+        )
+      : undefined;
     if (!prior && sibling) {
       if (
         sibling.intent.principal.kind !== i.principal.kind ||

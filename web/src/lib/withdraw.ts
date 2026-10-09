@@ -1,7 +1,11 @@
 import { getAddress } from "viem";
 import { accountForNote } from "../features/privacyKeys/keyRing";
 import { getPrivacyKeyring } from "../features/privacyKeys/session";
-import { pendingWithdrawBatch } from "../features/sponsorship/pendingWithdrawBatch";
+import { canonicalRelayRevert } from "../features/sponsorship/pendingAction";
+import {
+  pendingWithdrawBatch,
+  recordBatchAdmission,
+} from "../features/sponsorship/pendingWithdrawBatch";
 import { api } from "../trpc/client";
 import {
   gaslessEnabled,
@@ -31,7 +35,12 @@ export type WithdrawResult = {
 export type BatchWithdrawResult = {
   total: bigint; // base units successfully cashed out
   succeeded: WithdrawResult[]; // per-note results, largest-first order
-  failed: { leafIndex: number; amount: bigint; error: string }[];
+  failed: {
+    leafIndex: number;
+    amount: bigint;
+    error: string;
+    terminal?: boolean;
+  }[];
 };
 
 export function isAlreadyCashedOut(error: unknown): boolean {
@@ -122,12 +131,18 @@ export async function withdrawAll(params: {
       batchStorageKey,
       nullifiers,
     );
-    await api.sponsorship.admitWithdrawBatch.mutate({
-      id: pending.id,
-      pool: scan.scope,
-      recipient: dest,
-      nullifiers: pending.nullifiers,
-    });
+    try {
+      await api.sponsorship.admitWithdrawBatch.mutate({
+        id: pending.id,
+        pool: scan.scope,
+        recipient: dest,
+        nullifiers: pending.nullifiers,
+      });
+      recordBatchAdmission(localStorage, batchStorageKey, pending);
+    } catch (error) {
+      recordBatchAdmission(localStorage, batchStorageKey, pending, error);
+      throw error;
+    }
     if (params.isCurrent && !params.isCurrent())
       throw new Error("The private account changed during cash-out.");
     sponsorBatchId = pending.id;
@@ -149,6 +164,7 @@ export async function withdrawAll(params: {
       total += note.amount;
     } catch (error) {
       failed.push({
+        ...(canonicalRelayRevert(error) ? { terminal: true } : {}),
         leafIndex: note.leafIndex,
         amount: note.amount,
         error: isAlreadyCashedOut(error)
@@ -159,7 +175,7 @@ export async function withdrawAll(params: {
       });
     }
   }
-  if (sponsorBatchId && batchStorageKey && failed.length === 0) {
+  if (sponsorBatchId && batchStorageKey && failed.every((f) => f.terminal)) {
     await api.sponsorship.finishWithdrawBatch.mutate({ id: sponsorBatchId });
     localStorage.removeItem(batchStorageKey);
   }

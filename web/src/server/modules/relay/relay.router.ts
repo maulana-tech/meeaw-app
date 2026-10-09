@@ -68,9 +68,8 @@ function mapError(error: unknown): never {
   throw error;
 }
 
-// Every call is simulated before it is sent (see relayWrite), so a request
-// that would revert never costs gas. Rate limits bound the remaining cost of
-// valid-but-spammy traffic.
+// New unsigned ordinary calls are simulated before admission. Canonical mined
+// reverts still consume native budget; retries recover the original bytes.
 export const relayRouter = createTRPCRouter({
   status: publicProcedure.output(statusOutput).query(() => ({
     enabled: relayerConfigured(),

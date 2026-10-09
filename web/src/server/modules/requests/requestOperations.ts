@@ -58,6 +58,9 @@ function wire(doc: PaymentRequestDoc): PaymentOperation {
   const r = doc.reservation;
   if (!r || !doc.operationId) throw new RequestConflictError();
   return {
+    ...(r.sponsorshipStepLimit
+      ? { sponsorshipStepLimit: r.sponsorshipStepLimit }
+      : {}),
     ...(r.sponsorshipAction ? { sponsorshipAction: r.sponsorshipAction } : {}),
     ...(r.sponsorshipPause ? { sponsorshipPause: r.sponsorshipPause } : {}),
     ...(r.accountTicketId

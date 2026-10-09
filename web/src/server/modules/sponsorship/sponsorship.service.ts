@@ -69,6 +69,35 @@ export async function cancelSponsorship(ctx: Context, actionId: string) {
     action.intent.principal.key !== principal.key
   )
     throw new RelayConflictError();
+  if (action.intent.kind === "send" || action.intent.kind === "request-pay") {
+    const { OperationSponsorship } = await import("./operationAdapters");
+    const { accountSpendGate } = await import("../privacyKeys/spendGate");
+    const kind = action.intent.kind === "send" ? "transfer" : "request";
+    const db = ledger.options.db;
+    const doc =
+      kind === "transfer"
+        ? await db
+            .collection("private_transfers")
+            .findOne({ "operation.sponsorshipAction.actionId": actionId })
+        : await db
+            .collection("payment_requests")
+            .findOne({ "reservation.sponsorshipAction.actionId": actionId });
+    if (!doc?.operationId) throw new RelayConflictError();
+    await new OperationSponsorship(ledger).abandon(
+      kind,
+      doc.operationId,
+      principal.key,
+      async (owner, spendId, capture) => {
+        await (await accountSpendGate()).finish(
+          owner,
+          spendId,
+          capture,
+          "unsigned-abandoned",
+        );
+      },
+    );
+    return;
+  }
   await ledger.cancelUnsigned({
     chainId: chain.id,
     actionId,

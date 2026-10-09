@@ -26,6 +26,7 @@ import {
   canonicalRelayRevert,
   completePendingAction,
   pendingActionId,
+  unsignedSponsorshipReleased,
 } from "../features/sponsorship/pendingAction";
 import { completeFaucet } from "../features/sponsorship/pendingFaucet";
 import { api } from "../trpc/client";
@@ -639,7 +640,7 @@ export async function mintTestUsdc(
         await api.relay.mintTestUsdc.mutate({ pool: pool.scope, id: actionId })
       ).txHash;
     } catch (error) {
-      if (canonicalRelayRevert(error))
+      if (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
         completeFaucet(localStorage, signer.address, pool.scope, actionId);
       throw error;
     }
@@ -705,7 +706,10 @@ export async function poolWithdraw(
       if (id) completePendingAction(localStorage, key, id);
       return txHash;
     } catch (error) {
-      if (id && canonicalRelayRevert(error))
+      if (
+        id &&
+        (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
+      )
         completePendingAction(localStorage, key, id);
       throw error;
     }
@@ -759,7 +763,7 @@ export async function poolTransfer(
       completePendingAction(localStorage, key, id);
       return { recipientIndex, changeIndex };
     } catch (error) {
-      if (canonicalRelayRevert(error))
+      if (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
         completePendingAction(localStorage, key, id);
       throw error;
     }

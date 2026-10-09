@@ -12,6 +12,8 @@ const t = initTRPC.context<Context>().create({
         sponsorshipReason: isSponsorshipError(error.cause)
           ? error.cause.reason
           : null,
+        sponsorshipReleased:
+          isSponsorshipError(error.cause) && error.cause.released,
         relayOutcome:
           error.cause instanceof RelayRevertedError
             ? { state: "reverted" as const, txHash: error.cause.txHash }

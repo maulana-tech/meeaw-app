@@ -29,3 +29,14 @@ export function canonicalRelayRevert(error: unknown): boolean {
       /^0x[0-9a-fA-F]{64}$/.test(result.txHash),
   );
 }
+export function unsignedSponsorshipReleased(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "data" in error &&
+      error.data &&
+      typeof error.data === "object" &&
+      "sponsorshipReleased" in error.data &&
+      error.data.sponsorshipReleased === true,
+  );
+}

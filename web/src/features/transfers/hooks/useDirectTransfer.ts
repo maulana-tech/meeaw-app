@@ -53,6 +53,12 @@ export function useDirectTransfer(record: TransferRecord | null) {
         { record, account, pool, signer, ...(keyring ? { keyring } : {}) },
         {
           isCurrent: current,
+          abandon: async (op) => {
+            if (current() && op.sponsorshipAction)
+              await api.sponsorship.cancelUnsigned.mutate({
+                actionId: op.sponsorshipAction.actionId,
+              });
+          },
           operation: () => api.transfers.resume.mutate({ id: record.id }),
           scan: () =>
             keyring

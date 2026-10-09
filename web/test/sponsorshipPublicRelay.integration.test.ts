@@ -113,6 +113,51 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 describe("public relay with authoritative sponsorship ledger", () => {
+  it("releases a definitively unsigned guest deposit envelope and allows its same authorization to retry", async () => {
+    const caller = relayRouter.createCaller(guest),
+      input = {
+        payer: recipient,
+        commitment: hash,
+        amount: "10",
+        proof,
+        ephemeralPk: hash,
+        ciphertext: "0x12",
+        deadline: "9999999999",
+        signature: `0x${"11".repeat(65)}`,
+        permit: null,
+      };
+    const balance = fixture().port.balance;
+    fixture().port.balance = async () => 0n;
+    await expect(caller.deposit(input)).rejects.toMatchObject({
+      cause: { reason: "balance" },
+    });
+    expect((await fixture().a.repo.snapshot(143)).reservedWeiStr).toBe("0");
+    fixture().port.balance = balance;
+    const topics = encodeEventTopics({
+      abi: maweePoolAbi,
+      eventName: "Deposit",
+      args: { leafIndex: 0 },
+    });
+    state.wait = async (txHash) => {
+      fixture().setReceipt(txHash);
+      return {
+        ...(await fixture().port.receipt(txHash)),
+        logs: [
+          {
+            topics,
+            data: encodeAbiParameters(
+              [{ type: "bytes32" }, { type: "bytes32" }, { type: "bytes" }],
+              [hash, hash, "0x12"],
+            ),
+          },
+        ],
+      } as TransactionReceipt;
+    };
+    await expect(caller.deposit(input)).resolves.toMatchObject({
+      leafIndex: 0,
+    });
+    expect(fixture().port.sign).toHaveBeenCalledTimes(1);
+  });
   it("ends a canonical failed click but admits a fresh explicit cash-out action", async () => {
     const caller = relayRouter.createCaller(guest),
       id = "11111111-1111-4111-8111-111111111111";

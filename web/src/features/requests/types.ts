@@ -115,6 +115,7 @@ export type SubmissionBody = {
 export type SignedSubmission = SubmissionBody & { signature: Hex };
 
 export type PaymentOperation = {
+  sponsorshipStepLimit?: number;
   sponsorshipAction?: ActionTicket;
   sponsorshipPause?: UnavailableReason;
   fundingGeneration?: number;

@@ -227,26 +227,56 @@ async function cashoutOperations() {
   const { accountSpendGate } = await import("./spendGate"),
     gate = await accountSpendGate();
   const { CashoutOperations } = await import("./cashoutOperations");
-  return new CashoutOperations(await getDb(), gate, async (record) => {
-    const { resolvePool } = await import("../../../lib/pools"),
-      pool = resolvePool(record.pool);
-    const { publicClient } = await import("../../../lib/chain"),
-      { maweePoolAbi } = await import("../../../lib/abi");
-    const head = await publicClient.getBlockNumber(),
-      block = head - BigInt(pool.confirmations - 1);
-    if (block < 0n) return false;
-    const before = await publicClient.getBlock({ blockNumber: block });
-    const spent = await publicClient.readContract({
-      address: pool.address,
-      abi: maweePoolAbi,
-      functionName: "isSpent",
-      args: [record.nullifier],
-      blockNumber: block,
-    });
-    const after = await publicClient.getBlock({ blockNumber: block });
-    if (before.hash !== after.hash) throw rejected();
-    return spent;
-  });
+  return new CashoutOperations(
+    await getDb(),
+    gate,
+    async (record) => {
+      const { resolvePool } = await import("../../../lib/pools"),
+        pool = resolvePool(record.pool);
+      const { publicClient } = await import("../../../lib/chain"),
+        { maweePoolAbi } = await import("../../../lib/abi");
+      const head = await publicClient.getBlockNumber(),
+        block = head - BigInt(pool.confirmations - 1);
+      if (block < 0n) return false;
+      const before = await publicClient.getBlock({ blockNumber: block });
+      const spent = await publicClient.readContract({
+        address: pool.address,
+        abi: maweePoolAbi,
+        functionName: "isSpent",
+        args: [record.nullifier],
+        blockNumber: block,
+      });
+      const after = await publicClient.getBlock({ blockNumber: block });
+      if (before.hash !== after.hash) throw rejected();
+      return spent;
+    },
+    async (record) => {
+      if (!record.sponsorBatchId) return false;
+      const { sponsorshipLedger } = await import(
+        "../sponsorship/sponsorship.service"
+      );
+      const { ledgerKey } = await import("../sponsorship/ledgerModel");
+      const { resolvePool } = await import("../../../lib/pools");
+      const chainId = resolvePool(record.pool).chainId;
+      const db = await getDb();
+      const batch = await db
+        .collection<{ _id: string; pool: string; nullifiers: string[] }>(
+          "sponsorship_withdraw_batches",
+        )
+        .findOne({
+          _id: `${chainId}:${record.sponsorBatchId}`,
+          pool: record.pool,
+          nullifiers: record.nullifier,
+        });
+      if (!batch) return false;
+      const action = await (await sponsorshipLedger()).readAction(
+        chainId,
+        `withdraw-batch:${record.sponsorBatchId}`,
+      );
+      const child = action?.children[ledgerKey(record.nullifier)];
+      return child?.phase === "settled" && child.paid?.outcome === "reverted";
+    },
+  );
 }
 async function cashoutOwner(user: string) {
   const wallet = await currentWallet(user);

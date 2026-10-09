@@ -66,6 +66,7 @@ export const beginPaymentInput = z.strictObject({
 });
 export const submitPaymentInput = signedSubmissionSchema;
 export const paymentOperationOutput = z.strictObject({
+  sponsorshipStepLimit: z.number().int().min(1).max(16).optional(),
   sponsorshipAction: z
     .object({
       chainId: z.number().int().positive(),

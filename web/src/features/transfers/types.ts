@@ -51,6 +51,7 @@ export type TransferPage = {
   nextCursor: string | null;
 };
 export type TransferOperation = {
+  sponsorshipStepLimit?: number;
   sponsorshipAction?: ActionTicket;
   sponsorshipPause?: UnavailableReason;
   fundingGeneration?: number;

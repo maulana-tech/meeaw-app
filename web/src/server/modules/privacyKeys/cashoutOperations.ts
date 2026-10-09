@@ -34,6 +34,8 @@ export class CashoutOperations {
     db: Db,
     readonly gate: AccountSpendGate,
     readonly spent: (record: Cashout) => Promise<boolean>,
+    readonly reverted: (record: Cashout) => Promise<boolean> = async () =>
+      false,
   ) {
     this.records = db.collection<Cashout>("privacy_cashouts");
   }
@@ -62,6 +64,19 @@ export class CashoutOperations {
       { upsert: true },
     );
     let record = await this.records.findOne({ _id: id, owner });
+    if (
+      record &&
+      record.phase === "dispatching" &&
+      (await this.reverted(record))
+    ) {
+      const changed = await this.records.updateOne(
+        { _id: id, operationId: record.operationId, phase: "dispatching" },
+        { $set: { phase: "cancelled" } },
+      );
+      if (changed.matchedCount)
+        await this.release({ ...record, phase: "cancelled" }, "terminal");
+      record = await this.records.findOne({ _id: id, owner });
+    }
     if (
       record?.sponsorBatchId &&
       record.sponsorBatchId !== input.sponsorBatchId &&

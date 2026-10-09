@@ -38,6 +38,66 @@ it("recovers the same parent after a lost linking response without another quota
   ).toMatchObject({ sponsorshipAction: ticket });
   expect(await f.a.status(f.principal)).toMatchObject({ reserved: 1, used: 0 });
 });
+it("abandons an untouched private Send draft but refuses any accepted preparation", async () => {
+  const { f, repo, record, adapter } = await setup();
+  await adapter.ensure("transfer", record.operationId, "alice");
+  await repo.collection.updateOne(
+    { _id: record.id },
+    { $set: { currentSubmission: { step: 0 } as never } },
+  );
+  await expect(
+    adapter.abandon("transfer", record.operationId, "alice", async () => {}),
+  ).rejects.toThrow();
+  await repo.collection.updateOne(
+    { _id: record.id },
+    { $set: { currentSubmission: null } },
+  );
+  let released = false;
+  await adapter.abandon("transfer", record.operationId, "alice", async () => {
+    released = true;
+  });
+  expect(released).toBe(true);
+  expect((await repo.collection.findOne({ _id: record.id }))?.status).toBe(
+    "failed",
+  );
+  expect(await f.a.status(f.principal)).toMatchObject({ reserved: 0, used: 0 });
+});
+it("releases a request draft and allows a fresh attempt without losing the request", async () => {
+  const { f, adapter } = await setup();
+  const id = crypto.randomUUID(),
+    attempt = crypto.randomUUID();
+  const records = f.db.collection("payment_requests");
+  await records.insertOne({
+    _id: id,
+    operationId: attempt,
+    status: "pending",
+    revision: 0,
+    scope: testPool.scope,
+    digest: `0x${"a".repeat(64)}`,
+    addresseeWallet: `0x${"1".repeat(40)}`,
+    reservation: {
+      attemptId: attempt,
+      phase: "preparing",
+      nextStep: 0,
+      currentSubmission: null,
+    },
+  } as never);
+  const ticket = await adapter.ensure("request", attempt, "alice");
+  let released = false;
+  await adapter.abandon("request", attempt, "alice", async () => {
+    released = true;
+  });
+  expect(released).toBe(true);
+  expect(await records.findOne({ _id: id } as never)).toMatchObject({
+    operationId: null,
+    reservation: null,
+    status: "pending",
+    revision: 1,
+  });
+  expect((await f.a.readAction(31337, ticket.actionId))?.phase).toBe(
+    "cancelled",
+  );
+});
 it("preserves accepted submissions and capture when pausing, then resumes the same parent", async () => {
   const { repo, record, adapter } = await setup();
   const ticket = await adapter.ensure("transfer", record.operationId, "alice");

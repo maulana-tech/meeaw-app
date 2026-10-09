@@ -25,6 +25,9 @@ export class OperationSponsorship {
         where: { _id: doc._id, operationId: id },
         path: "operation",
         operation: doc.operation,
+        owner: doc.sender.wallet,
+        spendId: `transfer:${doc.id}`,
+        submission: doc.currentSubmission,
         chainId: resolvePool(doc.pool).chainId,
         actionId: `send:${doc.id}`,
         digest: doc.digest as `0x${string}`,
@@ -41,6 +44,9 @@ export class OperationSponsorship {
       where: { _id: doc._id, operationId: id },
       path: "reservation",
       operation: doc.reservation,
+      owner: doc.addresseeWallet as `0x${string}`,
+      spendId: `request:${id}`,
+      submission: doc.reservation.currentSubmission,
       chainId: resolvePool(doc.scope).chainId,
       actionId: `request-pay:${id}`,
       digest: doc.digest as `0x${string}`,
@@ -84,6 +90,12 @@ export class OperationSponsorship {
         maximumChildren: policy.ready ? policy.policy.maxChildren : 16,
       });
     }
+    const admitted = await this.ledger.readAction(t.chainId, ticket.actionId);
+    const sponsorshipStepLimit = admitted?.intent.maximumChildren;
+    if (!sponsorshipStepLimit) throw new SponsorshipError("rpc");
+    await t.collection.updateOne(t.where, {
+      $set: { [`${t.path}.sponsorshipStepLimit`]: sponsorshipStepLimit },
+    });
     if (t.operation.sponsorshipAction) {
       const prior = t.operation.sponsorshipAction;
       if (
@@ -96,7 +108,12 @@ export class OperationSponsorship {
     }
     await t.collection.updateOne(
       { ...t.where, [`${t.path}.sponsorshipAction`]: { $exists: false } },
-      { $set: { [`${t.path}.sponsorshipAction`]: ticket } },
+      {
+        $set: {
+          [`${t.path}.sponsorshipAction`]: ticket,
+          [`${t.path}.sponsorshipStepLimit`]: sponsorshipStepLimit,
+        },
+      },
     );
     const latest = await this.target(kind, operationId);
     const saved = latest.operation.sponsorshipAction;
@@ -107,6 +124,71 @@ export class OperationSponsorship {
     )
       throw new SponsorshipError("rpc");
     return ticket;
+  }
+  async abandon(
+    kind: OperationKind,
+    id: string,
+    user: string,
+    releaseCapture: (
+      owner: `0x${string}`,
+      spendId: string,
+      capture: import("../../../features/privacyKeys/types").FundingCapture,
+    ) => Promise<void>,
+  ) {
+    const t = await this.target(kind, id),
+      ticket = t.operation.sponsorshipAction;
+    if (
+      !ticket ||
+      t.submission ||
+      t.operation.nextStep !== 0 ||
+      !["preparing", "failed"].includes(t.operation.phase)
+    )
+      throw new SponsorshipError("budget");
+    const action = await this.ledger.readAction(
+      ticket.chainId,
+      ticket.actionId,
+    );
+    if (
+      action?.intent.principal.kind !== "user" ||
+      action.intent.principal.key !== user ||
+      action.charged ||
+      Object.values(action.children).some(
+        (c) => !["allocated", "abandoned"].includes(c.phase),
+      )
+    )
+      throw new SponsorshipError("budget");
+    const changed = await t.collection.updateOne(
+      {
+        ...t.where,
+        [`${t.path}.phase`]: t.operation.phase,
+        [`${t.path}.nextStep`]: 0,
+        [kind === "transfer"
+          ? "currentSubmission"
+          : "reservation.currentSubmission"]: null,
+      },
+      {
+        $set: {
+          [`${t.path}.phase`]: "failed",
+          ...(kind === "transfer" ? { status: "failed" } : {}),
+        },
+      },
+    );
+    if (!changed.matchedCount) throw new SponsorshipError("budget");
+    if (action.phase !== "closed" && action.phase !== "cancelled")
+      await this.ledger.cancelUnsigned(ticket);
+    await releaseCapture(t.owner, t.spendId, t.operation);
+    if (kind === "request") {
+      await this.ledger.options.db
+        .collection<{ _id: string; phase: string }>("request_operations")
+        .updateOne({ _id: id }, { $set: { phase: "failed" } });
+      await t.collection.updateOne(
+        { ...t.where, "reservation.phase": "failed" },
+        {
+          $set: { operationId: null, reservation: null },
+          $inc: { revision: 1 },
+        },
+      );
+    }
   }
   async pause(
     kind: OperationKind,
