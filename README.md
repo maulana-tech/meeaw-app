@@ -105,7 +105,7 @@ it does not learn which deposit event produced that note.
   - `test/` - end-to-end tests that generate real proofs with the browser
     artifacts and verify them on-chain.
   - `scripts/deploy.ts` - deploys everything and writes `web/.env.local`.
-- `circuits/` - Circom circuits for deposits, withdrawals, shielded
+- `monad-zk/` - Circom circuits for deposits, withdrawals, shielded
   transfers, and note consolidation (merges).
 - `web/` - Next.js app for onboarding, payment links, payer checkout, local note
   scanning, proof generation, withdrawals, and disclosure bundles.

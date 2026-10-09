@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 
 mkdir -p build
 
-# `bash circuits/build.sh merge` builds only the Merge circuit with its own
+# `bash monad-zk/build.sh merge` builds only the Merge circuit with its own
 # powers-of-tau file, so the shipped deposit/withdraw/transfer keys are never
 # regenerated. Merge has ~11.4k constraints at --O2; 2^15 leaves headroom.
 build_merge() {

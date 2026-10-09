@@ -137,7 +137,7 @@ pnpm --filter web migrate:up                   # Mongo indexes
 pnpm dev                                       # http://localhost:3000
 ```
 
-Rebuilding circuits (`cd circuits && ./build.sh`) also regenerates the Solidity
+Rebuilding circuits (`cd monad-zk && ./build.sh`) also regenerates the Solidity
 verifiers via `pnpm --filter contracts verifiers`. Redeploy the pool afterwards.
 
 ## Useful app routes
