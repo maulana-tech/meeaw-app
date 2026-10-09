@@ -8,12 +8,12 @@ import {
 } from "../../src/server/lib/durableRelayer";
 import { RelayJournal } from "../../src/server/lib/relayJournal";
 import { createSponsorFixture } from "./sponsorshipFixtures";
-export async function createSponsorSenderFixture() {
-  const f = await createSponsorFixture(),
+export async function createSponsorSenderFixture(chainId = 143) {
+  const f = await createSponsorFixture({}, chainId),
     account = privateKeyToAccount(`0x${"01".repeat(32)}`);
   const action = await f.a.admit(f.intent("sender"));
   const intent: RelayIntent = {
-    chainId: 143,
+    chainId,
     wallet: account.address,
     to: "0x2222222222222222222222222222222222222222",
     data: "0x1234",
@@ -24,7 +24,7 @@ export async function createSponsorSenderFixture() {
   let mined: TransactionReceipt | null = null;
   const blockHash = `0x${"b".repeat(64)}` as Hex;
   const frozen: FrozenTx = {
-    chainId: 143,
+    chainId,
     from: account.address,
     to: intent.to,
     data: intent.data,

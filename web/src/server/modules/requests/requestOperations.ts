@@ -21,6 +21,12 @@ import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerAddress, relayerConfigured } from "../../lib/relayer";
 import { RelayBusyError } from "../../lib/relayJournal";
 import { accountSpendGate } from "../privacyKeys/spendGate";
+import {
+  operationSponsorship,
+  pauseOperationSponsorship,
+  resumeOperationSponsorship,
+} from "../sponsorship/operationAdapters";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import { encodeSubmission, verifyRequestReceipt } from "./requestSettlement";
 import {
   RequestConflictError,
@@ -52,6 +58,8 @@ function wire(doc: PaymentRequestDoc): PaymentOperation {
   const r = doc.reservation;
   if (!r || !doc.operationId) throw new RequestConflictError();
   return {
+    ...(r.sponsorshipAction ? { sponsorshipAction: r.sponsorshipAction } : {}),
+    ...(r.sponsorshipPause ? { sponsorshipPause: r.sponsorshipPause } : {}),
     ...(r.accountTicketId
       ? {
           fundingGeneration: r.fundingGeneration,
@@ -74,16 +82,21 @@ async function project(doc: PaymentRequestDoc) {
   const { operations } = await collections();
   await operations.updateOne(
     { _id: op.id },
-    { $set: { ...op, payerWallet: doc.addresseeWallet } },
+    {
+      $set: { ...op, payerWallet: doc.addresseeWallet },
+      ...(!op.sponsorshipPause ? { $unset: { sponsorshipPause: "" } } : {}),
+    },
     { upsert: true },
   );
-  if (op.phase === "confirmed" || op.phase === "failed")
+  if (op.phase === "confirmed" || op.phase === "failed") {
+    await (await operationSponsorship()).finish("request", op.id);
     await (await accountSpendGate()).finish(
       doc.addresseeWallet as Hex,
       `request:${op.id}`,
       op,
       "terminal",
     );
+  }
   return op;
 }
 async function owned(user: string, id: string) {
@@ -114,13 +127,15 @@ export async function beginPayment(
   if (pool.role !== "active" || !pool.requestCapable)
     throw new RequestUnavailableError();
   if (doc.status !== "pending") throw new RequestConflictError();
-  if (doc.operationId === input.attemptId) return project(doc);
+  if (doc.operationId === input.attemptId) return admitAndProject(doc, user);
   const requests = await getPaymentRequests();
   let revision = input.revision;
   if (doc.operationId) {
     const r = doc.reservation;
     if (
       !r ||
+      r.sponsorshipAction ||
+      r.sponsorshipPause ||
       r.phase !== "preparing" ||
       r.currentSubmission ||
       Date.now() - r.updatedAt.getTime() < 600_000
@@ -200,7 +215,28 @@ export async function beginPayment(
       );
     throw new RequestConflictError();
   }
-  return project(reserved);
+  return admitAndProject(reserved, user);
+}
+async function admitAndProject(doc: PaymentRequestDoc, user: string) {
+  if (!doc.operationId) throw new RequestConflictError();
+  try {
+    await (await operationSponsorship()).ensure(
+      "request",
+      doc.operationId,
+      user,
+    );
+    if (doc.reservation?.sponsorshipPause)
+      await resumeOperationSponsorship("request", doc.operationId);
+  } catch (error) {
+    if (!isSponsorshipError(error)) throw error;
+    await pauseOperationSponsorship("request", doc.operationId, error.reason);
+  }
+  const latest = await (await getPaymentRequests()).findOne({
+    _id: doc._id,
+    operationId: doc.operationId,
+  });
+  if (!latest) throw new RequestConflictError();
+  return project(latest);
 }
 function intentFor(
   doc: PaymentRequestDoc,
@@ -266,6 +302,7 @@ async function failAttempt(doc: PaymentRequestDoc) {
 async function process(
   doc: PaymentRequestDoc,
   rebroadcast: boolean,
+  user?: string,
 ): Promise<PaymentOperation> {
   const body = doc.reservation?.currentSubmission;
   if (!body) return project(doc);
@@ -280,14 +317,24 @@ async function process(
   )
     throw new RequestRejectedError("Payment evidence has changed.");
   const runtime = await runtimeSender(),
-    intent = intentFor(doc, body),
     requests = await getPaymentRequests();
+  let intent = intentFor(doc, body);
   let active = doc;
   try {
     const known = await runtime.journal.read(
       `${intent.chainId}:${intent.wallet.toLowerCase()}`,
       intent.operationKey,
     );
+    if (known?.serializedTransaction && known.intent) intent = known.intent;
+    else if (!known?.serializedTransaction) {
+      const action = await (await operationSponsorship()).ensure(
+        "request",
+        body.operationId,
+        user,
+      );
+      if (doc.reservation) doc.reservation.sponsorshipAction = action;
+      intent.sponsorship = { action, childId: intent.operationKey };
+    }
     // Simulate only before the first signature. Once the journal owns signed
     // bytes, the input nullifier may already be spent; recover with those exact
     // bytes instead of treating a post-broadcast simulation revert as failure.
@@ -398,6 +445,10 @@ async function process(
     if (!latest) throw new RequestNotFoundError();
     return project(latest);
   } catch (e) {
+    if (isSponsorshipError(e)) {
+      await pauseOperationSponsorship("request", body.operationId, e.reason);
+      throw e;
+    }
     const saved = await runtime.journal.read(
       `${intent.chainId}:${intent.wallet.toLowerCase()}`,
       intent.operationKey,
@@ -497,7 +548,7 @@ async function submit(
   if (doc.reservation.currentSubmission) {
     if (doc.reservation.currentDigest !== hash)
       throw new RequestConflictError();
-    return process(doc, true);
+    return process(doc, true, user);
   }
   if (
     body.step !== doc.reservation.nextStep ||
@@ -528,7 +579,7 @@ async function submit(
     { returnDocument: "after", includeResultMetadata: false },
   );
   if (!reserved) throw new RequestConflictError();
-  return process(reserved, true);
+  return process(reserved, true, user);
 }
 export function submitPayment(user: string, body: SignedSubmission) {
   return submit(user, body, "payment");
@@ -544,6 +595,8 @@ export async function reconcileRequestOperation(
   if (
     doc.status === "pending" &&
     doc.reservation.phase === "preparing" &&
+    !doc.reservation.sponsorshipAction &&
+    !doc.reservation.sponsorshipPause &&
     !doc.reservation.currentSubmission &&
     !doc.reservation.txHash &&
     Date.now() - doc.reservation.updatedAt.getTime() >= 600_000

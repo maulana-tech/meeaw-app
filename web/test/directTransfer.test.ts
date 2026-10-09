@@ -3,9 +3,35 @@ import {
   runDirectTransfer,
   type TransferRunnerPort,
 } from "../src/features/transfers/directTransferRunner";
-import { makeTransferFixture } from "./helpers/transferFixtures";
 import { commitment, ownerPk } from "../src/lib/crypto";
+import { makeTransferFixture } from "./helpers/transferFixtures";
+
 describe("direct transfer client session", () => {
+  it("retains a sponsorship pause without building another preparation step", async () => {
+    const f = await makeTransferFixture();
+    let scans = 0;
+    const paused = { ...f.operation, sponsorshipPause: "budget" as const };
+    const result = await runDirectTransfer(
+      { record: f.record, account: f.sender, pool: f.pool, signer: f.signer },
+      {
+        isCurrent: () => true,
+        operation: async () => paused,
+        scan: async () => {
+          scans++;
+          throw Error("A paused action must not prepare notes");
+        },
+        build: async () => {
+          throw Error("Paused");
+        },
+        submit: async () => {
+          throw Error("Paused");
+        },
+        tick: () => {},
+      },
+    );
+    expect(result).toBe(paused);
+    expect(scans).toBe(0);
+  });
   it("discards a completed proof when the account changes", async () => {
     const f = await makeTransferFixture(),
       pk = await ownerPk(f.sender.ownerSecret);

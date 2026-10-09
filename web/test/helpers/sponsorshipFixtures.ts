@@ -10,6 +10,7 @@ import { loadSponsorPolicy } from "../../src/server/modules/sponsorship/policy";
 import { openIsolatedRequestDb } from "./requestDb";
 export async function createSponsorFixture(
   overrides: Partial<SponsorPolicy> = {},
+  chainId = 143,
 ) {
   const isolated = await openIsolatedRequestDb();
   const parsed = loadSponsorPolicy({
@@ -30,11 +31,12 @@ export async function createSponsorFixture(
   const principal: Principal = { kind: "user", key: "alice" };
   await isolated.db
     .collection("sponsorship_ledgers")
-    .insertOne(emptyLedger(143, at, "complete") as never);
+    .insertOne(emptyLedger(chainId, at, "complete") as never);
   const options = {
     db: isolated.db,
     policy: () => ({ ready: true as const, policy }),
     clock,
+    chainId,
   };
   return {
     ...isolated,
@@ -45,7 +47,7 @@ export async function createSponsorFixture(
     b: new SponsorLedger(options),
     intent(label: string, subject: Principal = principal): ActionIntent {
       return {
-        chainId: 143,
+        chainId,
         actionId: `test:${label}`,
         kind: "send",
         principal: subject,

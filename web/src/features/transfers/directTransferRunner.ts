@@ -52,7 +52,9 @@ export async function runDirectTransfer(
   port.tick(operation);
   for (
     let attempts = 0;
-    operation.phase === "preparing" && attempts < 4096;
+    operation.phase === "preparing" &&
+    !operation.sponsorshipPause &&
+    attempts < 4096;
     attempts++
   ) {
     const scan = await port.scan();

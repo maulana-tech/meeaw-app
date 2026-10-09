@@ -149,11 +149,18 @@ export function useDirectTransfer(record: TransferRecord | null) {
     if (
       auto.current &&
       operation?.phase === "preparing" &&
+      !operation.sponsorshipPause &&
       !working &&
       wallet.accountUnlocked
     )
       void continueSend();
-  }, [operation?.phase, working, wallet.accountUnlocked, continueSend]);
+  }, [
+    operation?.phase,
+    operation?.sponsorshipPause,
+    working,
+    wallet.accountUnlocked,
+    continueSend,
+  ]);
   useEffect(() => {
     if (!operation || !["confirmed", "failed"].includes(operation.phase))
       return;

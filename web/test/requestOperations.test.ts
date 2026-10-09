@@ -8,6 +8,15 @@ import {
   vi,
 } from "vitest";
 import { AccountSpendGate } from "../src/server/modules/privacyKeys/spendGate";
+import {
+  operationSponsorLedger,
+  resetOperationSponsorLedger,
+} from "./helpers/operationSponsorLedger";
+
+vi.mock("../src/server/modules/sponsorship/sponsorship.service", () => ({
+  sponsorshipLedger: async () =>
+    operationSponsorLedger(deps.db as import("mongodb").Db),
+}));
 
 const deps = vi.hoisted(() => ({
   db: null as unknown,
@@ -105,6 +114,7 @@ describe("request reservations and uncertain submissions", () => {
     await db?.close();
   });
   beforeEach(async () => {
+    await resetOperationSponsorLedger(db.db);
     __resetRateLimit();
     deps.simulationCalls = 0;
     deps.prepareCalls = 0;
@@ -187,7 +197,7 @@ describe("request reservations and uncertain submissions", () => {
       }),
     ).rejects.toThrow();
   });
-  it("releases the account ticket when an unsigned idle request is reconciled", async () => {
+  it("retains sponsored idle request quota and account capture across an elapsed timer", async () => {
     await beginPayment("payer", {
       id: f.record.id,
       revision: 0,
@@ -201,16 +211,13 @@ describe("request reservations and uncertain submissions", () => {
       .spyOn(AccountSpendGate.prototype, "finish")
       .mockResolvedValue();
     try {
-      expect((await reconcileRequestOperation(attempt))?.phase).toBe("failed");
-      expect(finish).toHaveBeenCalledWith(
-        f.record.addressee.wallet,
-        `request:${attempt}`,
-        expect.objectContaining({ id: attempt }),
-        "terminal",
+      expect((await reconcileRequestOperation(attempt))?.phase).toBe(
+        "preparing",
       );
+      expect(finish).not.toHaveBeenCalled();
       expect(
         (await db.requests.findOne({ _id: f.record.id }))?.operationId,
-      ).toBeNull();
+      ).toBe(attempt);
     } finally {
       finish.mockRestore();
     }
@@ -269,7 +276,7 @@ describe("request reservations and uncertain submissions", () => {
     await expect(
       cancelRequest("requester", {
         id: f.record.id,
-        revision: stored!.revision,
+        revision: stored?.revision ?? 0,
       }),
     ).rejects.toThrow();
     const stepId = `${attempt}:0`,

@@ -247,7 +247,17 @@ export function useRequestPayment(request: PaymentRequest | null) {
         throw new Error(
           "Payment progress is temporarily unavailable. Refresh and try again.",
         );
+      if (active.sponsorshipPause && live.operationId === active.id) {
+        active = (await api.requests.beginPayment.mutate({
+          id: live.id,
+          revision: live.revision,
+          attemptId: active.id,
+        })) as unknown as PaymentOperation;
+        tick(active);
+        if (run.current !== seq) return active;
+      }
       while (run.current === seq) {
+        if (active.sponsorshipPause) break;
         if (active.phase === "confirmed" || active.phase === "failed") break;
         if (active.phase === "preparing") {
           if (keyring) {
@@ -426,8 +436,11 @@ export function useRequestPayment(request: PaymentRequest | null) {
         e instanceof Error
           ? e.message
           : "Payment couldn't be prepared. Refresh and try again.";
-      setError(message);
-      throw new Error(message);
+      if (run.current === seq) {
+        await refresh(request.id);
+        if (run.current === seq) setError(message);
+      }
+      throw e instanceof Error ? e : new Error(message);
     } finally {
       if (run.current === seq) setWorking(false);
     }

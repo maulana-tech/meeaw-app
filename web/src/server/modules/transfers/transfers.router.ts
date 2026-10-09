@@ -9,6 +9,7 @@ import {
   transferSubmissionSchema,
 } from "../../../features/transfers/validation";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import {
   recoveryBatch,
   resumeTransfer,
@@ -29,6 +30,12 @@ import {
   pendingTransfer,
 } from "./transfers.service";
 export function mapTransferError(e: unknown): never {
+  if (isSponsorshipError(e))
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: e.message,
+      cause: e,
+    });
   if (e instanceof TransferNotFoundError)
     throw new TRPCError({ code: "NOT_FOUND", message: e.message });
   if (e instanceof TransferConflictError)

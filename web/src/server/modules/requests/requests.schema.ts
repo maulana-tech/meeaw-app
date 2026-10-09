@@ -66,6 +66,26 @@ export const beginPaymentInput = z.strictObject({
 });
 export const submitPaymentInput = signedSubmissionSchema;
 export const paymentOperationOutput = z.strictObject({
+  sponsorshipAction: z
+    .object({
+      chainId: z.number().int().positive(),
+      actionId: z.string().min(1).max(200),
+      fence: z.number().int().positive(),
+    })
+    .optional(),
+  sponsorshipPause: z
+    .enum([
+      "configuration",
+      "initializing",
+      "quota",
+      "budget",
+      "anonymous-budget",
+      "balance",
+      "cost",
+      "capacity",
+      "rpc",
+    ])
+    .optional(),
   fundingGeneration: z.number().int().min(0).max(63).optional(),
   keyRevision: z.number().int().positive().optional(),
   accountTicketId: z.string().uuid().optional(),
