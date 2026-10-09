@@ -84,8 +84,30 @@ export type LedgerSnapshot = {
   actions: Record<string, LedgerAction>;
   policy: SponsorPolicyStored | null;
   bootstrap: { state: "initializing" | "complete"; cursor: string | null };
+  recoveryCursor?: string | null;
 };
 export type SponsorCommand =
+  | { kind: "recovery-cursor"; cursor: string | null }
+  | {
+      kind: "retire";
+      ticket: ChildTicket;
+      retiredWalletFence: number;
+      hash: Hex;
+    }
+  | {
+      kind: "import";
+      intent: ActionIntent;
+      tx: FrozenTx;
+      digest: Hex;
+      hash: Hex;
+      walletFence: number;
+    }
+  | {
+      kind: "baseline";
+      expectedCursor: string | null;
+      cursor: string | null;
+      complete: boolean;
+    }
   | { kind: "admit"; intent: ActionIntent }
   | {
       kind: "allocate";
@@ -320,7 +342,84 @@ export function reduceSponsorCommand(
   totals(s);
   let result: ActionTicket | ChildTicket | QuotaStatus | undefined;
   if (cmd.kind === "status") result = status(s, cmd.principal, policy);
-  else if (cmd.kind === "admit") {
+  else if (cmd.kind === "recovery-cursor") s.recoveryCursor = cmd.cursor;
+  else if (cmd.kind === "baseline") {
+    if (
+      s.bootstrap.cursor !== cmd.expectedCursor ||
+      s.bootstrap.state === "complete"
+    )
+      error("rpc");
+    s.bootstrap = {
+      state: cmd.complete ? "complete" : "initializing",
+      cursor: cmd.cursor,
+    };
+  } else if (cmd.kind === "import") {
+    const i = cmd.intent,
+      tx = storeTx(cmd.tx),
+      key = ledgerKey(i.actionId),
+      prior = s.actions[key];
+    if (
+      i.chainId !== s.chainId ||
+      cmd.tx.chainId !== s.chainId ||
+      !hash.test(cmd.hash) ||
+      !hash.test(cmd.digest) ||
+      !Number.isSafeInteger(cmd.walletFence) ||
+      cmd.walletFence < 1
+    )
+      error("cost");
+    if (prior) {
+      const c = prior.children[ledgerKey("legacy")];
+      if (
+        !prior.legacy ||
+        !sameActionIntent(prior.intent, i) ||
+        !c ||
+        c.hash !== cmd.hash ||
+        JSON.stringify(c.tx) !== JSON.stringify(tx)
+      )
+        error("cost");
+      result = {
+        chainId: s.chainId,
+        actionId: i.actionId,
+        fence: prior.fence,
+        childId: "legacy",
+        childFence: c.fence,
+      };
+    } else {
+      if (Object.keys(s.actions).length >= 256) error("capacity");
+      const maximum = maximumLiability(cmd.tx),
+        fence = ++s.nextFence,
+        childFence = ++s.nextFence;
+      s.actions[key] = {
+        intent: structuredClone(i),
+        fence,
+        policy: storePolicy({ ...policy, actionWei: maximum }),
+        remainingWei: maximum.toString(),
+        charged: false,
+        chargedDay: null,
+        legacy: true,
+        phase: "active",
+        children: {
+          [ledgerKey("legacy")]: {
+            id: "legacy",
+            fence: childFence,
+            digest: cmd.digest,
+            tx,
+            maximumWei: maximum.toString(),
+            walletFence: cmd.walletFence,
+            phase: "signed",
+            hash: cmd.hash,
+          },
+        },
+      };
+      result = {
+        chainId: s.chainId,
+        actionId: i.actionId,
+        fence,
+        childId: "legacy",
+        childFence,
+      };
+    }
+  } else if (cmd.kind === "admit") {
     const i = cmd.intent;
     validIntent(i, policy, s);
     const key = ledgerKey(i.actionId),
@@ -451,6 +550,15 @@ export function reduceSponsorCommand(
     )
       error("budget");
     if (c.phase !== "settled") c.phase = "unknown";
+  } else if (cmd.kind === "retire") {
+    const { c } = child(s, cmd.ticket);
+    if (
+      c.walletFence !== cmd.retiredWalletFence ||
+      c.phase !== "signed" ||
+      c.hash !== cmd.hash
+    )
+      error("budget");
+    c.phase = "abandoned";
   } else if (cmd.kind === "release") {
     const { c } = child(s, cmd.ticket);
     if (

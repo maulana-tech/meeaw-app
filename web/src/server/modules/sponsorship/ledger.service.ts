@@ -15,6 +15,7 @@ import {
   type SponsorClock,
   SponsorLedgerRepository,
 } from "./ledger.repository";
+import type { SponsorCommand } from "./ledgerModel";
 import { ledgerKey } from "./ledgerModel";
 
 export type { SponsorClock };
@@ -39,6 +40,30 @@ export class SponsorLedger {
       kind: "admit",
       intent,
     })) as ActionTicket;
+  }
+  async importLegacy(
+    command: Extract<SponsorCommand, { kind: "import" }>,
+  ): Promise<ChildTicket> {
+    return (await this.repo.mutate(
+      command.intent.chainId,
+      command,
+    )) as ChildTicket;
+  }
+  async baseline(
+    chainId: number,
+    expectedCursor: string | null,
+    cursor: string | null,
+    complete: boolean,
+  ) {
+    await this.repo.mutate(chainId, {
+      kind: "baseline",
+      expectedCursor,
+      cursor,
+      complete,
+    });
+  }
+  async recoveryCursor(chainId: number, cursor: string | null) {
+    await this.repo.mutate(chainId, { kind: "recovery-cursor", cursor });
   }
   async readAction(chainId: number, actionId: string) {
     const doc = await this.repo.snapshot(chainId);
@@ -88,6 +113,18 @@ export class SponsorLedger {
       kind: "release",
       ticket,
       retiredWalletFence,
+    });
+  }
+  async retireUnpublished(
+    ticket: ChildTicket,
+    retiredWalletFence: number,
+    hash: Hex,
+  ) {
+    await this.repo.mutate(ticket.chainId, {
+      kind: "retire",
+      ticket,
+      retiredWalletFence,
+      hash,
     });
   }
   async closeAction(ticket: ActionTicket) {

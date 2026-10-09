@@ -7,6 +7,7 @@
     "dev": "next dev",
     "indexer:local": "node --use-system-ca --env-file=.env.local scripts/pool-indexer-local.mjs",
     "payments:local": "node --use-system-ca --env-file=.env.local scripts/request-payments-local.mjs",
+    "relayer:budget-status": "node --env-file=.env.local scripts/relayer-budget-status.mjs",
     "build": "next build",
     "build:local": "node scripts/next-local.mjs build",
     "lint": "next lint",

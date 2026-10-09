@@ -458,7 +458,10 @@ export async function reconcileRelay(i: RelayIntent) {
 export async function reconcileAllRelays(limit = 20) {
   const { sender, journal } = await runtimeSender();
   const wallets = await journal.wallets
-    .find({ "active.serializedTransaction": { $type: "string" } })
+    .find({
+      _id: { $regex: `^${chain.id}:` },
+      "active.serializedTransaction": { $type: "string" },
+    })
     .limit(limit)
     .toArray();
   let confirmed = 0,

@@ -68,8 +68,52 @@ export class SponsorLedgerRepository {
           };
         }
         if (["admit", "allocate", "signing"].includes(cmd.kind) || !doc.policy)
-          throw new SponsorshipError("configuration");
-        policy = restorePolicy(doc.policy);
+          if (
+            cmd.kind !== "import" &&
+            cmd.kind !== "baseline" &&
+            cmd.kind !== "recovery-cursor"
+          )
+            throw new SponsorshipError("configuration");
+        policy = doc.policy
+          ? restorePolicy(doc.policy)
+          : {
+              revision: "legacy-baseline",
+              userLimit: 0,
+              guestWalletLimit: 0,
+              anonymousLimit: 0,
+              globalWei: 0n,
+              anonymousWei: 0n,
+              actionWei: 0n,
+              balanceFloorWei: 0n,
+              feeCeilingWei: (1n << 256n) - 1n,
+              maxChildren: 16,
+            };
+      }
+      if (
+        cmd.kind === "import" &&
+        !doc.actions[ledgerKey(cmd.intent.actionId)]
+      ) {
+        const archived = await this.archives.findOne({
+            _id: `${chainId}:${cmd.intent.actionId}`,
+          }),
+          a = archived?.action,
+          c = a?.children[ledgerKey("legacy")];
+        if (a) {
+          if (
+            !a.legacy ||
+            !sameActionIntent(a.intent, cmd.intent) ||
+            c?.hash !== cmd.hash ||
+            c.digest !== cmd.digest
+          )
+            throw new SponsorshipError("cost");
+          return {
+            chainId,
+            actionId: cmd.intent.actionId,
+            fence: a.fence,
+            childId: "legacy",
+            childFence: c.fence,
+          };
+        }
       }
       if (
         cmd.kind === "admit" &&
