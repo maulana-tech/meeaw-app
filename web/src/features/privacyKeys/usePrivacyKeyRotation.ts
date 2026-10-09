@@ -112,6 +112,7 @@ export function usePrivacyKeyRotation() {
       try {
         return await action();
       } catch (cause) {
+        if (current.current === identity) await refresh().catch(() => null);
         if (current.current === identity)
           setError(
             cause instanceof Error
@@ -124,7 +125,7 @@ export function usePrivacyKeyRotation() {
         if (current.current === identity) setWorking(false);
       }
     },
-    [identity],
+    [identity, refresh],
   );
   const prepare = (pin?: string) =>
     work(async () => {

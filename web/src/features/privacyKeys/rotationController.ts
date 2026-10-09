@@ -242,11 +242,25 @@ export function createPrivacyRotationController(ports: RotationPorts) {
       }
       const sponsored = await ports.sponsored();
       current(at);
-      operation = await ports.submit(
-        intent.id,
-        authorization,
-        sponsored ? "relay" : "wallet",
-      );
+      try {
+        operation = await ports.submit(
+          intent.id,
+          authorization,
+          sponsored ? "relay" : "wallet",
+        );
+      } catch (error) {
+        const latest = await ports.state().catch(() => null);
+        const accepted = latest?.pending;
+        if (
+          at === epoch &&
+          ports.isCurrent() &&
+          accepted?.intent.id === intent.id &&
+          accepted.intent.owner.toLowerCase() === ports.owner.toLowerCase() &&
+          accepted.intent.registry === intent.registry
+        )
+          operation = accepted;
+        throw error;
+      }
       current(at);
       if (!sponsored && !operation.txHash && operation.phase !== "confirmed")
         await ports.wallet(operation, authorization, async (hash) => {
