@@ -1,11 +1,11 @@
-import { NextRequest } from "next/server";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
+import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { config, middleware } from "../middleware";
 import {
   PRIVY_ACCESS_TOKEN_COOKIE,
   PRIVY_SESSION_COOKIE,
 } from "../src/lib/auth-routes";
+import { config, middleware } from "../src/middleware";
 
 function request(pathname: string, cookie?: string) {
   return new NextRequest(`http://localhost:3000${pathname}`, {
@@ -14,15 +14,28 @@ function request(pathname: string, cookie?: string) {
 }
 
 describe("route middleware", () => {
-  it("runs authentication middleware for the Requests route group",()=>{
-    expect(unstable_doesMiddlewareMatch({config,nextConfig:{},url:"/requests"})).toBe(true);
-    expect(unstable_doesMiddlewareMatch({config,nextConfig:{},url:"/requests/notes"})).toBe(true);
+  it("runs authentication middleware for the Requests route group", () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "/requests",
+      }),
+    ).toBe(true);
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "/requests/notes",
+      }),
+    ).toBe(true);
   });
   it.each([
     "/dashboard",
     "/links",
     "/withdraw",
     "/history",
+    "/invoices",
   ])("redirects unsigned users away from %s", (pathname) => {
     const response = middleware(request(pathname));
     expect(response.status).toBe(307);

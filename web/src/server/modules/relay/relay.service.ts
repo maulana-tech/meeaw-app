@@ -12,7 +12,10 @@ import { USDC_DECIMALS } from "../../../lib/crypto";
 import { activePool, findPool } from "../../../lib/pools";
 import type { Context } from "../../context";
 import { relayerConfigured, relayWrite } from "../../lib/relayer";
-import { RelayRevertedError } from "../../lib/relayOutcome.errors";
+import {
+  RelayNotSubmittedError,
+  RelayRevertedError,
+} from "../../lib/relayOutcome.errors";
 import { ordinaryBusinessIdentity } from "../sponsorship/ordinaryIdentity";
 import { principalFromContext } from "../sponsorship/principals";
 import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
@@ -76,6 +79,16 @@ async function relay<T>(send: () => Promise<T>): Promise<T> {
   try {
     return await send();
   } catch (error) {
+    if (error instanceof RelayNotSubmittedError) {
+      const original = error.original;
+      if (isSponsorshipError(original)) throw error;
+      const rejected = revertErrorName(original);
+      throw new RelayNotSubmittedError(
+        rejected && REJECTIONS[rejected]
+          ? new RelayRejectedError(REJECTIONS[rejected])
+          : new Error("The transaction could not be submitted. Try again."),
+      );
+    }
     if (isSponsorshipError(error) || error instanceof RelayRevertedError)
       throw error;
     const name = revertErrorName(error);
@@ -133,6 +146,8 @@ export async function relayDeposit(
   input: DepositInput,
   ctx: Context = guest,
 ): Promise<{ txHash: string; leafIndex: number }> {
+  if (!relayerConfigured())
+    throw new RelayNotSubmittedError(new RelayerUnavailableError());
   const permit = input.permit ?? {
     value: 0n,
     deadline: 0n,
@@ -141,9 +156,12 @@ export async function relayDeposit(
     s: `0x${"00".repeat(32)}` as const,
   };
   const pool = input.pool ? findPool(input.pool) : activePool();
-  if (!pool) throw new RelayRejectedError("Unknown pool.");
+  if (!pool)
+    throw new RelayNotSubmittedError(new RelayRejectedError("Unknown pool."));
   if (pool.role !== "active") {
-    throw new RelayRejectedError("This pool no longer takes deposits.");
+    throw new RelayNotSubmittedError(
+      new RelayRejectedError("This pool no longer takes deposits."),
+    );
   }
   const { hash, receipt } = await relay(() =>
     relayWrite(

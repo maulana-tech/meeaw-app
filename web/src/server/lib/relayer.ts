@@ -21,7 +21,10 @@ import {
 } from "../modules/sponsorship/sponsorship.errors";
 import { type RelayIntent, runtimeSender } from "./durableRelayer";
 import { RelayConflictError } from "./relayJournal";
-import { RelayRevertedError } from "./relayOutcome.errors";
+import {
+  RelayNotSubmittedError,
+  RelayRevertedError,
+} from "./relayOutcome.errors";
 
 export type OrdinarySponsor = {
   kind: ActionKind;
@@ -69,6 +72,7 @@ export function relayWrite<
       `${chain.id}:${account.address.toLowerCase()}`,
       operationKey,
     );
+    let foundSibling = false;
     if (!prior && sponsor.closeParent !== false) {
       const sibling = await budget.ledger.findOrdinaryAction(
         chain.id,
@@ -76,6 +80,7 @@ export function relayWrite<
         sponsor.identity.businessDigest,
       );
       if (sibling) {
+        foundSibling = true;
         if (
           sibling.intent.principal.kind !== sponsor.principal.kind ||
           sibling.intent.principal.key !== sponsor.principal.key
@@ -105,13 +110,27 @@ export function relayWrite<
         throw new RelayConflictError();
       intent = prior.intent;
     } else {
-      await reader.simulateContract({ ...request, account } as Parameters<
-        typeof reader.simulateContract
-      >[0]);
-      const previousAction = await budget.ledger.readAction(
-        chain.id,
-        sponsor.identity.actionId,
-      );
+      const existingDeposit =
+        sponsor.kind === "deposit"
+          ? await budget.ledger.readAction(chain.id, sponsor.identity.actionId)
+          : null;
+      const freshDeposit =
+        sponsor.kind === "deposit" &&
+        !prior &&
+        !foundSibling &&
+        !existingDeposit;
+      try {
+        await reader.simulateContract({ ...request, account } as Parameters<
+          typeof reader.simulateContract
+        >[0]);
+      } catch (error) {
+        if (freshDeposit) throw new RelayNotSubmittedError(error);
+        throw error;
+      }
+      const previousAction =
+        sponsor.kind === "deposit"
+          ? existingDeposit
+          : await budget.ledger.readAction(chain.id, sponsor.identity.actionId);
       const abandoned =
         previousAction?.phase === "cancelled" ||
         (previousAction?.phase === "closed" &&
@@ -119,16 +138,21 @@ export function relayWrite<
           Object.values(previousAction.children).every(
             (c) => c.phase === "abandoned",
           ));
-      const action = await budget.ledger.admit({
-        chainId: chain.id,
-        actionId: abandoned
-          ? `${sponsor.identity.actionId}:retry:${randomUUID()}`
-          : sponsor.identity.actionId,
-        kind: sponsor.kind,
-        principal: sponsor.principal,
-        businessDigest: sponsor.identity.businessDigest,
-        maximumChildren: sponsor.maximumChildren ?? 1,
-      });
+      const action = await budget.ledger
+        .admit({
+          chainId: chain.id,
+          actionId: abandoned
+            ? `${sponsor.identity.actionId}:retry:${randomUUID()}`
+            : sponsor.identity.actionId,
+          kind: sponsor.kind,
+          principal: sponsor.principal,
+          businessDigest: sponsor.identity.businessDigest,
+          maximumChildren: sponsor.maximumChildren ?? 1,
+        })
+        .catch((error) => {
+          if (freshDeposit) throw new RelayNotSubmittedError(error);
+          throw error;
+        });
       operationKey = `ordinary:${action.actionId}${sponsor.closeParent === false ? `:${sponsor.identity.childId}` : ""}`;
       const accepted = await journal.read(
         `${chain.id}:${account.address.toLowerCase()}`,

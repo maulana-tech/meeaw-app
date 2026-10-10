@@ -1,12 +1,21 @@
 import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { expect, it } from "vitest";
-import { RelayRevertedError } from "../src/server/lib/relayOutcome.errors";
+import {
+  RelayNotSubmittedError,
+  RelayRevertedError,
+} from "../src/server/lib/relayOutcome.errors";
 import { SponsorshipError } from "../src/server/modules/sponsorship/sponsorship.errors";
 import { createTRPCRouter, publicProcedure } from "../src/server/trpc";
 
 const hash = `0x${"a".repeat(64)}` as const;
 const router = createTRPCRouter({
+  unsubmitted: publicProcedure.mutation(() => {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      cause: new RelayNotSubmittedError(new SponsorshipError("quota")),
+    });
+  }),
   paused: publicProcedure.mutation(() => {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -42,6 +51,10 @@ it("carries a safe pause reason and canonical revert outcome through the real HT
     return response.json();
   };
   expect((await call("paused")).error.data.sponsorshipReason).toBe("budget");
+  expect((await call("unsubmitted")).error.data.relayNotSubmitted).toBe(true);
+  expect((await call("unsubmitted")).error.data.sponsorshipReason).toBe(
+    "quota",
+  );
   expect((await call("reverted")).error.data.relayOutcome).toEqual({
     state: "reverted",
     txHash: hash,

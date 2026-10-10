@@ -8,6 +8,7 @@ vi.mock("../src/features/sponsorship/useSponsorship", () => ({
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InvoicePaymentIntent } from "../src/features/invoices/types";
 import type { PaymentLink } from "../src/features/paymentLinks/types";
 import type { MaweeAccount } from "../src/lib/chain";
 import type { PoolDescriptor } from "../src/lib/pools";
@@ -22,6 +23,11 @@ const mock = vi.hoisted(() => ({
 vi.mock("../src/lib/pools", () => ({
   activePools: () => mock.pools,
   activePoolFor: (asset: string) => mock.pools.find((p) => p.asset === asset),
+  resolvePool: (scope: string) => {
+    const pool = mock.pools.find((p) => p.scope === scope);
+    if (!pool) throw new Error("Unknown pool");
+    return pool;
+  },
 }));
 vi.mock("../src/features/payerWallet/hooks/usePayerWallet", () => ({
   usePayerWallet: () => ({
@@ -63,6 +69,72 @@ const link = {
   amount: null,
 } as unknown as PaymentLink;
 describe("managed checkout", () => {
+  it("keeps Pay disabled after a broadcast attempt has an uncertain result", async () => {
+    const intent: InvoicePaymentIntent = {
+      poolScope: assetPool("AUSD").scope,
+      salt: "7",
+      ephemeralPk: `0x${"11".repeat(32)}`,
+      ciphertext: `0x${"22".repeat(88)}`,
+    };
+    const lifecycle = {
+      onSubmitting: vi.fn(),
+      onSubmitted: vi.fn(),
+      onUncertain: vi.fn(),
+      onReleased: vi.fn(),
+    };
+    mock.pay.mockImplementation(async (...args) => {
+      args[5].lifecycle.onSubmitting();
+      throw new Error("receipt timeout");
+    });
+    render(
+      <PayForm
+        account={account}
+        username="alice"
+        link={{ ...link, amount: "2500000" }}
+        invoice={intent}
+        invoiceLifecycle={lifecycle}
+      />,
+    );
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /Pay 2.5 AUSD/i }));
+    await waitFor(() => expect(lifecycle.onUncertain).toHaveBeenCalledOnce());
+    expect(
+      screen.getByRole("button", { name: /check payment status/i }),
+    ).toBeDisabled();
+    expect(lifecycle.onReleased).not.toHaveBeenCalled();
+    expect(mock.pay).toHaveBeenCalledOnce();
+  });
+  it("passes the pinned invoice note and reports the resulting receipt", async () => {
+    const intent: InvoicePaymentIntent = {
+      poolScope: assetPool("AUSD").scope,
+      salt: "7",
+      ephemeralPk: `0x${"11".repeat(32)}`,
+      ciphertext: `0x${"22".repeat(88)}`,
+    };
+    const onPaid = vi.fn(async () => {});
+    mock.pay.mockResolvedValue({ txHash: `0x${"a".repeat(64)}`, leafIndex: 0 });
+    render(
+      <PayForm
+        account={account}
+        username="alice"
+        link={{ ...link, amount: "2500000" }}
+        invoice={intent}
+        onPaid={onPaid}
+      />,
+    );
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: /Pay 2.5 AUSD/i }));
+    await waitFor(() =>
+      expect(onPaid).toHaveBeenCalledWith(`0x${"a".repeat(64)}`),
+    );
+    expect(mock.pay.mock.calls[0][5].salt).toBe(7n);
+    expect(mock.pay.mock.calls[0][5].envelope.ciphertext).toHaveLength(88);
+    expect(
+      screen.getByRole("button", { name: /payment submitted/i }),
+    ).toBeDisabled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mock.pools = [assetPool("USDC"), assetPool("AUSD")];

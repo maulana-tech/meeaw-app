@@ -100,19 +100,29 @@ export type Signer = {
 };
 
 type WriteRequest = Parameters<WalletClient["writeContract"]>[0];
+export type DepositLifecycle = {
+  onSubmitting?: () => void;
+  onSubmitted?: (hash: string) => void;
+};
 
 async function send(
   signer: Signer,
   request: Omit<WriteRequest, "account" | "chain">,
+  lifecycle?: DepositLifecycle,
 ): Promise<{ hash: Hash; receipt: TransactionReceipt }> {
+  lifecycle?.onSubmitting?.();
   const hash = await signer.walletClient.writeContract({
     ...request,
     account: signer.address,
     chain,
   } as WriteRequest);
+  lifecycle?.onSubmitted?.(hash);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") {
-    throw new Error(`Transaction reverted: ${hash}`);
+    throw Object.assign(new Error(`Transaction reverted: ${hash}`), {
+      code: "MAWEE_CONFIRMED_REVERT",
+      txHash: hash,
+    });
   }
   return { hash, receipt };
 }
@@ -255,6 +265,7 @@ async function relayDeposit(
   ephemeralPk: Hex,
   ciphertext: Hex,
   isCurrent: () => boolean = () => true,
+  lifecycle?: DepositLifecycle,
 ): Promise<{ leafIndex: number; txHash: string }> {
   const [poolNonce, allowance] = await Promise.all([
     publicClient.readContract({
@@ -329,6 +340,7 @@ async function relayDeposit(
 
   if (!isCurrent())
     throw new Error("The payment selection changed. Review again.");
+  lifecycle?.onSubmitting?.();
   return api.relay.deposit.mutate({
     pool: pool.scope,
     payer: signer.address,
@@ -568,6 +580,7 @@ export async function poolDeposit(
   ciphertext: Uint8Array,
   pool: PoolDescriptor = activePool(),
   isCurrent: () => boolean = () => true,
+  lifecycle?: DepositLifecycle,
 ): Promise<{ leafIndex: number; txHash: string }> {
   if (pool.role !== "active")
     throw new Error("This pool no longer takes deposits.");
@@ -581,6 +594,7 @@ export async function poolDeposit(
       hexOf(ephemeralPk),
       hexOf(ciphertext),
       isCurrent,
+      lifecycle,
     );
   }
   const allowance = await publicClient.readContract({
@@ -601,18 +615,22 @@ export async function poolDeposit(
   }
   if (!isCurrent())
     throw new Error("The payment selection changed. Review again.");
-  const { hash, receipt } = await send(signer, {
-    address: pool.address,
-    abi: maweePoolAbi,
-    functionName: "deposit",
-    args: [
-      hexOf(commitment),
-      amount,
-      proof,
-      hexOf(ephemeralPk),
-      hexOf(ciphertext),
-    ],
-  });
+  const { hash, receipt } = await send(
+    signer,
+    {
+      address: pool.address,
+      abi: maweePoolAbi,
+      functionName: "deposit",
+      args: [
+        hexOf(commitment),
+        amount,
+        proof,
+        hexOf(ephemeralPk),
+        hexOf(ciphertext),
+      ],
+    },
+    lifecycle,
+  );
   const [event] = parseEventLogs({
     abi: maweePoolAbi,
     eventName: "Deposit",

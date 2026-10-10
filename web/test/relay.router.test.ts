@@ -310,6 +310,20 @@ describe("relay router", () => {
       signature: SIG,
       permit: null,
     };
+    it("signals no submission when the deposit IP limit rejects before service", async () => {
+      for (let i = 0; i < 20; i++)
+        await caller(null)
+          .deposit(deposit)
+          .catch(() => {});
+      const error = await caller(null)
+        .deposit(deposit)
+        .catch((error) => error);
+      expect(error).toMatchObject({
+        code: "TOO_MANY_REQUESTS",
+        cause: { name: "RelayNotSubmittedError" },
+      });
+      expect(mocks.relayWrite).toHaveBeenCalledTimes(20);
+    });
 
     it("deposits into the requested active pool", async () => {
       const { activePool } = await import("../src/lib/pools");
