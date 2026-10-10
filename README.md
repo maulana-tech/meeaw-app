@@ -242,6 +242,10 @@ pnpm --filter web build
 
 ## Deploy To Monad Testnet
 
+Meaw also includes a PWA manifest, home-screen installation guidance, a static
+offline page and an AUSD sending shortcut. See [Meaw on your phone](docs/mobile-pwa.md)
+for installation, privacy boundaries and the device checks needed before submission.
+
 ```sh
 DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet              # USDC pool
 DEPLOYER_PRIVATE_KEY=0x... ASSET=AUSD pnpm deploy:testnet   # add a pool for AUSD / USDT0 / MUSD

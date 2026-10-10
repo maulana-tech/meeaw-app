@@ -12,6 +12,7 @@ import { chain } from "../../lib/chain";
 import { getAccount } from "../../lib/notes";
 import { formatPaymentAmount } from "../../lib/paymentAsset";
 import { resolvePool } from "../../lib/pools";
+import { MeawMascot } from "../MeawMascot";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -94,6 +95,14 @@ export function TransferProgress({
             Your transfer stays available in History when you close this window.
           </DialogDescription>
         </DialogHeader>
+        {phase === "confirmed" && (
+          <div className="flex items-center gap-3" role="status">
+            <MeawMascot mood="success" size={48} tone="ink" />
+            <p className="text-sm">
+              Your payment is confirmed. You can find it in History.
+            </p>
+          </div>
+        )}
         {(phase === "preparing" || transfer.operation?.sponsorshipPause) && (
           <SponsorshipNotice
             status={sponsorship.status}

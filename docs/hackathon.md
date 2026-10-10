@@ -45,6 +45,12 @@ with a QR code.
 
 ## Bounties we claim
 
+Mobile implementation update (10 October 2026): the app includes a PWA manifest,
+regular/maskable icons, static offline fallback, installation guidance and a
+dashboard AUSD sending shortcut. This does not establish Agora eligibility or
+real-device verification. Confirm the organizer's PWA/mock-token/onboarding and
+stacking requirements before adding an Agora claim. See [mobile PWA](mobile-pwa.md).
+
 Bounties are track-agnostic and stack on top of the track submission. We claim
 two, and deliberately do not claim two others.
 
