@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Mawee is a private USDC payments app on Monad (testnet). Payers deposit into a shielded pool via payment links; recipients scan, decrypt and spend notes with zero-knowledge proofs generated in the browser. See `README.md` for the product/privacy model and `docs/` (GitBook) for deeper reference — `docs/local-setup.md` covers first-time setup.
+Meaw is a private USDC payments app on Monad (testnet). Payers deposit into a shielded pool via payment links; recipients scan, decrypt and spend notes with zero-knowledge proofs generated in the browser. See `README.md` for the product/privacy model and `docs/` (GitBook) for deeper reference — `docs/local-setup.md` covers first-time setup.
 
 ## Commands
 
-pnpm workspace (`web`, `contracts`). `circuits/` (npm) and `indexer/` (own pnpm lockfile) are standalone packages.
+pnpm workspace (`web`, `contracts`). `monad-zk/` (npm) and `indexer/` (own pnpm lockfile) are standalone packages.
 
 ```sh
 pnpm install
@@ -24,7 +24,7 @@ pnpm --filter contracts abis              # compile + regenerate web/src/lib/abi
 DEPLOYER_PRIVATE_KEY=0x... pnpm deploy:testnet   # deploys a pool, writes review candidates to .deploy-candidates/
 ASSET=AUSD pnpm deploy:testnet            # adds a pool for AUSD/USDT0/MUSD next to USDC (TOKEN_ADDRESS, else a mock on testnet)
 
-circuits/build.sh                         # needs circom 2 + snarkjs; dev-only trusted setup
+monad-zk/build.sh                         # needs circom 2 + snarkjs; dev-only trusted setup
 cd indexer && pnpm codegen && pnpm dev     # Envio HyperIndex (Node >= 22); pnpm test / pnpm typecheck
 ```
 
@@ -33,9 +33,9 @@ cd indexer && pnpm codegen && pnpm dev     # Envio HyperIndex (Node >= 22); pnpm
 ### Generated artifacts — don't hand-edit
 - `web/src/lib/abi.ts` ← `contracts/scripts/export-abis.cjs` (run `pnpm --filter contracts abis` after changing contract ABIs).
 - `contracts/src/verifiers/*.sol` ← `contracts/scripts/export-verifiers.cjs`, generated from `web/public/zk/*.zkey`.
-- `web/public/zk/*` (wasm, zkey, verification keys) ← `circuits/build.sh`, which also re-runs the verifier export.
+- `web/public/zk/*` (wasm, zkey, verification keys) ← `monad-zk/build.sh`, which also re-runs the verifier export.
 
-The browser prover, Solidity verifiers and contract tests must all use the same zkeys. Changing a `.circom` file means: `circuits/build.sh` → redeploy contracts → update env addresses.
+The browser prover, Solidity verifiers and contract tests must all use the same zkeys. Changing a `.circom` file means: `monad-zk/build.sh` → redeploy contracts → update env addresses.
 
 ### Contracts (`contracts/src`)
 - `MaweeRegistry` — `@username` → owner address, Poseidon note public key, x25519 viewing key.

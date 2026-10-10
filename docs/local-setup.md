@@ -18,7 +18,7 @@ the private-transfer/spend-reservation migrations. Read
 restarts or resolving a stuck send. Signed/unknown relay operations must retain
 their original transaction bytes and scoped spend claims.
 
-Run Mawee on your machine against Monad testnet, from a fresh clone to signing
+Run Meaw on your machine against Monad testnet, from a fresh clone to signing
 in on the dashboard. Plan on about 20 minutes.
 
 Without this setup the landing page still renders, but **Create your payment

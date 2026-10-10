@@ -1,7 +1,7 @@
 // Circuit-level tests for the Merge circuit, run against the shipped browser
 // artifacts in web/public/zk:
 //
-//   node circuits/test/merge.test.cjs
+//   node monad-zk/test/merge.test.cjs
 //
 // Honest inputs must produce a proof that verifies; every adversarial witness
 // must be rejected by the circuit's constraints during witness generation.

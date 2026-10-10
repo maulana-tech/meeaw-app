@@ -73,6 +73,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.81.0(react@19.2.7))(zod@4.4.3)
+      '@lucasmarkes/hairline':
+        specifier: 0.5.0
+        version: 0.5.0(react@19.2.7)
       '@noble/ciphers':
         specifier: ^2.2.0
         version: 2.2.0
@@ -1220,6 +1223,14 @@ packages:
 
   '@lit/reactive-element@2.1.2':
     resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
+
+  '@lucasmarkes/hairline@0.5.0':
+    resolution: {integrity: sha512-anXxRq2vRoBtjwt8q6CAlwcfpqVNmJIlM0HOaGpJFG6BNJVbjIoqD8m0JaFdYActPx6drUTpsaey55+ajWJ4pA==}
+    peerDependencies:
+      react: '>=18'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@marsidev/react-turnstile@1.6.0':
     resolution: {integrity: sha512-T2Um71ZdBgQBiyS01xgRMvDWk+mEsrLtXLFVhOC917OVEO584wbPOWj1sw35RaM17+q9QoADgLVcH60xr9NRqQ==}
@@ -8930,6 +8941,10 @@ snapshots:
   '@lit/reactive-element@2.1.2':
     dependencies:
       '@lit-labs/ssr-dom-shim': 1.6.0
+
+  '@lucasmarkes/hairline@0.5.0(react@19.2.7)':
+    optionalDependencies:
+      react: 19.2.7
 
   '@marsidev/react-turnstile@1.6.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:

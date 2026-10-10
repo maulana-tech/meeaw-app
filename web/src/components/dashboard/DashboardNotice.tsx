@@ -6,14 +6,17 @@ export function DashboardNotice({
   title,
   children,
   action,
+  art,
 }: {
   label: string;
   title: string;
   children: ReactNode;
   action?: ReactNode;
+  art?: ReactNode;
 }) {
   return (
     <section className="rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) p-6 sm:p-8">
+      {art ? <div className="mb-5">{art}</div> : null}
       <p className="dashboard-tile-title flex items-center gap-2">
         <span
           className="size-1.5 rounded-full bg-(--dash-accent)"

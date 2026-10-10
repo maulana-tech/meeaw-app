@@ -2,7 +2,6 @@
 
 import {
   ArrowUpRight,
-  Send,
   Check,
   ChevronDown,
   Eye,
@@ -11,6 +10,7 @@ import {
   Plus,
   QrCode,
   RotateCw,
+  Send,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import { useState } from "react";
 import { ASSETS } from "../../lib/assets";
 import { fromBaseUnits } from "../../lib/crypto";
 import { activePools } from "../../lib/pools";
+import { CoinIcon } from "../ui/coin-icon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -196,7 +197,18 @@ export function BalanceCard({
       </p>
 
       <div className="mt-auto flex flex-wrap gap-2 pt-8">
-        {onSend?<button type="button" className={dashButtonPrimary} onClick={onSend} disabled={loading} aria-label="Send private payment"><Send aria-hidden="true"/>Send</button>:null}
+        {onSend ? (
+          <button
+            type="button"
+            className={dashButtonPrimary}
+            onClick={onSend}
+            disabled={loading}
+            aria-label="Send private payment"
+          >
+            <Send aria-hidden="true" />
+            Send
+          </button>
+        ) : null}
         {onReceive ? (
           <button
             type="button"
@@ -227,21 +239,6 @@ export function BalanceCard({
         ) : null}
       </div>
     </div>
-  );
-}
-
-function CurrencyMark({ symbol, logo }: { symbol: string; logo?: string }) {
-  return logo ? (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#fff]">
-      <Image src={logo} alt="" width={24} height={24} className="size-6" />
-    </span>
-  ) : (
-    <span
-      className="flex size-8 shrink-0 items-center justify-center rounded-full border border-current/30 text-[10px] font-semibold"
-      aria-hidden="true"
-    >
-      {symbol.slice(0, 2)}
-    </span>
   );
 }
 
@@ -297,7 +294,11 @@ function CurrencySelector() {
                 onClick={() => selectAsset(pool.asset)}
                 className={`min-h-12 gap-3 rounded-lg px-3 py-2 text-brand-linen focus:bg-brand-linen/18 focus:text-brand-linen [&_svg]:text-brand-linen ${current ? "bg-brand-linen/12" : ""}`}
               >
-                <CurrencyMark symbol={asset.label} logo={asset.logo} />
+                <CoinIcon
+                  symbol={asset.label}
+                  logo={asset.logo}
+                  className="size-8"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold">{asset.label}</span>
                   {pools.length > 1 ? (
@@ -323,7 +324,7 @@ function CurrencySelector() {
               disabled
               className="min-h-11 gap-3 rounded-lg px-3 py-2 text-brand-linen/55 opacity-100 data-disabled:pointer-events-none data-disabled:opacity-55"
             >
-              <CurrencyMark symbol={symbol} logo={logo} />
+              <CoinIcon symbol={symbol} logo={logo} className="size-8" />
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">{symbol}</span>
                 <span className="block text-[11px]">{issuer}</span>

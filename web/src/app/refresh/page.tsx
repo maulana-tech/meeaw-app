@@ -3,6 +3,7 @@
 import { getAccessToken } from "@privy-io/react-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import { MeawMascot } from "../../components/MeawMascot";
 import { DASHBOARD_PATH, SIGN_IN_PATH } from "../../lib/auth-routes";
 
 function safeRedirect(value: string | null): string {
@@ -36,7 +37,11 @@ function RefreshSession() {
   }, [router, searchParams]);
 
   return (
-    <main className="grid min-h-svh place-items-center" aria-live="polite">
+    <main
+      className="grid min-h-svh place-content-center justify-items-center gap-4"
+      aria-live="polite"
+    >
+      <MeawMascot mood="loading" size={72} />
       <p>Refreshing your secure session…</p>
     </main>
   );
@@ -46,7 +51,11 @@ export default function RefreshPage() {
   return (
     <Suspense
       fallback={
-        <main className="grid min-h-svh place-items-center" aria-live="polite">
+        <main
+          className="grid min-h-svh place-content-center justify-items-center gap-4"
+          aria-live="polite"
+        >
+          <MeawMascot mood="loading" size={72} />
           <p>Refreshing your secure session…</p>
         </main>
       }

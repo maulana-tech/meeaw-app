@@ -721,7 +721,9 @@ body:has(.dashboard-app) {
   --dash-accent: var(--dash-fg);
   --dash-accent-ink: var(--dash-fg);
   --dash-radius: 0px;
-  --dash-radius-sm: 0px;
+  /* Panels stay square; controls and their hover fills keep a small radius
+     so they match the rounded fields beside them. */
+  --dash-radius-sm: 6px;
   color-scheme: light;
 }
 
@@ -908,4 +910,70 @@ body:has(.landing-paper) {
   --color-white: rgb(255 253 248);
   color-scheme: light;
   background: rgb(250 247 240);
+}
+
+/* Hairline figures on the landing paper. */
+.landing-paper .hairline-figure {
+  --hairline-plate: rgb(250 247 240);
+  --hairline-hi: rgb(21 19 16);
+  --hairline-edge: rgb(21 19 16 / 0.45);
+  --hairline-mid: rgb(21 19 16 / 0.28);
+  --hairline-lo: rgb(21 19 16 / 0.12);
+  --hairline-stroke: 1;
+}
+
+/* Meaw mascot. steps() keeps the motion as chunky as the pixels. */
+.meaw-mascot .meaw-cat {
+  transform-origin: 50% 100%;
+}
+.meaw-mascot[data-mood="idle"] .meaw-cat {
+  animation: meaw-breathe 2.4s steps(1) infinite;
+}
+.meaw-mascot[data-mood="loading"] .meaw-cat {
+  animation: meaw-hop 0.7s steps(1) infinite;
+}
+.meaw-mascot[data-mood="success"] .meaw-cat {
+  animation:
+    meaw-gulp 0.5s steps(1) 0.75s 2,
+    meaw-breathe 2.4s steps(1) 1.8s infinite;
+}
+.meaw-mascot .meaw-coin {
+  translate: -50% 0;
+  opacity: 0;
+  animation: meaw-coin-drop 0.9s cubic-bezier(0.5, 0, 0.9, 0.6) 0.1s forwards;
+}
+@keyframes meaw-breathe {
+  50% {
+    transform: scaleY(1.04);
+  }
+}
+@keyframes meaw-hop {
+  50% {
+    transform: translateY(-10%);
+  }
+}
+@keyframes meaw-gulp {
+  50% {
+    transform: scale(1.08, 0.94);
+  }
+}
+@keyframes meaw-coin-drop {
+  0% {
+    opacity: 1;
+    transform: translateY(-140%) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(150%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(190%) scale(0.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meaw-mascot .meaw-cat,
+  .meaw-mascot .meaw-coin {
+    animation: none;
+  }
 }
