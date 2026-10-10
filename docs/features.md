@@ -22,6 +22,11 @@ Every link comes with a QR code for in-person or mobile payments.
 
 ## Direct private sends
 
+The dashboard also offers **Send AUSD** when an eligible AUSD pool is configured.
+It selects AUSD and reopens any unfinished transfer before offering a new one.
+Meaw includes a home-screen installation flow and a static offline fallback;
+see [Meaw on your phone](mobile-pwa.md) for installation and recovery.
+
 Use **Send** on your private balance card to pay another registered `@username`
 without waiting for a payment request. Enter an amount in the selected eligible asset and an optional private
 note, review the recipient, then confirm. Meaw combines fragmented active-pool

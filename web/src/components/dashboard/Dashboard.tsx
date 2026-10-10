@@ -12,13 +12,14 @@ import {
   useState,
 } from "react";
 import { usePaymentActivity } from "../../features/payments/usePaymentActivity";
+import { InstallMeaw } from "../../features/pwa/InstallMeaw";
 import { useTransfers } from "../../features/transfers/hooks/useTransfers";
 import type { TransferRecord } from "../../features/transfers/types";
 import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH, WITHDRAW_PATH } from "../../lib/auth-routes";
 import { fromBaseUnits } from "../../lib/crypto";
 import { unlockLabel } from "../../lib/passkey";
-import { activePools } from "../../lib/pools";
+import { activePools, type PoolDescriptor } from "../../lib/pools";
 import { useWallet } from "../WalletProvider";
 import { ActivityFeed } from "./ActivityFeed";
 import { AddFundsDialog } from "./AddFundsDialog";
@@ -30,6 +31,7 @@ import { PaymentQrDialog } from "./PaymentQrDialog";
 import { PendingTransfersNotice } from "./PendingTransfersNotice";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { RequestsTile } from "./RequestsTile";
+import { SendAusdAction } from "./SendAusdAction";
 import { SendTransferDialog } from "./SendTransferDialog";
 import {
   dashButtonPrimary,
@@ -40,7 +42,7 @@ import {
 } from "./styles";
 import { TransferProgress } from "./TransferProgress";
 import { useMyNotes } from "./useMyNotes";
-import { assetLabel, useSelectedPool } from "./useSelectedPool";
+import { assetLabel, selectAsset, useSelectedPool } from "./useSelectedPool";
 export function Dashboard() {
   const {
     address,
@@ -55,6 +57,7 @@ export function Dashboard() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [sendPool, setSendPool] = useState<PoolDescriptor | null>(null);
   const pool = useSelectedPool();
   const [sendOpen, setSendOpen] = useState(false),
     [selectedTransfer, setSelectedTransfer] = useState<TransferRecord | null>(
@@ -68,6 +71,7 @@ export function Dashboard() {
     setSelectedTransfer(null);
     setProgressOpen(false);
     setSendOpen(false);
+    setSendPool(null);
   }, [address]);
   const { notes, claimable, loading, refreshing, stale, refresh } = useMyNotes(
     accountUnlocked ? address : undefined,
@@ -94,7 +98,24 @@ export function Dashboard() {
       <DashboardPageHeader
         title={username ? `Hi, @${username}` : "Welcome to Meaw"}
         description="Your private balance, payment link and recent activity."
+        action={
+          <SendAusdAction
+            onReady={(ausdPool, pending) => {
+              selectAsset(ausdPool.asset);
+              if (pending) {
+                setSelectedTransfer(pending);
+                setStartTransfer(false);
+                setProgressOpen(true);
+              } else {
+                setSendPool(ausdPool);
+                setSendOpen(true);
+              }
+            }}
+          />
+        }
       />
+
+      <InstallMeaw />
 
       <PendingTransfersNotice
         record={transfers.pending}
@@ -143,6 +164,7 @@ export function Dashboard() {
             onSend={
               username
                 ? () => {
+                    setSendPool(null);
                     if (transfers.pending) {
                       setSelectedTransfer(transfers.pending);
                       setStartTransfer(false);
@@ -203,9 +225,12 @@ export function Dashboard() {
         onOpenChange={setRequestOpen}
       />
       <SendTransferDialog
-        pool={pool}
+        pool={sendPool ?? pool}
         open={sendOpen}
-        onOpenChange={setSendOpen}
+        onOpenChange={(next) => {
+          setSendOpen(next);
+          if (!next) setSendPool(null);
+        }}
         onCreated={(record) => {
           setSelectedTransfer(record);
           setStartTransfer(true);
