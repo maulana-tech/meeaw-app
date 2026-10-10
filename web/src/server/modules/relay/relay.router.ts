@@ -2,11 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { usdcMintable } from "../../../lib/chain";
 import { rateLimit } from "../../lib/rateLimit";
 import { relayerConfigured } from "../../lib/relayer";
+import { RelayRevertedError } from "../../lib/relayOutcome.errors";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "../../trpc";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import {
   RelayerUnavailableError,
   RelayRateLimitedError,
@@ -39,6 +41,18 @@ function limit(key: string, max: number, windowMs: number): void {
 }
 
 function mapError(error: unknown): never {
+  if (error instanceof RelayRevertedError)
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
+  if (isSponsorshipError(error))
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
   if (error instanceof RelayRateLimitedError) {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: error.message });
   }
@@ -54,9 +68,8 @@ function mapError(error: unknown): never {
   throw error;
 }
 
-// Every call is simulated before it is sent (see relayWrite), so a request
-// that would revert never costs gas. Rate limits bound the remaining cost of
-// valid-but-spammy traffic.
+// New unsigned ordinary calls are simulated before admission. Canonical mined
+// reverts still consume native budget; retries recover the original bytes.
 export const relayRouter = createTRPCRouter({
   status: publicProcedure.output(statusOutput).query(() => ({
     enabled: relayerConfigured(),
@@ -69,7 +82,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:register:${ctx.privyUserId}`, 5, 10 * MINUTE);
-        return await relayRegister(ctx.privyUserId, input);
+        return await relayRegister(ctx.privyUserId, input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -81,7 +94,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:deposit:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
-        return await relayDeposit(input);
+        return await relayDeposit(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -93,7 +106,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:withdraw:${ctx.ip ?? "unknown"}`, 30, 10 * MINUTE);
-        return await relayWithdraw(input);
+        return await relayWithdraw(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -105,7 +118,7 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:transfer:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
-        return await relayTransfer(input);
+        return await relayTransfer(input, ctx);
       } catch (error) {
         mapError(error);
       }
@@ -117,7 +130,12 @@ export const relayRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         limit(`relay:mint:${ctx.privyUserId}`, 3, 60 * MINUTE);
-        return await relayMintTestUsdc(ctx.privyUserId, input?.pool);
+        return await relayMintTestUsdc(
+          ctx.privyUserId,
+          input.pool,
+          input.id,
+          ctx,
+        );
       } catch (error) {
         mapError(error);
       }

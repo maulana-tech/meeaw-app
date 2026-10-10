@@ -1,3 +1,9 @@
+import { sponsorshipUiFixture } from "./helpers/sponsorshipUiFixture";
+
+vi.mock("../src/features/sponsorship/useSponsorship", () => ({
+  useSponsorship: sponsorshipUiFixture,
+}));
+
 // @vitest-environment happy-dom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -92,6 +98,10 @@ describe("SettingsDashboard recovery", () => {
       screen.queryByRole("button", { name: "Change PIN" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Gasless allowance" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pending")).toBeInTheDocument();
   });
 
   it("shows Change PIN only for configured recovery and opens the dialog", async () => {

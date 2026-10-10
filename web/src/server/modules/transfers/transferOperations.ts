@@ -12,6 +12,12 @@ import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerConfigured } from "../../lib/relayer";
 import { accountSpendGate } from "../privacyKeys/spendGate";
 import {
+  operationSponsorship,
+  pauseOperationSponsorship,
+  resumeOperationSponsorship,
+} from "../sponsorship/operationAdapters";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
+import {
   encodeTransferSubmission,
   verifyTransferReceipt,
 } from "./transferSettlement";
@@ -28,13 +34,13 @@ import {
   transferRepo,
 } from "./transfers.service";
 
-async function advance(doc: TransferDoc, rebroadcast = true) {
+async function advance(doc: TransferDoc, rebroadcast = true, user?: string) {
   const body = doc.currentSubmission;
   if (!body) return doc.operation;
   const pool = resolvePool(doc.pool),
     repo = await transferRepo(),
     runtime = await runtimeSender();
-  const intent: RelayIntent = {
+  let intent: RelayIntent = {
     operationKey: `transfer:${doc.id}:${body.step}`,
     chainId: pool.chainId,
     wallet: runtime.account.address,
@@ -53,6 +59,16 @@ async function advance(doc: TransferDoc, rebroadcast = true) {
       `${intent.chainId}:${intent.wallet.toLowerCase()}`,
       intent.operationKey,
     );
+    if (prior?.serializedTransaction && prior.intent) intent = prior.intent;
+    else if (!prior?.serializedTransaction) {
+      const action = await (await operationSponsorship()).ensure(
+        "transfer",
+        doc.operation.id,
+        user,
+      );
+      doc.operation.sponsorshipAction = action;
+      intent.sponsorship = { action, childId: intent.operationKey };
+    }
     if (!prior?.serializedTransaction)
       await runtime.reader.call({
         account: runtime.account.address,
@@ -162,6 +178,10 @@ async function advance(doc: TransferDoc, rebroadcast = true) {
       });
     }
   } catch (e) {
+    if (isSponsorshipError(e)) {
+      await pauseOperationSponsorship("transfer", doc.operation.id, e.reason);
+      throw e;
+    }
     const prior = await runtime.journal.read(
       `${intent.chainId}:${intent.wallet.toLowerCase()}`,
       intent.operationKey,
@@ -200,13 +220,18 @@ async function advance(doc: TransferDoc, rebroadcast = true) {
   if (
     latest.operation.phase === "confirmed" ||
     latest.operation.phase === "failed"
-  )
+  ) {
+    await (await operationSponsorship()).finish(
+      "transfer",
+      latest.operation.id,
+    );
     await (await accountSpendGate()).finish(
       latest.sender.wallet,
       `transfer:${latest.id}`,
       latest.operation,
       "terminal",
     );
+  }
   return latest.operation;
 }
 export async function submitTransfer(
@@ -250,7 +275,7 @@ export async function submitTransfer(
       );
     if (doc.operation.nextStep > body.step || doc.status !== "pending")
       return doc.operation;
-    if (doc.currentSubmission) return advance(doc);
+    if (doc.currentSubmission) return advance(doc, true, user);
   }
   const pool = resolvePool(doc.pool);
   if (pool.role !== "active" || !(pool.transferCapable ?? pool.requestCapable))
@@ -333,7 +358,7 @@ export async function submitTransfer(
     { returnDocument: "after", includeResultMetadata: false },
   );
   if (!changed) throw new TransferConflictError();
-  return advance(changed);
+  return advance(changed, true, user);
 }
 export async function transferStatus(user: string, id: string) {
   enforceTransferLimit(user, "query");
@@ -370,7 +395,17 @@ export async function resumeTransfer(user: string, id: string) {
     d = await repo.getDoc(await transferCaller(user), id);
   if (d.sender.wallet.toLowerCase() !== (await transferCaller(user)))
     throw new TransferRejectedError();
-  if (d.currentSubmission) return advance(d);
+  if (d.status === "pending") {
+    await (await operationSponsorship()).ensure(
+      "transfer",
+      d.operation.id,
+      user,
+    );
+    if (d.operation.sponsorshipPause)
+      await resumeOperationSponsorship("transfer", d.operation.id);
+    d.operation = (await repo.getDoc(await transferCaller(user), id)).operation;
+  }
+  if (d.currentSubmission) return advance(d, true, user);
   if (d.status === "pending" && !d.operation.accountTicketId) {
     const gate = await accountSpendGate();
     const captured = await gate.admit(

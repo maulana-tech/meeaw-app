@@ -14,6 +14,11 @@ import type { PoolScope } from "../../../lib/pools";
 import { getDb } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
 import { accountSpendGate } from "../privacyKeys/spendGate";
+import {
+  operationSponsorship,
+  pauseOperationSponsorship,
+} from "../sponsorship/operationAdapters";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import { resolveUsername } from "../usernames/usernames.service";
 import { currentWallet } from "../wallets/wallets.service";
 import {
@@ -90,7 +95,22 @@ export async function createTransfer(user: string, input: SignedTransfer) {
     true,
   );
   try {
-    return await repo.create(record, capture);
+    const accepted = await repo.create(record, capture);
+    try {
+      await (await operationSponsorship()).ensure(
+        "transfer",
+        accepted.operationId,
+        user,
+      );
+    } catch (error) {
+      if (!isSponsorshipError(error)) throw error;
+      await pauseOperationSponsorship(
+        "transfer",
+        accepted.operationId,
+        error.reason,
+      );
+    }
+    return accepted;
   } catch (error) {
     if (
       error instanceof TransferConflictError &&

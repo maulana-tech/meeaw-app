@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { SponsorshipNotice } from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { useDirectTransfer } from "../../features/transfers/hooks/useDirectTransfer";
 import { openTransfer } from "../../features/transfers/transferCrypto";
 import type {
@@ -46,6 +48,7 @@ export function TransferProgress({
       owner: string;
       payload: TransferPayload;
     } | null>(null);
+  const sponsorship = useSponsorship({ enabled: open });
   useEffect(() => {
     if (autoStart && started.current !== record.id && wallet.accountUnlocked) {
       started.current = record.id;
@@ -69,7 +72,11 @@ export function TransferProgress({
     };
   }, [record, owner, wallet.accountUnlocked]);
   const phase = transfer.operation?.phase,
-    title = phase ? phaseLabels[phase] : "Checking transfer",
+    title = transfer.operation?.sponsorshipPause
+      ? "Gasless transfer paused"
+      : phase
+        ? phaseLabels[phase]
+        : "Checking transfer",
     payload = details?.owner === owner ? details.payload : null;
   const explorer = chain.blockExplorers?.default.url,
     hash = transfer.operation?.txHash;
@@ -87,6 +94,17 @@ export function TransferProgress({
             Your transfer stays available in History when you close this window.
           </DialogDescription>
         </DialogHeader>
+        {(phase === "preparing" || transfer.operation?.sponsorshipPause) && (
+          <SponsorshipNotice
+            status={sponsorship.status}
+            loading={sponsorship.loading}
+            pause={transfer.operation?.sponsorshipPause}
+            captured={Boolean(transfer.operation?.sponsorshipAction)}
+            onRefresh={() => {
+              void sponsorship.refresh();
+            }}
+          />
+        )}
         {payload ? (
           <div className="grid gap-2">
             <p className="text-2xl tabular-nums">
@@ -129,12 +147,16 @@ export function TransferProgress({
         )}
         {!wallet.accountUnlocked ? (
           <Button onClick={wallet.promptUnlock}>Unlock Meaw</Button>
-        ) : phase === "preparing" ? (
+        ) : phase === "preparing" || transfer.operation?.sponsorshipPause ? (
           <Button
             disabled={transfer.working}
             onClick={() => void transfer.continueSend().catch(() => {})}
           >
-            {transfer.working ? "Preparing payment…" : "Continue transfer"}
+            {transfer.working
+              ? "Preparing payment…"
+              : transfer.operation?.sponsorshipPause
+                ? "Resume transfer"
+                : "Continue transfer"}
           </Button>
         ) : null}
         <Button variant="outline" onClick={onClose}>

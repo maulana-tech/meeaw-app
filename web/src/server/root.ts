@@ -5,6 +5,7 @@ import { privacyKeysRouter } from "./modules/privacyKeys/privacyKeys.router";
 import { receiptsRouter } from "./modules/receipts/receipts.router";
 import { relayRouter } from "./modules/relay/relay.router";
 import { requestsRouter } from "./modules/requests/requests.router";
+import { sponsorshipRouter } from "./modules/sponsorship/sponsorship.router";
 import { transfersRouter } from "./modules/transfers/transfers.router";
 import { usernamesRouter } from "./modules/usernames/usernames.router";
 import { walletsRouter } from "./modules/wallets/wallets.router";
@@ -18,6 +19,7 @@ export const appRouter = createTRPCRouter({
   paymentLinks: paymentLinksRouter,
   wallets: walletsRouter,
   relay: relayRouter,
+  sponsorship: sponsorshipRouter,
   requests: requestsRouter,
   transfers: transfersRouter,
 });

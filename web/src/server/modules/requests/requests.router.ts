@@ -1,5 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
+import {
+  beginPayment,
+  paymentStatus,
+  submitConsolidation,
+  submitPayment,
+} from "./requestOperations";
 import {
   RequestConflictError,
   RequestNotFoundError,
@@ -8,14 +15,16 @@ import {
   RequestUnavailableError,
 } from "./requests.errors";
 import {
+  beginPaymentInput,
   createRequestInput,
   listRequestsInput,
+  paymentOperationOutput,
   paymentRequestOutput,
   pendingCountOutput,
   requestIdInput,
   requestPageOutput,
   requestTransitionInput,
-  beginPaymentInput,submitPaymentInput,paymentOperationOutput,
+  submitPaymentInput,
 } from "./requests.schema";
 import {
   cancelRequest,
@@ -26,11 +35,16 @@ import {
   listSent,
   pendingCount,
 } from "./requests.service";
-import {beginPayment,submitConsolidation,submitPayment,paymentStatus} from "./requestOperations";
 
 // Errors map to fixed messages; nothing from the record or its envelopes is
 // echoed back or logged.
 export function mapRequestError(e: unknown): never {
+  if (isSponsorshipError(e))
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: e.message,
+      cause: e,
+    });
   if (e instanceof RequestNotFoundError)
     throw new TRPCError({ code: "NOT_FOUND", message: e.message });
   if (e instanceof RequestConflictError)
@@ -53,10 +67,30 @@ export function mapRequestError(e: unknown): never {
 }
 
 export const requestsRouter = createTRPCRouter({
-  beginPayment:protectedProcedure.input(beginPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>beginPayment(ctx.privyUserId,input).catch(mapRequestError)),
-  submitConsolidation:protectedProcedure.input(submitPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>submitConsolidation(ctx.privyUserId,input).catch(mapRequestError)),
-  submitPayment:protectedProcedure.input(submitPaymentInput).output(paymentOperationOutput).mutation(({ctx,input})=>submitPayment(ctx.privyUserId,input).catch(mapRequestError)),
-  paymentStatus:protectedProcedure.input(requestIdInput).output(paymentOperationOutput.nullable()).query(({ctx,input})=>paymentStatus(ctx.privyUserId,input).catch(mapRequestError)),
+  beginPayment: protectedProcedure
+    .input(beginPaymentInput)
+    .output(paymentOperationOutput)
+    .mutation(({ ctx, input }) =>
+      beginPayment(ctx.privyUserId, input).catch(mapRequestError),
+    ),
+  submitConsolidation: protectedProcedure
+    .input(submitPaymentInput)
+    .output(paymentOperationOutput)
+    .mutation(({ ctx, input }) =>
+      submitConsolidation(ctx.privyUserId, input).catch(mapRequestError),
+    ),
+  submitPayment: protectedProcedure
+    .input(submitPaymentInput)
+    .output(paymentOperationOutput)
+    .mutation(({ ctx, input }) =>
+      submitPayment(ctx.privyUserId, input).catch(mapRequestError),
+    ),
+  paymentStatus: protectedProcedure
+    .input(requestIdInput)
+    .output(paymentOperationOutput.nullable())
+    .query(({ ctx, input }) =>
+      paymentStatus(ctx.privyUserId, input).catch(mapRequestError),
+    ),
   create: protectedProcedure
     .input(createRequestInput)
     .output(paymentRequestOutput)

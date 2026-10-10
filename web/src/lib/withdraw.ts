@@ -1,8 +1,14 @@
 import { getAddress } from "viem";
 import { accountForNote } from "../features/privacyKeys/keyRing";
 import { getPrivacyKeyring } from "../features/privacyKeys/session";
+import { canonicalRelayRevert } from "../features/sponsorship/pendingAction";
+import {
+  pendingWithdrawBatch,
+  recordBatchAdmission,
+} from "../features/sponsorship/pendingWithdrawBatch";
 import { api } from "../trpc/client";
 import {
+  gaslessEnabled,
   isEvmAddress,
   poolWithdraw,
   revertErrorName,
@@ -29,7 +35,12 @@ export type WithdrawResult = {
 export type BatchWithdrawResult = {
   total: bigint; // base units successfully cashed out
   succeeded: WithdrawResult[]; // per-note results, largest-first order
-  failed: { leafIndex: number; amount: bigint; error: string }[];
+  failed: {
+    leafIndex: number;
+    amount: bigint;
+    error: string;
+    terminal?: boolean;
+  }[];
 };
 
 export function isAlreadyCashedOut(error: unknown): boolean {
@@ -63,6 +74,8 @@ export async function withdrawNote(params: {
   scan: ScanResult;
   note: MyNote;
   destination: string;
+  sponsorBatchId?: string;
+  isCurrent?: () => boolean;
 }): Promise<WithdrawResult> {
   const { signer, acct, scan, note, destination } = params;
   if (!isValidDestination(destination)) {
@@ -74,6 +87,8 @@ export async function withdrawNote(params: {
     scan,
     note,
     dest: getAddress(destination.trim()),
+    sponsorBatchId: params.sponsorBatchId,
+    isCurrent: params.isCurrent,
   });
 }
 
@@ -83,6 +98,7 @@ export async function withdrawAll(params: {
   scan: ScanResult;
   notes: MyNote[];
   destination: string;
+  isCurrent?: () => boolean;
 }): Promise<BatchWithdrawResult> {
   const { signer, acct, scan, notes, destination } = params;
   if (!isValidDestination(destination)) {
@@ -96,13 +112,59 @@ export async function withdrawAll(params: {
   const succeeded: WithdrawResult[] = [];
   const failed: BatchWithdrawResult["failed"] = [];
   let total = 0n;
-
-  for (const note of claimableNotes(notes)) {
+  const selected = claimableNotes(notes);
+  let sponsorBatchId: string | undefined;
+  let batchStorageKey: string | undefined;
+  if (selected.length && (await gaslessEnabled())) {
+    const ring = getPrivacyKeyring();
+    const nullifiers = await Promise.all(
+      selected.map(async (note) => {
+        const owner = ring ? accountForNote(ring, note) : acct;
+        return `0x${Array.from(toBE32(await nullifierHash(owner.ownerSecret, note.leafIndex)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+      }),
+    );
+    if (getPrivacyKeyring() !== ring)
+      throw new Error("Privacy key session changed during cash-out.");
+    batchStorageKey = `mawee:withdraw-batch:${signer.address.toLowerCase()}:${scan.scope}:${dest.toLowerCase()}`;
+    const pending = pendingWithdrawBatch(
+      localStorage,
+      batchStorageKey,
+      nullifiers,
+    );
     try {
-      succeeded.push(await directWithdraw({ signer, acct, scan, note, dest }));
+      await api.sponsorship.admitWithdrawBatch.mutate({
+        id: pending.id,
+        pool: scan.scope,
+        recipient: dest,
+        nullifiers: pending.nullifiers,
+      });
+      recordBatchAdmission(localStorage, batchStorageKey, pending);
+    } catch (error) {
+      recordBatchAdmission(localStorage, batchStorageKey, pending, error);
+      throw error;
+    }
+    if (params.isCurrent && !params.isCurrent())
+      throw new Error("The private account changed during cash-out.");
+    sponsorBatchId = pending.id;
+  }
+
+  for (const note of selected) {
+    try {
+      succeeded.push(
+        await directWithdraw({
+          signer,
+          acct,
+          scan,
+          note,
+          dest,
+          sponsorBatchId,
+          isCurrent: params.isCurrent,
+        }),
+      );
       total += note.amount;
     } catch (error) {
       failed.push({
+        ...(canonicalRelayRevert(error) ? { terminal: true } : {}),
         leafIndex: note.leafIndex,
         amount: note.amount,
         error: isAlreadyCashedOut(error)
@@ -112,6 +174,10 @@ export async function withdrawAll(params: {
             : "Withdrawal failed.",
       });
     }
+  }
+  if (sponsorBatchId && batchStorageKey && failed.every((f) => f.terminal)) {
+    await api.sponsorship.finishWithdrawBatch.mutate({ id: sponsorBatchId });
+    localStorage.removeItem(batchStorageKey);
   }
 
   return { total, succeeded, failed };
@@ -123,8 +189,12 @@ async function directWithdraw(params: {
   scan: ScanResult;
   note: MyNote;
   dest: string;
+  sponsorBatchId?: string;
+  isCurrent?: () => boolean;
 }): Promise<WithdrawResult> {
   const { signer, scan, note, dest } = params;
+  if (params.isCurrent && !params.isCurrent())
+    throw new Error("The private account changed during cash-out.");
   const ring = getPrivacyKeyring();
   const acct = ring ? accountForNote(ring, note) : params.acct;
   // A note's Merkle path and nullifier are only meaningful in its own pool.
@@ -166,6 +236,8 @@ async function directWithdraw(params: {
   };
 
   const { proof, ms } = await proveWithdraw(input);
+  if (params.isCurrent && !params.isCurrent())
+    throw new Error("The private account changed during cash-out.");
   if (ring && getPrivacyKeyring() !== ring)
     throw new Error("Privacy key session changed during cash-out.");
   const operationId = crypto.randomUUID();
@@ -176,6 +248,7 @@ async function directWithdraw(params: {
         keyRevision: ring.revision,
         pool: pool.scope,
         nullifier: `0x${Array.from(toBE32(nf), (byte) => byte.toString(16).padStart(2, "0")).join("")}`,
+        sponsorBatchId: params.sponsorBatchId,
       })
     : null;
   if (
@@ -204,6 +277,8 @@ async function directWithdraw(params: {
     toBE32(nf),
     proof,
     pool,
+    params.sponsorBatchId,
+    () => getPrivacyKeyring() === ring && (params.isCurrent?.() ?? true),
   );
   if (
     capture?.accountTicketId &&

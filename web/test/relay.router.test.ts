@@ -114,6 +114,12 @@ beforeEach(() => {
 });
 
 describe("relay router", () => {
+  it("rejects faucet requests without a stable action marker", async () => {
+    await expect(
+      caller().mintTestUsdc({} as { id: string }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.relayWrite).not.toHaveBeenCalled();
+  });
   it("reports whether gasless mode is available", async () => {
     await expect(caller(null).status()).resolves.toEqual({
       enabled: true,
@@ -270,7 +276,7 @@ describe("relay router", () => {
   });
 
   it("mints test USDC to the bound wallet only", async () => {
-    await caller().mintTestUsdc();
+    await caller().mintTestUsdc({ id: "11111111-1111-4111-8111-111111111111" });
     const request = mocks.relayWrite.mock.calls[0][0];
     expect(request.functionName).toBe("mint");
     expect(request.args[0]).toBe(OWNER);
@@ -280,7 +286,7 @@ describe("relay router", () => {
     const PAYER = "0x00000000000000000000000000000000000000Fa";
     mocks.currentWallet.mockResolvedValue(null);
     mocks.verifiedPrivyWallets.mockResolvedValue([{ address: PAYER }]);
-    await caller().mintTestUsdc();
+    await caller().mintTestUsdc({ id: "11111111-1111-4111-8111-111111111111" });
     expect(mocks.relayWrite.mock.calls[0][0].args[0]).toBe(PAYER);
   });
 
@@ -333,7 +339,10 @@ describe("relay router", () => {
 
     it("mints only for a mintable pool", async () => {
       await expect(
-        caller().mintTestUsdc({ pool: LEGACY }),
+        caller().mintTestUsdc({
+          pool: LEGACY,
+          id: "11111111-1111-4111-8111-111111111111",
+        }),
       ).rejects.toBeTruthy();
       expect(mocks.relayWrite).not.toHaveBeenCalled();
     });

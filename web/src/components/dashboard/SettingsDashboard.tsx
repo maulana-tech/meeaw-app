@@ -5,6 +5,7 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { usePrivacyKeyRotation } from "../../features/privacyKeys/usePrivacyKeyRotation";
 import { useChangeRecoveryPin } from "../../features/recovery/hooks/useChangeRecoveryPin";
+import { SponsorshipSettingsRow } from "../../features/sponsorship/SponsorshipSettingsRow";
 import { trpc } from "../../trpc/react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -45,6 +46,7 @@ export function SettingsDashboard() {
 
       <div className={`${dashLedger} max-w-3xl`}>
         <IdentityTile username={username} onClaim={openUsernameModal} />
+        <SponsorshipSettingsRow />
         <RecoveryTile
           method={passkeyProtected ? "passkey" : "pin"}
           protectedRecovery={passkeyProtected || Boolean(escrowQuery.data)}

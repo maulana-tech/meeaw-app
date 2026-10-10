@@ -1,3 +1,9 @@
+import { sponsorshipUiFixture } from "./helpers/sponsorshipUiFixture";
+
+vi.mock("../src/features/sponsorship/useSponsorship", () => ({
+  useSponsorship: sponsorshipUiFixture,
+}));
+
 // @vitest-environment happy-dom
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -50,6 +56,49 @@ vi.mock("../src/components/dashboard/useMyNotes", () => ({
 import { PayRequestDialog } from "../src/components/dashboard/PayRequestDialog";
 
 describe("fixed private balance payment dialog", () => {
+  it("offers resume for a gasless pause without presenting it as a submitted payment", () => {
+    const record = {
+      record: {
+        id: "r",
+        pool: "31337:0x1111111111111111111111111111111111111111",
+        requester: { username: "client" },
+        status: "pending",
+        operationId: "op",
+        revision: 0,
+      },
+      amount: 20_000_000n,
+      note: "Design work",
+      unreadable: false,
+    };
+    render(
+      <PayRequestDialog
+        request={record as never}
+        open
+        onOpenChange={vi.fn()}
+        operation={
+          {
+            id: "op",
+            phase: "submitting",
+            txHash: null,
+            completedMerges: 1,
+            sponsorshipPause: "cost",
+            sponsorshipAction: {
+              chainId: 31337,
+              actionId: "request-pay:op",
+              fence: 1,
+            },
+          } as never
+        }
+        working={false}
+        error={null}
+        onPay={state.pay}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Resume payment" }),
+    ).toBeEnabled();
+    expect(screen.queryByText("Payment sent")).not.toBeInTheDocument();
+  });
   it("offers a status check after 30 seconds without offering another payment", async () => {
     vi.useFakeTimers();
     const onCheck = vi.fn().mockResolvedValue(null),

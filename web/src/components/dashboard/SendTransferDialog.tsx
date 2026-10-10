@@ -1,5 +1,12 @@
 "use client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { getPrivacyKeyring } from "../../features/privacyKeys/session";
+import { assertFundingSteps } from "../../features/sponsorship/fundingSteps";
+import {
+  SponsorshipNotice,
+  sponsorshipMessage,
+} from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { createSignedTransfer } from "../../features/transfers/transferCrypto";
 import type {
   TransferParticipant,
@@ -10,7 +17,7 @@ import {
   validateTransferNote,
 } from "../../features/transfers/validation";
 import { ASSETS } from "../../lib/assets";
-import { getAccount, scanMyNotes } from "../../lib/notes";
+import { getAccount, scanKeyringNotes, scanMyNotes } from "../../lib/notes";
 import { formatAssetUnits } from "../../lib/paymentAsset";
 import { type PoolDescriptor, requestPool } from "../../lib/pools";
 import { api } from "../../trpc/client";
@@ -62,6 +69,7 @@ export function SendTransferDialog({
     [review, setReview] = useState<Review | null>(null),
     [error, setError] = useState<string | null>(null),
     [working, setWorking] = useState(false);
+  const sponsorship = useSponsorship({ enabled: open });
   const chosenPool = providedPool ?? requestPool(),
     asset = chosenPool ? ASSETS[chosenPool.asset ?? "USDC"].label : "USDC";
   const busy = useRef(false),
@@ -150,6 +158,12 @@ export function SendTransferDialog({
         pool = chosenPool;
       if (!account || !pool || at !== review.identity)
         throw new Error("Unlock this account and review the transfer again.");
+      const allowance = await sponsorship.refresh();
+      if (session.current !== at) return;
+      if (!allowance?.available)
+        throw new Error(
+          sponsorshipMessage(allowance?.reason ?? "rpc", allowance?.resetAt),
+        );
       const currentRecipient = await resolve(review.recipient.username);
       if (session.current !== at) return;
       if (
@@ -160,6 +174,32 @@ export function SendTransferDialog({
       }
       const signer = await wallet.getSigner();
       if (session.current !== at || getAccount() !== account) return;
+      const ring = getPrivacyKeyring();
+      const funding = ring
+        ? await scanKeyringNotes(ring, pool, {
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          })
+        : await scanMyNotes(account, {
+            pool,
+            includeRequestRecovery: true,
+            includeTransferRecovery: true,
+          });
+      if (
+        session.current !== at ||
+        getAccount() !== account ||
+        getPrivacyKeyring() !== ring
+      )
+        return;
+      if (funding.health !== "healthy")
+        throw new Error("Refresh your balance before sending.");
+      assertFundingSteps(
+        funding.notes,
+        review.amount,
+        pool.scope,
+        16,
+        ring?.activeGeneration,
+      );
       const record = await createSignedTransfer({
         id: crypto.randomUUID(),
         pool,
@@ -203,6 +243,15 @@ export function SendTransferDialog({
             Send {asset} from your private balance to another Meaw user.
           </DialogDescription>
         </DialogHeader>
+        {wallet.accountUnlocked && (
+          <SponsorshipNotice
+            status={sponsorship.status}
+            loading={sponsorship.loading}
+            onRefresh={() => {
+              void sponsorship.refresh();
+            }}
+          />
+        )}
         {!wallet.accountUnlocked ? (
           <div className="grid gap-4">
             <p>Unlock Meaw to send a private payment.</p>
@@ -248,7 +297,11 @@ export function SendTransferDialog({
               </Button>
               <Button
                 className="min-h-11 flex-1"
-                disabled={working}
+                disabled={
+                  working ||
+                  sponsorship.loading ||
+                  !sponsorship.status?.available
+                }
                 onClick={() => void confirm()}
               >
                 {working ? "Preparing transfer…" : "Confirm send"}

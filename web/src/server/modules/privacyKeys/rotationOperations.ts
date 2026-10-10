@@ -1,5 +1,5 @@
 import "server-only";
-import { type Hex, verifyTypedData } from "viem";
+import { type Hex, keccak256, verifyTypedData } from "viem";
 import { samePublicKeys } from "../../../features/privacyKeys/keyRing";
 import {
   type RegistryAuthorization,
@@ -16,6 +16,13 @@ import { getDb } from "../../db/mongo";
 import type { RelayIntent, RelayResult } from "../../lib/durableRelayer";
 import { runtimeSender } from "../../lib/durableRelayer";
 import { relayerAddress, relayerConfigured } from "../../lib/relayer";
+import { RelayJournal } from "../../lib/relayJournal";
+import type { SponsorLedger } from "../sponsorship/ledger.service";
+import {
+  isSponsorshipError,
+  SponsorshipError,
+} from "../sponsorship/sponsorship.errors";
+import { sponsorshipLedger } from "../sponsorship/sponsorship.service";
 import { registerUsernameCache } from "../usernames/usernames.service";
 import { currentWallet } from "../wallets/wallets.service";
 import { PrivacyKeysRepository } from "./privacyKeys.repository";
@@ -33,6 +40,8 @@ export type RegistryTransactionResult = {
   evidence?: GenerationEvidence;
 };
 type Ports = {
+  sponsorship?: { ledger: SponsorLedger; user?: string };
+  journal?: Pick<RelayJournal, "read">;
   repository: PrivacyKeysRepository;
   readRegistry: RegistryReader;
   verifyTransaction(
@@ -60,6 +69,45 @@ const conflict = () =>
   new Error("Privacy rotation needs reconciliation before another operation");
 
 export function createRotationOperations(ports: Ports) {
+  function relayIntent(op: RotationOperation): RelayIntent {
+    const auth = op.registryAuthorization;
+    if (!auth) throw conflict();
+    const [chainId, target] = op.intent.registry.split(":");
+    const operationKey = `privacy-rotation:${op.intent.id}`;
+    return {
+      operationKey,
+      chainId: Number(chainId),
+      wallet: ports.relayer,
+      to: target as Hex,
+      data: registryRotationCalldata(op.intent, auth),
+      confirmations: ports.confirmations,
+      ...(op.sponsorshipAction
+        ? {
+            sponsorship: {
+              action: op.sponsorshipAction,
+              childId: operationKey,
+            },
+          }
+        : {}),
+    };
+  }
+  async function feeReconcile(op: RotationOperation) {
+    if (!op.sponsorshipAction) return;
+    try {
+      await ports.sender.reconcile(relayIntent(op));
+    } catch {
+      // The wallet journal retains unresolved fee liability independently.
+    }
+  }
+  async function closeSponsor(op: RotationOperation) {
+    if (!ports.sponsorship || !op.sponsorshipAction) return;
+    await feeReconcile(op);
+    try {
+      await ports.sponsorship.ledger.closeAction(op.sponsorshipAction);
+    } catch (error) {
+      if (!isSponsorshipError(error)) throw error;
+    }
+  }
   const authorize = async (
     owner: Hex,
     registry: RegistryScope,
@@ -124,7 +172,12 @@ export function createRotationOperations(ports: Ports) {
   ): Promise<RotationOperation> => {
     let op = await ports.repository.operation(owner, registry, id);
     const authorization = op.registryAuthorization;
-    if (op.phase === "confirmed" || !authorization) return op;
+    if (op.phase === "confirmed") {
+      await closeSponsor(op);
+      return op;
+    }
+    if (!authorization) return op;
+    await feeReconcile(op);
     const current = await ports.readRegistry(owner, op.intent.username);
     if (
       current.timestamp &&
@@ -134,8 +187,15 @@ export function createRotationOperations(ports: Ports) {
       current.head - current.block + 1 >= ports.confirmations &&
       current.nonce === authorization.nonce &&
       samePublicKeys(current.keys, op.intent.oldKeys)
-    )
-      return ports.repository.terminateRotation(owner, registry, op);
+    ) {
+      const closed = await ports.repository.terminateRotation(
+        owner,
+        registry,
+        op,
+      );
+      await closeSponsor(closed);
+      return closed;
+    }
     if (!op.txHash && ports.findTransaction) {
       const found = await ports.findTransaction(op);
       op = await progress(
@@ -179,7 +239,13 @@ export function createRotationOperations(ports: Ports) {
     } catch {
       return progress(owner, registry, op, "confirming");
     }
-    return ports.repository.completeProjection(owner, registry, op);
+    const completed = await ports.repository.completeProjection(
+      owner,
+      registry,
+      op,
+    );
+    await closeSponsor(completed);
+    return completed;
   };
   return {
     async abort(owner: Hex, registry: RegistryScope, id: string) {
@@ -196,27 +262,69 @@ export function createRotationOperations(ports: Ports) {
         mode?: "relay" | "wallet";
       },
     ) {
-      const op = await authorize(
-        owner,
-        registry,
-        input.id,
-        input.authorization,
-      );
+      let op = await authorize(owner, registry, input.id, input.authorization);
       if (op.phase === "confirmed" || input.mode === "wallet") return op;
-      const [chainId, target] = registry.split(":");
-      const intent: RelayIntent = {
-        operationKey: `privacy-rotation:${input.id}`,
-        chainId: Number(chainId),
-        wallet: ports.relayer,
-        to: target as Hex,
-        data: registryRotationCalldata(op.intent, input.authorization),
-        confirmations: ports.confirmations,
-      };
-      const prepared = await ports.sender.prepare(intent);
-      await progress(owner, registry, op, "submitted", prepared.txHash);
-      await ports.sender.broadcast(intent);
-      await ports.sender.reconcile(intent);
-      return reconcile(owner, registry, input.id);
+      let intent = relayIntent(op);
+      try {
+        const prior = await ports.journal?.read(
+          `${intent.chainId}:${intent.wallet.toLowerCase()}`,
+          intent.operationKey,
+        );
+        if (prior?.serializedTransaction && prior.intent) intent = prior.intent;
+        else if (ports.sponsorship) {
+          const { ledger, user } = ports.sponsorship,
+            actionId = `rotation:${input.id}`,
+            businessDigest = keccak256(intent.data);
+          const existing = await ledger.readAction(intent.chainId, actionId);
+          if (
+            existing &&
+            (existing.intent.businessDigest !== businessDigest ||
+              existing.intent.kind !== "rotation" ||
+              existing.intent.principal.kind !== "user" ||
+              (user && existing.intent.principal.key !== user) ||
+              existing.phase === "cancelled")
+          )
+            throw new SponsorshipError("budget");
+          if (!existing && !user) throw new SponsorshipError("initializing");
+          const action = existing
+            ? { chainId: intent.chainId, actionId, fence: existing.fence }
+            : await ledger.admit({
+                chainId: intent.chainId,
+                actionId,
+                kind: "rotation",
+                principal: { kind: "user", key: user as string },
+                businessDigest,
+                maximumChildren: 1,
+              });
+          op = await progress(
+            owner,
+            registry,
+            { ...op, sponsorshipAction: action, sponsorshipPause: undefined },
+            op.phase,
+          );
+          intent = relayIntent(op);
+        }
+        const prepared = await ports.sender.prepare(intent);
+        await progress(owner, registry, op, "submitted", prepared.txHash);
+        await ports.sender.broadcast(intent);
+        await ports.sender.reconcile(intent);
+        return reconcile(owner, registry, input.id);
+      } catch (error) {
+        if (isSponsorshipError(error)) {
+          const latest = await ports.repository.operation(
+            owner,
+            registry,
+            input.id,
+          );
+          await progress(
+            owner,
+            registry,
+            { ...latest, sponsorshipPause: error.reason },
+            latest.phase,
+          );
+        }
+        throw error;
+      }
     },
     async markSubmitted(
       owner: Hex,
@@ -233,11 +341,13 @@ export function createRotationOperations(ports: Ports) {
   };
 }
 
-export async function runtimeRotationOperations(owner: Hex) {
+export async function runtimeRotationOperations(owner: Hex, user?: string) {
   const relayer = (relayerAddress() ??
     "0x0000000000000000000000000000000000000000") as Hex;
   const verify = registryTransactionVerifier([owner, relayer]);
   return createRotationOperations({
+    sponsorship: { ledger: await sponsorshipLedger(), user },
+    journal: new RelayJournal(await getDb()),
     repository: new PrivacyKeysRepository(await getDb()),
     readRegistry,
     verifyTransaction: verify,
@@ -287,7 +397,7 @@ export async function submitPrivacyRotation(
       "The gasless relayer is unavailable. Use your wallet to submit this rotation.",
     );
   const owner = await boundOwner(user);
-  return (await runtimeRotationOperations(owner)).submit(
+  return (await runtimeRotationOperations(owner, user)).submit(
     owner,
     configuredRegistryScope,
     input,
@@ -298,7 +408,7 @@ export async function markPrivacyRotationSubmitted(
   input: { id: string; txHash: Hex },
 ) {
   const owner = await boundOwner(user);
-  return (await runtimeRotationOperations(owner)).markSubmitted(
+  return (await runtimeRotationOperations(owner, user)).markSubmitted(
     owner,
     configuredRegistryScope,
     input.id,
@@ -307,7 +417,7 @@ export async function markPrivacyRotationSubmitted(
 }
 export async function reconcilePrivacyRotation(user: string, id: string) {
   const owner = await boundOwner(user);
-  return (await runtimeRotationOperations(owner)).reconcile(
+  return (await runtimeRotationOperations(owner, user)).reconcile(
     owner,
     configuredRegistryScope,
     id,
@@ -322,7 +432,7 @@ export async function privacyRotationStatus(user: string, id: string) {
 }
 export async function abortPrivacyRotation(user: string, id: string) {
   const owner = await boundOwner(user);
-  return (await runtimeRotationOperations(owner)).abort(
+  return (await runtimeRotationOperations(owner, user)).abort(
     owner,
     configuredRegistryScope,
     id,

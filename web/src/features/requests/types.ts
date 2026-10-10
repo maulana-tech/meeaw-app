@@ -3,6 +3,7 @@
 // live in browser memory and must never be persisted or logged.
 
 import type { AssetSymbol } from "../../lib/assets";
+import type { ActionTicket, UnavailableReason } from "../sponsorship/types";
 
 export type Hex = `0x${string}`;
 
@@ -114,6 +115,9 @@ export type SubmissionBody = {
 export type SignedSubmission = SubmissionBody & { signature: Hex };
 
 export type PaymentOperation = {
+  sponsorshipStepLimit?: number;
+  sponsorshipAction?: ActionTicket;
+  sponsorshipPause?: UnavailableReason;
   fundingGeneration?: number;
   keyRevision?: number;
   accountTicketId?: string;

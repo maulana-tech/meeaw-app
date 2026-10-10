@@ -44,8 +44,11 @@
 
 ## Gasless relay
 
-With `RELAYER_PRIVATE_KEY` set, users never need MON. Every relayed call is
-simulated first, so a bad proof or signature costs the relayer nothing.
+With a configured and available relayer, sponsorship covers MON within daily
+action quotas, per-action envelopes and global/guest native budgets. Unsigned
+ordinary calls are simulated before admission; mined reverts still consume
+budget. Missing policy pauses new sponsorship. See
+[gasless allowance and rollout](gasless-sponsorship-budget.md).
 
 | Action | What the user does | What authorizes it on-chain |
 | --- | --- | --- |
@@ -54,8 +57,10 @@ simulated first, so a bad proof or signature costs the relayer nothing.
 | Withdraw / transfer | Nothing to sign | The Groth16 proof binds recipient and amount (withdraw) or both output notes (transfer) |
 | Test USDC (testnet) | Click | Relayer mints `MockUSDC` to the signed-in user's bound wallet |
 
-Rate limits (per IP for public calls, per Privy user for account calls) bound
-abuse. Typed-data definitions live in `web/src/lib/typedData.ts` and are reused
+Short-window rate limits supplement durable quotas and native budgets. One
+logical Send/Pay covers its internal preparation steps; unknown signed bytes
+retain their liability across restarts and UTC reset. Typed-data definitions
+live in `web/src/lib/typedData.ts` and are reused
 by the contract tests.
 
 ## Passkey-derived keys (Mera PRF)

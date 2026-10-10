@@ -83,6 +83,8 @@ export const depositInput = z.object({
 });
 
 export const withdrawInput = z.object({
+  id: z.string().uuid().optional(),
+  batchId: z.string().uuid().optional(),
   // The note's pool; legacy pools stay withdrawable.
   pool: poolScope,
   recipient: address,
@@ -93,6 +95,7 @@ export const withdrawInput = z.object({
 });
 
 export const transferInput = z.object({
+  id: z.string().uuid().optional(),
   root: hex32,
   nullifier: hex32,
   proof: proofInput,
@@ -107,7 +110,11 @@ export const transferOutput = txOutput.extend({
   changeIndex: z.number().int(),
 });
 export const statusOutput = z.object({
-  enabled: z.boolean(),
+  enabled: z
+    .boolean()
+    .describe(
+      "Relayer configuration; current allowance is exposed by sponsorship.availability.",
+    ),
   testUsdcMintable: z.boolean(),
 });
 
@@ -116,4 +123,7 @@ export type DepositInput = z.infer<typeof depositInput>;
 export type WithdrawInput = z.infer<typeof withdrawInput>;
 export type TransferInput = z.infer<typeof transferInput>;
 
-export const mintTestUsdcInput = z.object({ pool: poolScope }).optional();
+export const mintTestUsdcInput = z.object({
+  pool: poolScope,
+  id: z.string().uuid(),
+});

@@ -1,3 +1,9 @@
+import { sponsorshipUiFixture } from "./helpers/sponsorshipUiFixture";
+
+vi.mock("../src/features/sponsorship/useSponsorship", () => ({
+  useSponsorship: sponsorshipUiFixture,
+}));
+
 // @vitest-environment happy-dom
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

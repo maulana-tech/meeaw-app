@@ -207,10 +207,19 @@ export class PrivacyKeysRepository {
           "state.pending.phase": operation.phase,
           "state.pending.txHash": operation.txHash,
           "state.pending.updatedAt": operation.updatedAt,
+          ...(operation.sponsorshipAction
+            ? { "state.pending.sponsorshipAction": operation.sponsorshipAction }
+            : {}),
+          ...(operation.sponsorshipPause
+            ? { "state.pending.sponsorshipPause": operation.sponsorshipPause }
+            : {}),
           ...(operation.searchEvidence
             ? { "state.pending.searchEvidence": operation.searchEvidence }
             : {}),
         },
+        ...(!operation.sponsorshipPause
+          ? { $unset: { "state.pending.sponsorshipPause": "" } }
+          : {}),
       },
       { returnDocument: "after" },
     );

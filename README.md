@@ -297,7 +297,9 @@ Important server-only values:
   `eth_getLogs` poller for wallet scanning and pool stats.
 - `RELAYER_RPC_URL` - dedicated RPC for the relayer (e.g. Alchemy).
 - `RELAYER_PRIVATE_KEY` - hot wallet for gasless mode. Users then only sign;
-  the relayer submits and pays MON gas. See
+  the relayer submits and pays MON gas within the configured action and native
+  budget limits. Required monetary policy must be configured before sponsorship
+  opens. See [gasless allowance and rollout](docs/gasless-sponsorship-budget.md) and
   [docs/reference.md](docs/reference.md#gasless-relay).
 
 Do not commit `web/.env.local`. The repository ignores `.env*` files except the

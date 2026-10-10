@@ -7,6 +7,7 @@ import { PrivacyKeyConflictError } from "./privacyKeys.repository";
 import type { AccountSpendGate } from "./spendGate";
 
 type CashoutInput = {
+  sponsorBatchId?: string;
   operationId: string;
   fundingGeneration: number;
   keyRevision: number;
@@ -14,6 +15,7 @@ type CashoutInput = {
   nullifier: Hex;
 };
 type Cashout = {
+  sponsorBatchId?: string;
   _id: string;
   operationId: string;
   owner: Hex;
@@ -32,6 +34,8 @@ export class CashoutOperations {
     db: Db,
     readonly gate: AccountSpendGate,
     readonly spent: (record: Cashout) => Promise<boolean>,
+    readonly reverted: (record: Cashout) => Promise<boolean> = async () =>
+      false,
   ) {
     this.records = db.collection<Cashout>("privacy_cashouts");
   }
@@ -46,6 +50,7 @@ export class CashoutOperations {
       {
         $setOnInsert: {
           operationId: input.operationId,
+          sponsorBatchId: input.sponsorBatchId,
           owner,
           registry: this.gate.registry,
           pool: input.pool,
@@ -59,6 +64,27 @@ export class CashoutOperations {
       { upsert: true },
     );
     let record = await this.records.findOne({ _id: id, owner });
+    if (
+      record &&
+      record.phase === "dispatching" &&
+      (await this.reverted(record))
+    ) {
+      const changed = await this.records.updateOne(
+        { _id: id, operationId: record.operationId, phase: "dispatching" },
+        { $set: { phase: "cancelled" } },
+      );
+      if (changed.matchedCount)
+        await this.release({ ...record, phase: "cancelled" }, "terminal");
+      record = await this.records.findOne({ _id: id, owner });
+    }
+    if (
+      record?.sponsorBatchId &&
+      record.sponsorBatchId !== input.sponsorBatchId &&
+      record.phase !== "cancelled"
+    )
+      throw new PrivacyKeyConflictError(
+        "Resume this note in its original cash-out batch.",
+      );
     if (!record || record.phase === "confirmed")
       throw new PrivacyKeyConflictError(
         "This cash-out is already confirmed. Refresh your balance.",
@@ -70,6 +96,7 @@ export class CashoutOperations {
         {
           $set: {
             operationId: input.operationId,
+            sponsorBatchId: input.sponsorBatchId,
             phase: "prepared",
             released: false,
             keyRevision: input.keyRevision,
