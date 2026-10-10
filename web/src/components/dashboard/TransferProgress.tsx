@@ -10,8 +10,9 @@ import type {
 } from "../../features/transfers/types";
 import { chain } from "../../lib/chain";
 import { getAccount } from "../../lib/notes";
-import { formatPaymentAmount } from "../../lib/paymentAsset";
+import { formatAssetUnits, formatPaymentAmount } from "../../lib/paymentAsset";
 import { resolvePool } from "../../lib/pools";
+import { formatSettlementSeconds } from "../../lib/settlement";
 import { MeawMascot } from "../MeawMascot";
 import { Button } from "../ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { useWallet } from "../WalletProvider";
+import { FxEstimate } from "./FxEstimate";
 
 const phaseLabels = {
   preparing: "Preparing payment",
@@ -56,7 +58,7 @@ export function TransferProgress({
       void transfer.continueSend().catch(() => {});
     }
   }, [autoStart, record.id, wallet.accountUnlocked, transfer.continueSend]);
-  const owner = `${wallet.address}:${wallet.accountUnlocked}`;
+  const owner = `${wallet.address}:${wallet.accountUnlocked}:${record.id}:${record.pool}`;
   useEffect(() => {
     let cancelled = false;
     const account = getAccount();
@@ -79,6 +81,10 @@ export function TransferProgress({
         ? phaseLabels[phase]
         : "Checking transfer",
     payload = details?.owner === owner ? details.payload : null;
+  const duration =
+    transfer.settledInMs == null
+      ? null
+      : formatSettlementSeconds(transfer.settledInMs);
   const explorer = chain.blockExplorers?.default.url,
     hash = transfer.operation?.txHash;
   return (
@@ -103,6 +109,11 @@ export function TransferProgress({
             </p>
           </div>
         )}
+        {phase === "confirmed" && duration && (
+          <p className="text-sm text-muted-foreground">
+            Confirmation observed after {duration} in this tab.
+          </p>
+        )}
         {(phase === "preparing" || transfer.operation?.sponsorshipPause) && (
           <SponsorshipNotice
             status={sponsorship.status}
@@ -119,6 +130,14 @@ export function TransferProgress({
             <p className="text-2xl tabular-nums">
               {formatPaymentAmount(BigInt(payload.amount), record.pool)}
             </p>
+            <FxEstimate
+              amount={formatAssetUnits(
+                BigInt(payload.amount),
+                resolvePool(record.pool).tokenDecimals,
+              )}
+              asset={resolvePool(record.pool).asset ?? "USDC"}
+              testFunds={resolvePool(record.pool).chainId !== 143}
+            />
             <p className="text-sm text-muted-foreground">
               To @{record.recipient.username}
             </p>

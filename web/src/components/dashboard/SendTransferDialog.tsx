@@ -31,6 +31,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { useWallet } from "../WalletProvider";
+import { FxEstimate } from "./FxEstimate";
 
 type Review = {
   sender: TransferParticipant;
@@ -268,7 +269,7 @@ export function SendTransferDialog({
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Amount</dt>
-                <dd className="font-semibold tabular-nums">
+                <dd className="text-right font-semibold tabular-nums">
                   {formatAssetUnits(
                     review.amount,
                     chosenPool?.tokenDecimals ?? 6,
@@ -285,6 +286,14 @@ export function SendTransferDialog({
                 </div>
               )}
             </dl>
+            <FxEstimate
+              amount={formatAssetUnits(
+                review.amount,
+                chosenPool?.tokenDecimals ?? 6,
+              )}
+              asset={asset}
+              testFunds={chosenPool?.chainId !== 143}
+            />
             <p className="text-xs leading-5 text-muted-foreground">
               Your amount and note are encrypted for both of you. Once
               submitted, this payment cannot be cancelled.
@@ -349,6 +358,12 @@ export function SendTransferDialog({
                 onChange={(e) => setAmount(e.target.value)}
               />
             </label>
+            <FxEstimate
+              amount={amount}
+              asset={asset}
+              testFunds={chosenPool?.chainId !== 143}
+              allowCurrencyChoice
+            />
             <label
               className="grid gap-2 text-sm font-medium"
               htmlFor="send-note"

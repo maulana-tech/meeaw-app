@@ -8,6 +8,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SendTransferDialog } from "../src/components/dashboard/SendTransferDialog";
+
+vi.mock("../src/lib/fxClient", () => ({
+  readReferenceRates: async () => {
+    throw new Error("reference API unavailable");
+  },
+}));
+
 import {
   testAccount,
   testParticipant,
@@ -58,6 +65,7 @@ vi.mock("../src/trpc/client", () => ({
 }));
 describe("Send modal", () => {
   beforeEach(() => {
+    localStorage.setItem("mawee:fiat-reference-currency", "IDR");
     state.resolve.mockReset();
     state.create.mockReset();
     state.signer.mockResolvedValue(testSigner(1));
@@ -82,6 +90,7 @@ describe("Send modal", () => {
     render(
       <SendTransferDialog open onOpenChange={() => {}} onCreated={() => {}} />,
     );
+    expect(await screen.findByText(/Fiat estimate unavailable/)).toBeVisible();
     fireEvent.change(screen.getByLabelText("Send to"), {
       target: { value: "bob" },
     });
@@ -90,6 +99,8 @@ describe("Send modal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Review transfer" }));
     await screen.findByRole("button", { name: "Confirm send" });
+    expect(screen.getByRole("button", { name: "Confirm send" })).toBeEnabled();
+    expect(screen.getByText("20 USDC")).toBeVisible();
     rotated = true;
     fireEvent.click(screen.getByRole("button", { name: "Confirm send" }));
     await waitFor(() =>
