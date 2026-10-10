@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   phase: "submitted",
   hash: "0x123",
   continueSend: vi.fn(),
+  elapsed: null as number | null,
 }));
 vi.mock("../src/features/sponsorship/useSponsorship", () => ({
   useSponsorship: () => sponsorshipUiFixture(),
@@ -19,6 +20,7 @@ vi.mock("../src/features/transfers/hooks/useDirectTransfer", () => ({
     continueSend: state.continueSend,
     working: false,
     error: null,
+    settledInMs: state.elapsed,
   }),
 }));
 vi.mock("../src/components/WalletProvider", () => ({
@@ -32,10 +34,27 @@ const record = {
 } as TransferRecord;
 beforeEach(() => {
   state.phase = "submitted";
+  state.elapsed = null;
   state.continueSend.mockReset();
 });
 
 describe("transfer confirmation", () => {
+  it("labels measured confirmation as an observation in this tab", () => {
+    state.phase = "confirmed";
+    state.elapsed = 1200;
+    render(<TransferProgress record={record} open onClose={() => {}} />);
+    expect(
+      screen.getByText("Confirmation observed after 1.2 s in this tab."),
+    ).toBeVisible();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+  });
+  it("does not invent a duration for a historical confirmation", () => {
+    state.phase = "confirmed";
+    render(<TransferProgress record={record} open onClose={() => {}} />);
+    expect(
+      screen.queryByText(/Confirmation observed after/),
+    ).not.toBeInTheDocument();
+  });
   it("shows success only after confirmed chain status", () => {
     state.phase = "confirmed";
     render(<TransferProgress record={record} open onClose={() => {}} />);

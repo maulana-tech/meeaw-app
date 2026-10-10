@@ -17,6 +17,14 @@ Kurs lokal dan angka waktu settlement tidak ditambahkan. Pengujian perangkat HP
 dan pembayaran testnet live masih perlu dilakukan; bounty Agora belum diklaim.
 Panduan aktual: [Meaw on your phone](../../mobile-pwa.md).
 
+Update 11 Oktober 2026: kelanjutan draft di `feature/cross-border-send`
+menambahkan pilihan mata uang lokal, kurs referensi Frankfurter v2 dengan cache,
+sumber/tanggal kurs dan durasi konfirmasi yang diamati di tab pengirim.
+Nominal pembayaran tetap USDC/AUSD. Ini bukan konversi fiat atau ukuran finalitas
+chain; durasi tidak dibuat untuk transaksi historis. Scope dan batas pengujian:
+[panduan Send](../../cross-border-send.md). Pembayaran AUSD funded dari HP dan
+penerimaan bounty tetap memerlukan bukti demo terpisah.
+
 ## Ringkasan
 
 Dokumen ini menyusun fitur yang akan dibangun sebelum submission Monad Metropolis.
