@@ -1,5 +1,6 @@
 import type { inferRouterOutputs } from "@trpc/server";
 import { depositsRouter } from "./modules/deposits/deposits.router";
+import { invoicesRouter } from "./modules/invoices/invoices.router";
 import { paymentLinksRouter } from "./modules/paymentLinks/paymentLinks.router";
 import { privacyKeysRouter } from "./modules/privacyKeys/privacyKeys.router";
 import { receiptsRouter } from "./modules/receipts/receipts.router";
@@ -12,6 +13,7 @@ import { walletsRouter } from "./modules/wallets/wallets.router";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
+  invoices: invoicesRouter,
   privacyKeys: privacyKeysRouter,
   receipts: receiptsRouter,
   deposits: depositsRouter,

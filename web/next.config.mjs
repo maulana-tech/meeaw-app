@@ -36,6 +36,13 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: "/i/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
         source: "/sw.js",
         headers: [
           {

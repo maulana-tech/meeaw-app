@@ -8,3 +8,9 @@ export class RelayRevertedError extends Error {
     this.name = "RelayRevertedError";
   }
 }
+export class RelayNotSubmittedError extends Error {
+  constructor(readonly original: unknown) {
+    super("The relay request was rejected before submission.");
+    this.name = "RelayNotSubmittedError";
+  }
+}

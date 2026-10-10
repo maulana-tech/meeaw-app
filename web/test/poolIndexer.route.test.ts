@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ sync: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  sync: vi.fn(),
+  invoices: vi.fn(async () => ({ checked: 0, paid: 0, unavailable: 0 })),
+}));
+vi.mock("../src/server/modules/invoices/invoices.service", () => ({
+  reconcileInvoices: mocks.invoices,
+}));
 
 vi.mock("../src/server/modules/deposits/deposits.service", () => ({
   syncAllPoolIndexes: mocks.sync,
@@ -10,6 +16,7 @@ describe("pool indexer cron route", () => {
   afterEach(() => {
     delete process.env.CRON_SECRET;
     mocks.sync.mockReset();
+    mocks.invoices.mockClear();
   });
 
   it("fails closed without a matching cron secret", async () => {
@@ -21,6 +28,7 @@ describe("pool indexer cron route", () => {
 
     expect(response.status).toBe(401);
     expect(mocks.sync).not.toHaveBeenCalled();
+    expect(mocks.invoices).not.toHaveBeenCalled();
   });
 
   it("runs an authorized synchronization", async () => {
@@ -42,5 +50,6 @@ describe("pool indexer cron route", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.sync).toHaveBeenCalledOnce();
+    expect(mocks.invoices).toHaveBeenCalledOnce();
   });
 });

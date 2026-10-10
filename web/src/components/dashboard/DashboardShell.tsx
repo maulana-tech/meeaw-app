@@ -2,6 +2,7 @@
 
 import {
   ArrowUpRight,
+  FileText,
   History,
   Inbox,
   LayoutGrid,
@@ -19,6 +20,7 @@ import { usePendingRequestsCount } from "../../features/requests/hooks/usePendin
 import {
   DASHBOARD_PATH,
   HISTORY_PATH,
+  INVOICES_PATH,
   LINKS_PATH,
   REQUESTS_PATH,
   SETTINGS_PATH,
@@ -41,6 +43,7 @@ import { dashFocus, dashIconButton } from "./styles";
 const NAV_ITEMS = [
   { href: DASHBOARD_PATH, label: "Overview", icon: LayoutGrid },
   { href: LINKS_PATH, label: "Links", icon: Link2 },
+  { href: INVOICES_PATH, label: "Invoices", icon: FileText },
   { href: WITHDRAW_PATH, label: "Cash out", icon: ArrowUpRight },
   { href: HISTORY_PATH, label: "History", icon: History },
   { href: REQUESTS_PATH, label: "Requests", icon: Inbox },
@@ -267,8 +270,11 @@ function MobileTabs({
   pendingRequestsCount?: number;
 }) {
   return (
-    <nav aria-label="Dashboard tabs">
-      <ul className="grid grid-cols-6">
+    <nav
+      aria-label="Dashboard tabs"
+      className="overflow-x-auto overscroll-x-contain"
+    >
+      <ul className="grid min-w-[28rem] grid-cols-7">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           const badge =

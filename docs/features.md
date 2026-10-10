@@ -38,6 +38,14 @@ transactions; internal consolidation and change do not count as payments.
 See [direct-transfer operations](direct-transfer-operations.md) for recovery and
 deployment prerequisites. Legacy balances remain withdrawal-only.
 
+## Invoices
+
+Create numbered USDC/AUSD invoices with clients, line items and due dates. Share
+a link or QR; a matching canonical payment changes the invoice to Paid. Pending
+invoices can be voided, and Overdue is derived from the UTC due date. Details are
+visible to the server and link holders. See [Invoices](invoices.md) for checkout,
+uncertain-transaction recovery and deployment requirements.
+
 ## Payment Requests
 
 Ask a registered `@username` for a fixed amount in an eligible asset with an optional private

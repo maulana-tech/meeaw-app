@@ -242,6 +242,10 @@ pnpm --filter web build
 
 ## Deploy To Monad Testnet
 
+Numbered USDC/AUSD invoices now use immutable private-note payment intents,
+verified Paid status, owner-only management and closed-tab reconciliation. See
+[Invoices](docs/invoices.md) for the flow, privacy tradeoffs and operations.
+
 Meaw also includes a PWA manifest, home-screen installation guidance, a static
 offline page and an AUSD sending shortcut. See [Meaw on your phone](docs/mobile-pwa.md)
 for installation, privacy boundaries and the device checks needed before submission.

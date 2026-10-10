@@ -130,6 +130,19 @@ privat dan tanpa gas.
 
 ## 2. Invoice privat
 
+Update 10 Oktober: MVP di `feature/private-invoices` mengikuti
+[desain aktual](../specs/2026-10-10-private-invoices-design.md).
+Invoice memakai note terenkripsi kanonis yang dibuat dari kunci publik penerima,
+ownership dari sesi Privy, status Pending/Paid/Void dan Overdue turunan.
+Pembayaran tidak pasti ditahan untuk pengecekan ulang, termasuk sesudah reload.
+PDF dan email tetap ditunda. Pengujian lokal tidak membuktikan pembayaran testnet
+live atau checkout perangkat HP.
+
+Rincian di bawah adalah proposal awal 9 Oktober, bukan kontrak implementasi
+terbaru. Untuk scope MVP, struktur data, migration, status dan batas privasi
+yang berlaku, gunakan desain aktual di atas dan [panduan invoice](../../invoices.md).
+Draft, PDF dan email klien belum termasuk MVP; token aktual memakai 192 bit.
+
 ### Tujuan
 
 Freelancer membuat invoice sungguhan (nomor, klien, item, jatuh tempo), lalu
