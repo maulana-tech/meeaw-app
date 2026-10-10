@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useWallet } from "../../../components/WalletProvider";
 import { getAccount, scanKeyringNotes, scanMyNotes } from "../../../lib/notes";
 import { resolvePool } from "../../../lib/pools";
+import { createConfirmationTimer } from "../../../lib/settlement";
 import { api } from "../../../trpc/client";
 import { accountForParticipant } from "../../privacyKeys/keyRing";
 import { getPrivacyKeyring } from "../../privacyKeys/session";
@@ -10,22 +11,97 @@ import { runDirectTransfer } from "../directTransferRunner";
 import { buildTransferSubmission } from "../transferProofs";
 import type { TransferOperation, TransferRecord } from "../types";
 export function useDirectTransfer(record: TransferRecord | null) {
-  const wallet = useWallet(),
-    [operation, setOperation] = useState<TransferOperation | null>(null),
-    [working, setWorking] = useState(false),
-    [error, setError] = useState<string | null>(null);
-  const identity = `${wallet.address.toLowerCase()}:${wallet.accountUnlocked}:${record?.id ?? ""}`,
-    session = useRef(identity),
+  const wallet = useWallet();
+  const identity = `${wallet.address.toLowerCase()}:${wallet.accountUnlocked}:${record?.id ?? ""}:${record?.pool ?? ""}`;
+  const empty = {
+    identity,
+    operation: null as TransferOperation | null,
+    working: false,
+    error: null as string | null,
+    settledInMs: null as number | null,
+  };
+  const [state, setState] = useState(empty);
+  const { operation, working, error, settledInMs } =
+    state.identity === identity ? state : empty;
+  const session = useRef(identity),
     busy = useRef(false),
     auto = useRef(false),
-    notified = useRef("");
+    notified = useRef(""),
+    mounted = useRef(true),
+    timing = useRef({
+      identity,
+      timer: createConfirmationTimer(),
+      isCurrent: (): boolean => true,
+    });
   session.current = identity;
+  if (timing.current.identity !== identity)
+    timing.current = {
+      identity,
+      timer: createConfirmationTimer(),
+      isCurrent: (): boolean => true,
+    };
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      timing.current.timer.reset();
+    };
+  }, []);
+  const update = useCallback(
+    (change: Partial<typeof empty>) => {
+      if (!mounted.current || session.current !== identity) return;
+      setState((previous) => ({
+        ...(previous.identity === identity
+          ? previous
+          : {
+              identity,
+              operation: null,
+              working: false,
+              error: null,
+              settledInMs: null,
+            }),
+        ...change,
+        identity,
+      }));
+    },
+    [identity],
+  );
+  const observe = useCallback(
+    (next: TransferOperation) => {
+      if (
+        !mounted.current ||
+        session.current !== identity ||
+        next.transferId !== record?.id ||
+        next.id !== record.operationId
+      )
+        return;
+      if (!timing.current.isCurrent()) timing.current.timer.reset();
+      const elapsed = timing.current.timer.observe(next);
+      setState((previous) => {
+        if (
+          previous.identity === identity &&
+          previous.operation?.phase === "confirmed" &&
+          next.phase !== "confirmed"
+        )
+          return previous;
+        return {
+          ...(previous.identity === identity
+            ? previous
+            : { identity, working: false, error: null }),
+          identity,
+          operation: next,
+          settledInMs: elapsed,
+          ...(next.phase === "confirmed" ? { error: null } : {}),
+        };
+      });
+    },
+    [identity, record],
+  );
   useEffect(() => {
     session.current = identity;
     auto.current = false;
-    setOperation(null);
-    setError(null);
-  }, [identity]);
+    update({ operation: null, working: false, error: null, settledInMs: null });
+  }, [identity, update]);
   const continueSend = useCallback(async () => {
     if (!record || busy.current) return null;
     if (!wallet.accountUnlocked)
@@ -36,9 +112,9 @@ export function useDirectTransfer(record: TransferRecord | null) {
     if (!activeAccount) throw new Error("Unlock Meaw before continuing.");
     busy.current = true;
     auto.current = true;
-    setWorking(true);
-    setError(null);
+    update({ working: true, error: null });
     const current = () =>
+      mounted.current &&
       session.current === currentIdentity &&
       getAccount() === activeAccount &&
       getPrivacyKeyring() === keyring;
@@ -90,8 +166,12 @@ export function useDirectTransfer(record: TransferRecord | null) {
               },
               action,
             ),
-          submit: (s) =>
-            api.transfers.submit.mutate({
+          submit: (s) => {
+            if (current() && s.kind === "payment") {
+              timing.current.isCurrent = current;
+              timing.current.timer.start(s.operationId);
+            }
+            return api.transfers.submit.mutate({
               submission: {
                 ...s,
                 nullifiers: [...s.nullifiers],
@@ -105,24 +185,27 @@ export function useDirectTransfer(record: TransferRecord | null) {
                   c: [s.proof.c[0], s.proof.c[1]],
                 },
               },
-            }),
+            });
+          },
           tick: (o) => {
-            if (current()) setOperation(o);
+            if (current()) observe(o);
           },
         },
       );
     } catch (e) {
       auto.current = false;
       if (current())
-        setError(
-          e instanceof Error ? e.message : "The transfer could not continue.",
-        );
+        update({
+          error:
+            e instanceof Error ? e.message : "The transfer could not continue.",
+        });
       return null;
     } finally {
       busy.current = false;
-      setWorking(false);
+      if (!current()) auto.current = false;
+      update({ working: false });
     }
-  }, [record, wallet.accountUnlocked, wallet.getSigner]);
+  }, [record, wallet.accountUnlocked, wallet.getSigner, observe, update]);
   const phase = operation?.phase;
   useEffect(() => {
     if (!record || phase === "confirmed" || phase === "failed") return;
@@ -134,12 +217,13 @@ export function useDirectTransfer(record: TransferRecord | null) {
       reading = true;
       try {
         const next = await api.transfers.status.query({ id: record.id });
-        if (!cancelled && session.current === at) setOperation(next);
+        if (!cancelled && session.current === at) observe(next);
       } catch {
-        if (!cancelled)
-          setError(
-            "Status could not be checked. Reopen the transfer to try again.",
-          );
+        if (!cancelled && session.current === at)
+          update({
+            error:
+              "Status could not be checked. Reopen the transfer to try again.",
+          });
       } finally {
         reading = false;
       }
@@ -150,7 +234,7 @@ export function useDirectTransfer(record: TransferRecord | null) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [record, identity, phase]);
+  }, [record, identity, phase, observe, update]);
   useEffect(() => {
     if (
       auto.current &&
@@ -183,5 +267,6 @@ export function useDirectTransfer(record: TransferRecord | null) {
     error,
     checking: operation === null,
     continueSend,
+    settledInMs,
   };
 }
