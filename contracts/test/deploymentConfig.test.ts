@@ -3,10 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import {expect} from "chai";
 import type {Hex} from "viem";
-import {candidateManifest,renderIndexerCandidate,writeDeploymentCandidates} from "../scripts/deployment-config";
+import {candidateManifest,confirmedDeploymentBlock,renderIndexerCandidate,writeDeploymentCandidates} from "../scripts/deployment-config";
 
 const a=(c:string):Hex=>`0x${c.repeat(40)}` as Hex;
 describe("reviewable pool deployment candidates",()=>{
+  it("records the creation receipt block instead of a cached chain head",()=>{
+    const receipt={status:"success" as const,contractAddress:a("1"),blockNumber:69837052n};
+    expect(confirmedDeploymentBlock(receipt,a("1"))).to.equal(69837052);
+    expect(()=>confirmedDeploymentBlock({...receipt,status:"reverted"},a("1"))).to.throw("receipt");
+    expect(()=>confirmedDeploymentBlock(receipt,a("2"))).to.throw("receipt");
+  });
   it("keeps every prior same-chain pool withdrawal-only and makes the new pool active",()=>{
     const legacy=[{chainId:10143,address:a("1"),deployBlock:50,token:a("2"),tokenDecimals:6,depth:20,confirmations:2,role:"active",requestCapable:false}];
     const manifest=candidateManifest({chainId:10143,priorManifest:JSON.stringify(legacy),newPool:{chainId:10143,address:a("3"),deployBlock:200,token:a("2"),tokenDecimals:6},confirmations:1});

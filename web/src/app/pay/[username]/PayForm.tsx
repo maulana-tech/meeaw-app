@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { hexToBytes } from "viem";
 import { z } from "zod";
+import { AgoraFundingNotice } from "../../../components/AgoraFundingNotice";
 import { MeawMascot } from "../../../components/MeawMascot";
 import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
 import { Button } from "../../../components/ui/button";
@@ -416,6 +417,14 @@ function PayFormContent({
               : `Get ${fromBaseUnits(TEST_MINT_UNITS)} test ${asset}`}
           </Button>
         ) : null}
+        {address && (
+          <AgoraFundingNotice
+            pool={pool}
+            onRefresh={() => void refreshBalance()}
+            disabled={isSubmitting || minting}
+            className="text-brand-linen/80"
+          />
+        )}
         <ToastFeedback
           message={walletError}
           variant="error"

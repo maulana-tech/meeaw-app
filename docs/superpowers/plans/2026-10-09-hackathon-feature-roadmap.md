@@ -1,6 +1,12 @@
 # Roadmap Fitur Hackathon: Agora PWA, Invoice Privat, Notifikasi Email
 
 Disusun: 9 Oktober 2026
+
+Update Agora 10 Oktober: pool AUSD resmi di Monad testnet sudah dideploy dan
+diaktifkan lokal, dengan funding guide dan permit gasless. Mock AUSD menjadi
+legacy. [Panduan aktual](../../agora-ausd.md) menggantikan asumsi awal bahwa
+AUSD testnet hanya tersedia sebagai mock. Deposit/transfer/withdrawal funded
+dan pengujian HP belum menjadi bukti demo atau penerimaan bounty.
 Branch kerja: `monad-migration`
 
 Update implementasi 10 Oktober 2026: prioritas PWA + Send AUSD dikerjakan di

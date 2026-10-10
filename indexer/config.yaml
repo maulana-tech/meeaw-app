@@ -19,6 +19,7 @@ chains:
           - "0x166bf3e602e10a71a59b4a57aeb842fd12d71d9d"
           - "0x8df03a1b169dda861d633035b945a484bcf234ca"
           - "0x7539d7585dbd7b49f23d23549d65cc995346838b"
+          - "0xe19fc79a122a8314d43ac543bd72d27e6bf0d838"
         events:
           - event: Deposit(uint32 indexed leafIndex, bytes32 commitment, bytes32 ephemeralPk, bytes ciphertext)
           - event: Spend(bytes32 indexed nullifier)

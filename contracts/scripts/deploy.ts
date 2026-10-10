@@ -14,10 +14,12 @@ import path from "node:path";
 import hre from "hardhat";
 import { getAddress, isAddress } from "viem";
 import {
-  ASSETS,
   type AssetSymbol,
   MAINNET_TOKENS,
   candidateManifest,
+  confirmedDeploymentBlock,
+  deploymentAsset,
+  deploymentToken,
   configuredIndexerAddresses,
   manifestForChain,
   readPublicSetting,
@@ -104,11 +106,7 @@ function previousPool(
 }
 
 function requestedAsset(): AssetSymbol {
-  const asset = process.env.ASSET ?? "USDC";
-  if (!(ASSETS as readonly string[]).includes(asset)) {
-    throw new Error(`ASSET must be one of ${ASSETS.join(", ")}.`);
-  }
-  return asset as AssetSymbol;
+  return deploymentAsset(process.env.ASSET, process.env.TOKEN_PROFILE);
 }
 
 async function main() {
@@ -203,9 +201,10 @@ async function main() {
     reuseRegistry = true;
   }
 
-  let usdc = (isUsdc ? process.env.USDC_ADDRESS : process.env.TOKEN_ADDRESS) as
-    | `0x${string}`
-    | undefined;
+  let usdc = deploymentToken({
+    asset, chainId, profile: process.env.TOKEN_PROFILE,
+    token: isUsdc ? process.env.USDC_ADDRESS : process.env.TOKEN_ADDRESS,
+  });
   const configuredDecimals =
     process.env.USDC_DECIMALS ??
     (sameConfiguredChain
@@ -256,7 +255,6 @@ async function main() {
 
   // All local manifest, indexer and token inputs have been checked before the
   // first deployment transaction is sent.
-  const firstBlock = await publicClient.getBlockNumber();
   if (!usdc) {
     const mock = isUsdc
       ? await hre.viem.deployContract("MockUSDC")
@@ -282,7 +280,7 @@ async function main() {
         ) => Promise<{ address: `0x${string}` }>
       )("MaweeRegistry", previousRegistry as `0x${string}`)
     : await hre.viem.deployContract("MaweeRegistry");
-  const pool = await hre.viem.deployContract(
+  const { contract: pool, deploymentTransaction } = await hre.viem.sendDeploymentTransaction(
     "MaweePool",
     [
       admin,
@@ -298,7 +296,8 @@ async function main() {
       },
     },
   );
-  const deployBlock = await publicClient.getBlockNumber();
+  const poolReceipt = await publicClient.waitForTransactionReceipt({ hash: deploymentTransaction.hash });
+  const deployBlock = confirmedDeploymentBlock(poolReceipt, pool.address);
   const newPool: CandidatePool = {
     chainId,
     address: pool.address,
@@ -382,10 +381,9 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(
-    error instanceof Error
-      ? error.message
-      : "Deployment candidate generation failed.",
-  );
+  const message = error instanceof Error ? error.message : "Deployment candidate generation failed.";
+  const masked = process.env.DEPLOYER_PRIVATE_KEY
+    ? message.replaceAll(process.env.DEPLOYER_PRIVATE_KEY, "[redacted]") : message;
+  console.error(masked.replace(/https?:\/\/[^\s]+/g, "[RPC endpoint]"));
   process.exitCode = 1;
 });

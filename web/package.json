@@ -8,6 +8,8 @@
     "indexer:local": "node --use-system-ca --env-file=.env.local scripts/pool-indexer-local.mjs",
     "payments:local": "node --use-system-ca --env-file=.env.local scripts/request-payments-local.mjs",
     "relayer:budget-status": "node --env-file=.env.local scripts/relayer-budget-status.mjs",
+    "agora:preflight": "node --use-system-ca --env-file=.env.local scripts/agora-preflight.mjs",
+    "agora:deploy:testnet": "node --use-system-ca --env-file=.env.local scripts/agora-deploy.mjs",
     "build": "next build",
     "build:local": "node scripts/next-local.mjs build",
     "lint": "next lint",

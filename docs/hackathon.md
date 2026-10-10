@@ -51,6 +51,12 @@ dashboard AUSD sending shortcut. This does not establish Agora eligibility or
 real-device verification. Confirm the organizer's PWA/mock-token/onboarding and
 stacking requirements before adding an Agora claim. See [mobile PWA](mobile-pwa.md).
 
+Agora integration update (10 October 2026): an official test AUSD pool was deployed
+and activated locally with canonical-token funding guidance and gasless permit
+support. Mock AUSD remains withdrawal-only. Pool creation, token/admin bindings
+and verifier bytecode were verified on-chain; funded deposit/transfer/withdrawal
+and physical-phone checkout remain unverified. See [Agora AUSD](agora-ausd.md).
+
 Bounties are track-agnostic and stack on top of the track submission. We claim
 two, and deliberately do not claim two others.
 

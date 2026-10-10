@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { env } from "../env";
 import type { PoolDescriptor, PoolScope } from "../features/requests/types";
+import { agoraAusdToken } from "./agora";
 import { ASSET_SYMBOLS, ASSETS, MONAD_MAINNET_CHAIN_ID } from "./assets";
 
 export type { PoolDescriptor, PoolScope };
@@ -130,6 +131,14 @@ export function parsePoolManifest(input: {
       if (p.mintable) throw new Error("Mainnet pools cannot be mintable.");
       if (p.token !== ASSETS[p.asset].mainnetAddress)
         throw new Error(`${p.asset} pool does not hold the canonical token.`);
+    }
+  }
+  for (const p of pools) {
+    if (p.asset === "AUSD" && p.token === agoraAusdToken(p.chainId)) {
+      if (p.mintable)
+        throw new Error("Official AUSD pools cannot use mock minting.");
+      if (p.tokenDecimals !== 6)
+        throw new Error("Official AUSD uses six decimals.");
     }
   }
   return pools;
