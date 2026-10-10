@@ -1,10 +1,10 @@
 # Concepts
 
-A few core ideas that make Mawee tick, explained plainly.
+A few core ideas that make Meaw tick, explained plainly.
 
 ## Private notes (the shielded pool)
 
-Instead of paying money *to your address*, Mawee payments go into a shared
+Instead of paying money *to your address*, Meaw payments go into a shared
 **shielded pool** — think of it as a big communal vault. Your payment becomes a
 **private note** inside that vault: a sealed record that says "this much money
 belongs to whoever holds the right key."
@@ -20,14 +20,14 @@ everyone's notes together, and the math keeps yours private.
 
 ## Unlinkability
 
-The single most important idea in Mawee: **an observer can't connect the money
+The single most important idea in Meaw: **an observer can't connect the money
 coming in to the money going out.** They can see deposits happen and withdrawals
 happen, but not that a particular deposit funded a particular withdrawal, or that
 either one is yours.
 
 ## Self-custody & passkeys
 
-Mawee is **self-custodial** — you hold the keys that authorize spending, not us.
+Meaw is **self-custodial** — you hold the keys that authorize spending, not us.
 The app and its servers can't spend your money. The pool admin can pause
 deposits and withdrawals during an emergency; it cannot move funds or change the
 proof rules, which are fixed when the pool is deployed.
@@ -51,4 +51,4 @@ payments. Private by default, provable by choice.
 
 The Monad version withdraws to any Monad wallet. A bank off-ramp is not wired up
 yet; when one is added, bank details will go directly to the regulated provider,
-never through Mawee.
+never through Meaw.

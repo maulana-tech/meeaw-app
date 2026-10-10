@@ -18,7 +18,7 @@ the private-transfer/spend-reservation migrations. Read
 restarts or resolving a stuck send. Signed/unknown relay operations must retain
 their original transaction bytes and scoped spend claims.
 
-Run Mawee on your machine against Monad testnet, from a fresh clone to signing
+Run Meaw on your machine against Monad testnet, from a fresh clone to signing
 in on the dashboard. Plan on about 20 minutes.
 
 Without this setup the landing page still renders, but **Create your payment
@@ -177,7 +177,11 @@ blockchain. Keep this worker running while testing request payments locally.
 ### Gasless mode
 
 With a relayer, payers and recipients only sign; the relayer submits each
-transaction and pays the MON gas.
+transaction and pays the MON gas within daily action and native budget limits.
+Required policy fields are listed in `web/.env.example` and
+[gasless sponsorship](gasless-sponsorship-budget.md). Missing bounds pause new
+sponsorship. Run the authenticated reconciliation worker until its legacy
+baseline is complete before expecting new gasless actions to be available.
 
 ```sh
 # A second throwaway wallet funded from the faucet. Keep its balance small.
@@ -185,6 +189,12 @@ RELAYER_PRIVATE_KEY=0x<relayer key>
 
 # Optional dedicated RPC, e.g. Alchemy.
 RELAYER_RPC_URL=https://monad-testnet.g.alchemy.com/v2/<your key>
+
+# Example native bounds; tune these on the trusted host.
+RELAYER_DAILY_BUDGET_MON=5
+RELAYER_ANONYMOUS_BUDGET_MON=1
+RELAYER_ACTION_BUDGET_MON=0.5
+RELAYER_MAX_FEE_GWEI=200
 ```
 
 When `RELAYER_PRIVATE_KEY` is empty, each user pays their own gas, which is

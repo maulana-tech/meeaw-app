@@ -32,6 +32,7 @@ vi.mock("../src/lib/crypto", () => ({
   TREE_DEPTH: 20,
 }));
 vi.mock("../src/lib/chain", () => ({
+  gaslessEnabled: vi.fn(async () => false),
   poolWithdraw: vi.fn(async () => "0xhash"),
   isEvmAddress: (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value.trim()),
   revertErrorName: () => null,

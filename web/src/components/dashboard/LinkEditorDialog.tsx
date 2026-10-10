@@ -214,7 +214,7 @@ export function LinkEditorDialog({
                   key={modeKey}
                   type="button"
                   onClick={() => setAmountMode(modeKey)}
-                  className={`rounded-(--dash-radius-sm) px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     amountMode === modeKey
                       ? "bg-foreground/18 text-foreground ring-1 ring-foreground/25"
                       : "text-foreground/65 hover:bg-foreground/8 hover:text-foreground"

@@ -22,6 +22,13 @@ import {
 } from "viem";
 import { monad, monadTestnet } from "viem/chains";
 import { env } from "../env";
+import {
+  canonicalRelayRevert,
+  completePendingAction,
+  pendingActionId,
+  unsignedSponsorshipReleased,
+} from "../features/sponsorship/pendingAction";
+import { completeFaucet } from "../features/sponsorship/pendingFaucet";
 import { api } from "../trpc/client";
 import { erc20Abi, maweePoolAbi, maweeRegistryAbi } from "./abi";
 import { bytesToHex, fromBaseUnits, hexToBytes } from "./crypto";
@@ -128,16 +135,23 @@ export function revertErrorName(error: unknown): string | null {
 
 let gaslessStatus: Promise<boolean> | null = null;
 
-/** Whether the server relayer is available (cached per page load). */
+/** Configuration is refreshed between actions; allowance stays authoritative on the server. */
 export function gaslessEnabled(): Promise<boolean> {
-  gaslessStatus ??= api.relay.status
+  if (gaslessStatus) return gaslessStatus;
+  const request = api.relay.status
     .query()
     .then((status) => status.enabled)
     .catch(() => {
-      gaslessStatus = null; // retry next time instead of caching an outage
-      return false;
+      throw new Error(
+        "Gasless availability could not be checked. Try again before continuing.",
+      );
     });
-  return gaslessStatus;
+  gaslessStatus = request;
+  const clear = () => {
+    if (gaslessStatus === request) gaslessStatus = null;
+  };
+  request.then(clear, clear);
+  return request;
 }
 
 const SIGNATURE_TTL_SECONDS = 15n * 60n;
@@ -616,11 +630,20 @@ export async function mintTestUsdc(
   signer: Signer,
   amount: bigint,
   pool: PoolDescriptor = activePool(),
+  actionId: string = crypto.randomUUID(),
 ): Promise<string> {
   if (!pool.mintable) throw new Error("Test tokens are not available here.");
   if (await gaslessEnabled()) {
     // The relayer mints a fixed amount to the caller's bound wallet.
-    return (await api.relay.mintTestUsdc.mutate({ pool: pool.scope })).txHash;
+    try {
+      return (
+        await api.relay.mintTestUsdc.mutate({ pool: pool.scope, id: actionId })
+      ).txHash;
+    } catch (error) {
+      if (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
+        completeFaucet(localStorage, signer.address, pool.scope, actionId);
+      throw error;
+    }
   }
   const { hash } = await send(signer, {
     address: pool.token,
@@ -660,18 +683,41 @@ export async function poolWithdraw(
   nullifier: Uint8Array,
   proof: EvmProof,
   pool: PoolDescriptor = activePool(),
+  batchId?: string,
+  isCurrent?: () => boolean,
 ): Promise<string> {
-  if (await gaslessEnabled()) {
-    const { txHash } = await api.relay.withdraw.mutate({
-      pool: pool.scope,
-      recipient: getAddress(recipient),
-      amount: amount.toString(),
-      root: hexOf(root),
-      nullifier: hexOf(nullifier),
-      proof: proofJson(proof),
-    });
-    return txHash;
+  const sponsored = await gaslessEnabled();
+  if (isCurrent && !isCurrent())
+    throw new Error("The private account changed during cash-out.");
+  if (sponsored) {
+    const key = `mawee:relay-withdraw:${keccak256(new TextEncoder().encode(`${pool.scope}:${hexOf(nullifier)}:${recipient.toLowerCase()}:${amount}`))}`;
+    const id = batchId ? undefined : pendingActionId(localStorage, key);
+    try {
+      const { txHash } = await api.relay.withdraw.mutate({
+        id,
+        batchId,
+        pool: pool.scope,
+        recipient: getAddress(recipient),
+        amount: amount.toString(),
+        root: hexOf(root),
+        nullifier: hexOf(nullifier),
+        proof: proofJson(proof),
+      });
+      if (id) completePendingAction(localStorage, key, id);
+      return txHash;
+    } catch (error) {
+      if (
+        id &&
+        (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
+      )
+        completePendingAction(localStorage, key, id);
+      throw error;
+    }
   }
+  if (batchId)
+    throw new Error(
+      "Gas sponsorship is temporarily unavailable. Resume this cash-out when it returns.",
+    );
   if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { hash } = await send(signer, {
     address: pool.address,
@@ -703,14 +749,24 @@ export async function poolTransfer(
   change: TransferNote,
 ): Promise<{ recipientIndex: number; changeIndex: number }> {
   if (await gaslessEnabled()) {
-    const { recipientIndex, changeIndex } = await api.relay.transfer.mutate({
-      root: hexOf(root),
-      nullifier: hexOf(nullifier),
-      proof: proofJson(proof),
-      recipientNote: noteOutput(recipient),
-      changeNote: noteOutput(change),
-    });
-    return { recipientIndex, changeIndex };
+    const key = `mawee:relay-transfer:${keccak256(new TextEncoder().encode(`${hexOf(nullifier)}:${hexOf(recipient.commitment)}:${hexOf(change.commitment)}`))}`,
+      id = pendingActionId(localStorage, key);
+    try {
+      const { recipientIndex, changeIndex } = await api.relay.transfer.mutate({
+        id,
+        root: hexOf(root),
+        nullifier: hexOf(nullifier),
+        proof: proofJson(proof),
+        recipientNote: noteOutput(recipient),
+        changeNote: noteOutput(change),
+      });
+      completePendingAction(localStorage, key, id);
+      return { recipientIndex, changeIndex };
+    } catch (error) {
+      if (canonicalRelayRevert(error) || unsignedSponsorshipReleased(error))
+        completePendingAction(localStorage, key, id);
+      throw error;
+    }
   }
   if (!signer) throw new Error("Connect a wallet with MON to pay gas.");
   const { receipt } = await send(signer, {

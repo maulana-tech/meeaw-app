@@ -6,6 +6,7 @@ import {
   nextGenerationFundingAction,
 } from "../privacyKeys/generationFunding";
 import type { LocalPrivacyKeyring } from "../privacyKeys/types";
+import { assertFundingSteps } from "../sponsorship/fundingSteps";
 import { openTransfer } from "./transferCrypto";
 import type {
   PoolDescriptor,
@@ -24,6 +25,7 @@ export type TransferRunnerPort = {
   ) => Promise<SignedTransferSubmission>;
   submit: (s: SignedTransferSubmission) => Promise<TransferOperation>;
   tick: (op: TransferOperation) => void;
+  abandon?: (op: TransferOperation) => Promise<void>;
 };
 export async function runDirectTransfer(
   context: {
@@ -52,13 +54,29 @@ export async function runDirectTransfer(
   port.tick(operation);
   for (
     let attempts = 0;
-    operation.phase === "preparing" && attempts < 4096;
+    operation.phase === "preparing" &&
+    !operation.sponsorshipPause &&
+    attempts < 4096;
     attempts++
   ) {
     const scan = await port.scan();
     if (!current()) return null;
     if (scan.health !== "healthy" || scan.scope !== context.pool.scope)
       throw new Error("Refresh the balance before sending.");
+    if (operation.sponsorshipAction) {
+      try {
+        assertFundingSteps(
+          scan.notes,
+          BigInt(payload.amount),
+          context.pool.scope,
+          (operation.sponsorshipStepLimit ?? 16) - operation.nextStep,
+          context.keyring ? (operation.fundingGeneration ?? 0) : undefined,
+        );
+      } catch (error) {
+        if (operation.nextStep === 0) await port.abandon?.(operation);
+        throw error;
+      }
+    }
     const action = context.keyring
       ? nextGenerationFundingAction(
           scan.notes,

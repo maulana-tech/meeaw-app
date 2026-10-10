@@ -9,6 +9,7 @@ import { trpc } from "../../../trpc/react";
 import { nextGenerationFundingAction } from "../../privacyKeys/generationFunding";
 import { accountForParticipant } from "../../privacyKeys/keyRing";
 import { getPrivacyKeyring } from "../../privacyKeys/session";
+import { assertFundingSteps } from "../../sponsorship/fundingSteps";
 import { readPaymentStatus, watchPaymentStatus } from "../paymentStatusMonitor";
 import {
   buildMergeSubmission,
@@ -208,6 +209,13 @@ export function useRequestPayment(request: PaymentRequest | null) {
           ? operation
           : null;
       if (!active && !live.operationId) {
+        assertFundingSteps(
+          scan.notes,
+          BigInt(payload.amount),
+          pool.scope,
+          16,
+          keyring?.activeGeneration,
+        );
         if (keyring)
           nextGenerationFundingAction(
             scan.notes,
@@ -247,9 +255,34 @@ export function useRequestPayment(request: PaymentRequest | null) {
         throw new Error(
           "Payment progress is temporarily unavailable. Refresh and try again.",
         );
+      if (active.sponsorshipPause && live.operationId === active.id) {
+        active = (await api.requests.beginPayment.mutate({
+          id: live.id,
+          revision: live.revision,
+          attemptId: active.id,
+        })) as unknown as PaymentOperation;
+        tick(active);
+        if (run.current !== seq) return active;
+      }
       while (run.current === seq) {
+        if (active.sponsorshipPause) break;
         if (active.phase === "confirmed" || active.phase === "failed") break;
         if (active.phase === "preparing") {
+          try {
+            assertFundingSteps(
+              scan.notes,
+              BigInt(payload.amount),
+              pool.scope,
+              (active.sponsorshipStepLimit ?? 16) - active.nextStep,
+              keyring ? (active.fundingGeneration ?? 0) : undefined,
+            );
+          } catch (error) {
+            if (current() && active.nextStep === 0 && active.sponsorshipAction)
+              await api.sponsorship.cancelUnsigned.mutate({
+                actionId: active.sponsorshipAction.actionId,
+              });
+            throw error;
+          }
           if (keyring) {
             const action = nextGenerationFundingAction(
               scan.notes,
@@ -426,8 +459,11 @@ export function useRequestPayment(request: PaymentRequest | null) {
         e instanceof Error
           ? e.message
           : "Payment couldn't be prepared. Refresh and try again.";
-      setError(message);
-      throw new Error(message);
+      if (run.current === seq) {
+        await refresh(request.id);
+        if (run.current === seq) setError(message);
+      }
+      throw e instanceof Error ? e : new Error(message);
     } finally {
       if (run.current === seq) setWorking(false);
     }

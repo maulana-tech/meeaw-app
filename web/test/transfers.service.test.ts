@@ -7,7 +7,17 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  operationSponsorLedger,
+  resetOperationSponsorLedger,
+} from "./helpers/operationSponsorLedger";
 import { openIsolatedRequestDb } from "./helpers/requestDb";
+
+vi.mock("../src/server/modules/sponsorship/sponsorship.service", () => ({
+  sponsorshipLedger: async () =>
+    operationSponsorLedger(deps.db as import("mongodb").Db),
+}));
+
 import { testParticipant, testPool } from "./helpers/requestFixtures";
 import { makeTransferFixture } from "./helpers/transferFixtures";
 
@@ -43,6 +53,7 @@ describe("transfer participant authorization", () => {
     deps.db = db.db;
   }, 15000);
   beforeEach(async () => {
+    await resetOperationSponsorLedger(db.db);
     await db.db.collection("private_transfers").deleteMany({});
     deps.registry.clear();
   });

@@ -9,7 +9,7 @@ Get set up in a few minutes. No seed phrases, no gas tokens to buy.
 
 ## 1. Create your account
 
-Open Mawee and sign in with a **passkey** — the same fingerprint or face unlock
+Open Meaw and sign in with a **passkey** — the same fingerprint or face unlock
 your phone or laptop already uses. No seed phrase to write down or lose.
 
 ## 2. Claim your username
@@ -27,7 +27,7 @@ Choose a 6-digit PIN. It's your backup key — it helps you recover your account
 and unlock spending. Keep it somewhere safe.
 
 {% hint style="warning" %}
-Mawee will **never** ask you for your PIN over email, chat, or DM. If someone
+Meaw will **never** ask you for your PIN over email, chat, or DM. If someone
 does, it's a scam.
 {% endhint %}
 
@@ -43,7 +43,7 @@ balance** — visible only to you.
 ## 5. Cash out whenever
 
 Withdraw your balance to any Monad wallet (`0x…`). Network fees are covered by
-Mawee.
+Meaw.
 
 ---
 
@@ -51,4 +51,4 @@ That's the whole loop: **claim → share → get paid → cash out.** Everything
 between stays private automatically.
 
 Want to see what's actually happening behind the scenes? →
-[How Mawee Works](how-it-works.md)
+[How Meaw Works](how-it-works.md)

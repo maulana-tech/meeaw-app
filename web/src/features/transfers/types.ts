@@ -9,6 +9,7 @@ import type {
   PoolScope,
   ProofWire,
 } from "../requests/types";
+import type { ActionTicket, UnavailableReason } from "../sponsorship/types";
 
 export type { Envelope, Hex, NoteOutput, PoolDescriptor, PoolScope, ProofWire };
 export type TransferParticipant = Participant;
@@ -50,6 +51,9 @@ export type TransferPage = {
   nextCursor: string | null;
 };
 export type TransferOperation = {
+  sponsorshipStepLimit?: number;
+  sponsorshipAction?: ActionTicket;
+  sponsorshipPause?: UnavailableReason;
   fundingGeneration?: number;
   keyRevision?: number;
   accountTicketId?: string;

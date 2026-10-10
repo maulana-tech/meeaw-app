@@ -1,4 +1,11 @@
 import {
+  encodeAbiParameters,
+  encodeEventTopics,
+  type Hex,
+  type TransactionReceipt,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import {
   afterAll,
   beforeAll,
   beforeEach,
@@ -7,21 +14,24 @@ import {
   it,
   vi,
 } from "vitest";
-import {
-  encodeAbiParameters,
-  encodeEventTopics,
-  keccak256,
-  type TransactionReceipt,
-  type Hex,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import { maweePoolAbi } from "../src/lib/abi";
+import {
+  operationSponsorLedger,
+  resetOperationSponsorLedger,
+} from "./helpers/operationSponsorLedger";
 import { openIsolatedRequestDb } from "./helpers/requestDb";
-import { makeTransferFixture } from "./helpers/transferFixtures";
-import { testPool } from "./helpers/requestFixtures";
-import { TransferRepository } from "../src/server/modules/transfers/transfers.repository";
+
+vi.mock("../src/server/modules/sponsorship/sponsorship.service", () => ({
+  sponsorshipLedger: async () =>
+    operationSponsorLedger(deps.db as import("mongodb").Db),
+}));
+
 import { transferSubmissionTypedData } from "../src/features/transfers/transferTypedData";
 import type { SignedTransferSubmission } from "../src/features/transfers/types";
+import { TransferRepository } from "../src/server/modules/transfers/transfers.repository";
+import { testPool } from "./helpers/requestFixtures";
+import { makeTransferFixture } from "./helpers/transferFixtures";
+
 const deps = vi.hoisted(() => ({
   db: null as unknown,
   runtime: null as unknown,
@@ -40,13 +50,14 @@ vi.mock("../src/lib/pools", async (original) => ({
   resolvePool: () => testPool,
   requestPool: () => testPool,
 }));
+
 import {
-  submitTransfer,
-  transferStatus,
-  transferEvidence,
-  reconcilePendingTransfers,
   resumeTransfer,
+  submitTransfer,
+  transferEvidence,
+  transferStatus,
 } from "../src/server/modules/transfers/transferOperations";
+
 const h = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 describe("direct transfer operation state", () => {
   let db: Awaited<ReturnType<typeof openIsolatedRequestDb>>,
@@ -58,6 +69,7 @@ describe("direct transfer operation state", () => {
     await repo.ensureIndexes();
   }, 15000);
   beforeEach(async () => {
+    await resetOperationSponsorLedger(db.db);
     await repo.collection.deleteMany({});
     await repo.steps.deleteMany({});
   });

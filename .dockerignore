@@ -9,7 +9,7 @@ web/tsconfig.tsbuildinfo
 # Solidity contracts + ZK circuit toolchain — not needed to run `web`.
 contracts
 !contracts/package.json
-circuits
+monad-zk
 scripts
 
 # Secrets and local env — never bake into an image layer.

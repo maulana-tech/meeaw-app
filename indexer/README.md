@@ -1,6 +1,6 @@
-# Mawee indexer (Envio HyperIndex)
+# Meaw indexer (Envio HyperIndex)
 
-Indexes the Mawee pool and registry on Monad and serves them over GraphQL.
+Indexes the Meaw pool and registry on Monad and serves them over GraphQL.
 The web app reads it when `ENVIO_GRAPHQL_URL` is set:
 
 - **Wallet scanning** — `Note` (encrypted note per leaf) and `Nullifier`

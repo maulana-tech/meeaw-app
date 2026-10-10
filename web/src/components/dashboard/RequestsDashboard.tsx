@@ -15,6 +15,7 @@ import type { PaymentRequest } from "../../features/requests/types";
 import { ASSETS } from "../../lib/assets";
 import { findPool, requestPool } from "../../lib/pools";
 import { api } from "../../trpc/client";
+import { MeawMascot } from "../MeawMascot";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import {
@@ -183,6 +184,7 @@ export function RequestsDashboard({
             </ListMessage>
           ) : list.rows.length === 0 ? (
             <ListMessage
+              art={<MeawMascot size={56} />}
               action={
                 direction === "sent" ? (
                   <button
@@ -454,12 +456,15 @@ function DirectionTab({
 function ListMessage({
   children,
   action,
+  art,
 }: {
   children: ReactNode;
   action?: ReactNode;
+  art?: ReactNode;
 }) {
   return (
     <div className="py-10">
+      {art ? <div className="mb-4">{art}</div> : null}
       <p className="max-w-sm text-sm leading-6 text-(--dash-ash)">{children}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>

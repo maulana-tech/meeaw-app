@@ -5,10 +5,12 @@ import { relayerConfigured } from "../../../../server/lib/relayer";
 import { SpendReservations } from "../../../../server/lib/spendReservations";
 import { reconcilePendingPrivacyRotations } from "../../../../server/modules/privacyKeys/rotationOperations";
 import { reconcilePendingRequests } from "../../../../server/modules/requests/requestOperations";
+import { reconcileSponsorship } from "../../../../server/modules/sponsorship/reconcile";
 import { reconcilePendingTransfers } from "../../../../server/modules/transfers/transferOperations";
 export const dynamic = "force-dynamic";
 let reconciliation: Promise<{
   status: string;
+  sponsorship: Awaited<ReturnType<typeof reconcileSponsorship>>;
   relays: Awaited<ReturnType<typeof reconcileAllRelays>>;
   requests: Awaited<ReturnType<typeof reconcilePendingRequests>>;
   transfers: Awaited<ReturnType<typeof reconcilePendingTransfers>>;
@@ -23,10 +25,12 @@ export async function GET(request: Request) {
     if (!relayerConfigured())
       return Response.json({
         status: "unavailable",
+        sponsorship: await reconcileSponsorship({ limit: 20 }),
         rotations: await reconcilePendingPrivacyRotations({ limit: 20 }),
       });
     reconciliation ??= (async () => {
-      const relays = await reconcileAllRelays(20),
+      const sponsorship = await reconcileSponsorship({ limit: 20 }),
+        relays = await reconcileAllRelays(20),
         requests = await reconcilePendingRequests({ limit: 20 }),
         transfers = await reconcilePendingTransfers({ limit: 20 }),
         spends = await new SpendReservations(await getDb()).reconcile(20),
@@ -38,6 +42,7 @@ export async function GET(request: Request) {
         );
       return {
         status: "checked",
+        sponsorship,
         relays,
         requests,
         transfers,

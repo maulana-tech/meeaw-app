@@ -1,8 +1,8 @@
-# Welcome to Mawee
+# Welcome to Meaw
 
 **Get paid in USDC. Keep your business your business.**
 
-Mawee is a private payment rail on Monad. You share a simple link, your client
+Meaw is a private payment rail on Monad. You share a simple link, your client
 pays it, and the money lands in your private balance — without broadcasting your
 whole payment history to the entire internet.
 
@@ -29,16 +29,16 @@ That's it. The privacy happens automatically in the background.
 * 🤔 **Wondering if this is for you?** →
   [Why Privacy Matters](why-privacy-matters.md)
 * ⚡ **Ready to go?** → [Quickstart](quickstart.md)
-* 🔍 **Want to know how the magic works?** → [How Mawee Works](how-it-works.md)
+* 🔍 **Want to know how the magic works?** → [How Meaw Works](how-it-works.md)
 * 🛟 **Got a question?** → [FAQs](faqs.md)
 
 ## A quick, honest note
 
-Mawee is currently running on **testnet** — a practice version of the network with
+Meaw is currently running on **testnet** — a practice version of the network with
 play money, so we can test everything before real funds are involved. Some things
 will change before launch, and we'll always tell you what's real and what isn't.
 
-Building or judging Mawee? See
+Building or judging Meaw? See
 [Monad Metropolis Hackathon](hackathon.md) for the track we're submitting to,
 the bounties we claim, and the deliverables checklist.
 

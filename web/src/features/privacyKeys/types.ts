@@ -1,5 +1,6 @@
 import type { Hex } from "viem";
 import type { LocalAccount } from "../../lib/notes";
+import type { ActionTicket, UnavailableReason } from "../sponsorship/types";
 
 export type RegistryScope = `${number}:${string}`;
 export type KeyGenerationId = number;
@@ -37,6 +38,8 @@ export type RotationIntent = {
   signature: Hex;
 };
 export type RotationOperation = {
+  sponsorshipAction?: ActionTicket;
+  sponsorshipPause?: UnavailableReason;
   intent: RotationIntent;
   phase: RotationPhase;
   txHash: Hex | null;

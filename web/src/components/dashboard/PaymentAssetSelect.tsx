@@ -5,6 +5,15 @@ import {
   type PoolDescriptor,
   type PoolScope,
 } from "../../lib/pools";
+import { CoinIcon } from "../ui/coin-icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+
 export function PaymentAssetSelect({
   value,
   onChange,
@@ -23,30 +32,53 @@ export function PaymentAssetSelect({
         ? p.requestCapable
         : (p.transferCapable ?? p.requestCapable),
   );
+  const selected = pools.find((p) => p.scope === value);
   return (
-    <label className="grid gap-2 text-sm font-medium">
-      Asset
-      <select
-        aria-label="Payment asset"
-        value={value}
+    <div className="grid gap-2 text-sm font-medium">
+      <span>Asset</span>
+      <Select
+        value={selected ? value : null}
         disabled={disabled}
-        onChange={(e) => {
-          const pool = pools.find((p) => p.scope === e.target.value);
+        onValueChange={(scope) => {
+          const pool = pools.find((p) => p.scope === scope);
           if (pool) onChange(pool);
         }}
-        className="min-h-11 rounded-lg border border-input bg-card px-3 text-base"
       >
-        {!pools.some((p) => p.scope === value) && (
-          <option value={value} disabled>
-            Choose an available asset
-          </option>
-        )}
-        {pools.map((p) => (
-          <option key={p.scope} value={p.scope}>
-            {ASSETS[p.asset].label}
-          </option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger aria-label="Payment asset">
+          <SelectValue
+            className="flex min-w-0 items-center gap-2.5"
+            placeholder="Choose an available asset"
+          >
+            {(scope: PoolScope | null) => {
+              const pool = pools.find((p) => p.scope === scope);
+              if (!pool) return "Choose an available asset";
+              const asset = ASSETS[pool.asset];
+              return (
+                <>
+                  <CoinIcon symbol={asset.label} logo={asset.logo} />
+                  <span className="truncate">{asset.label}</span>
+                </>
+              );
+            }}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {pools.map((p) => {
+            const asset = ASSETS[p.asset];
+            return (
+              <SelectItem key={p.scope} value={p.scope}>
+                <CoinIcon symbol={asset.label} logo={asset.logo} />
+                <span className="min-w-0">
+                  <span className="block font-medium">{asset.label}</span>
+                  <span className="block text-xs font-normal text-foreground/60">
+                    {asset.name}
+                  </span>
+                </span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

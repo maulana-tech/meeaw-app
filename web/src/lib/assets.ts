@@ -34,6 +34,7 @@ export const ASSETS: Record<AssetSymbol, AssetInfo> = {
     label: "AUSD",
     name: "Agora USD",
     issuer: "Agora",
+    logo: "/stablecoins/ausd.svg",
     mainnetAddress: "0x00000000efe302beaa2b3e6e1b18d08d69a9012a",
   },
   USDT0: {
@@ -41,6 +42,7 @@ export const ASSETS: Record<AssetSymbol, AssetInfo> = {
     label: "USDT",
     name: "Tether USD",
     issuer: "Tether",
+    logo: "/stablecoins/usdt.svg",
     mainnetAddress: "0xe7cd86e13ac4309349f30b3435a9d337750fc82d",
   },
   MUSD: {
@@ -48,6 +50,7 @@ export const ASSETS: Record<AssetSymbol, AssetInfo> = {
     label: "mUSD",
     name: "MetaMask USD",
     issuer: "MetaMask",
+    logo: "/stablecoins/musd.svg",
     mainnetAddress: "0xaca92e438df0b2401ff60da7e4337b687a2435da",
   },
 };

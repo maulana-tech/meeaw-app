@@ -1,4 +1,6 @@
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { isSponsorshipError } from "../sponsorship/sponsorship.errors";
 import {
   bootstrapPrivacyKeysInput,
   cashoutCaptureInput,
@@ -69,7 +71,15 @@ export const privacyKeysRouter = createTRPCRouter({
     .input(submitPrivacyRotationInput)
     .output(rotationOperationSchema)
     .mutation(({ ctx, input }) =>
-      submitPrivacyRotation(ctx.privyUserId, input),
+      submitPrivacyRotation(ctx.privyUserId, input).catch((error) => {
+        if (isSponsorshipError(error))
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: error.message,
+            cause: error,
+          });
+        throw error;
+      }),
     ),
   markSubmitted: protectedProcedure
     .input(markPrivacyRotationInput)

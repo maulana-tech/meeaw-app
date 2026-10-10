@@ -9,7 +9,7 @@ Legacy pool balances remain withdrawal-only.
 Open **Send** on the private balance card, enter a registered username, an amount in that asset,
 and optional note, then review and confirm. Notes are limited to 200 Unicode code
 points. The sender and recipient can decrypt their own copy after unlocking.
-Mawee combines fragmented notes without exposing note selection.
+Meaw combines fragmented notes without exposing note selection.
 
 Closing the progress window does not cancel the payment. The dashboard's pending
 transfer notice and History reopen it. A reload during preparation requires unlock

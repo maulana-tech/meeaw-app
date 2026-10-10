@@ -5,6 +5,7 @@ import { Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { MeawMascot } from "../../../components/MeawMascot";
 import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -13,6 +14,12 @@ import { ToastFeedback } from "../../../components/ui/toast-feedback";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
 import { parseRequestAmount } from "../../../features/requests/validation";
+import {
+  completeFaucet,
+  pendingFaucetId,
+} from "../../../features/sponsorship/pendingFaucet";
+import { SponsorshipNotice } from "../../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../../features/sponsorship/useSponsorship";
 import { ASSETS } from "../../../lib/assets";
 import {
   chain,
@@ -63,6 +70,7 @@ function PayFormContent({
   const [balance, setBalance] = useState<bigint | null>(null);
   const [minting, setMinting] = useState(false);
   const gasless = useGasless();
+  const sponsorship = useSponsorship();
   const [status, setStatus] = useState<{
     kind: "ok" | "err";
     msg: string;
@@ -112,7 +120,18 @@ function PayFormContent({
     setStatus(null);
     setMinting(true);
     try {
-      await mintTestUsdc(await getSigner(), TEST_MINT_UNITS, pool);
+      if (!address) throw new Error("Connect your wallet first.");
+      const payer = address,
+        at = identity,
+        signer = await getSigner();
+      if (
+        current.current !== at ||
+        signer.address.toLowerCase() !== payer.toLowerCase()
+      )
+        throw new Error("Wallet changed during the test token request.");
+      const attempt = pendingFaucetId(localStorage, address, pool.scope);
+      await mintTestUsdc(signer, TEST_MINT_UNITS, pool, attempt);
+      completeFaucet(localStorage, address, pool.scope, attempt);
       await refreshBalance();
       setStatus({
         kind: "ok",
@@ -189,6 +208,18 @@ function PayFormContent({
       </div>
 
       <form className="grid gap-2" onSubmit={onSubmit}>
+        {gasless !== false && (
+          <div className="mb-3">
+            <SponsorshipNotice
+              status={sponsorship.status}
+              loading={sponsorship.loading}
+              public
+              onRefresh={() => {
+                void sponsorship.refresh();
+              }}
+            />
+          </div>
+        )}
         {pools.length > 1 && !link ? (
           <fieldset className="flex flex-wrap gap-2">
             <legend className="sr-only">Currency</legend>
@@ -234,7 +265,11 @@ function PayFormContent({
               // variant="glass"
               className="min-h-11"
               type="submit"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                (gasless !== false &&
+                  (sponsorship.loading || !sponsorship.status?.available))
+              }
             >
               {isSubmitting && (
                 <Loader
@@ -263,7 +298,7 @@ function PayFormContent({
         </div>
         <span className="text-xs text-brand-linen/55">
           {address
-            ? `Paying from ${source === "privy" ? "your email wallet" : "your browser wallet"} ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless ? "You only sign — no gas needed." : `You need ${asset} plus a little MON for gas.`}`
+            ? `Paying from ${source === "privy" ? "your email wallet" : "your browser wallet"} ${address.slice(0, 6)}…${address.slice(-4)} on ${chain.name}. ${gasless === true ? (sponsorship.status?.available ? "Gas is covered within the daily allowance." : "Gasless payments are paused for now.") : gasless === false ? `You need ${asset} plus a little MON for gas.` : "Checking network fee availability."}`
             : "No crypto wallet? Continue with email and we create one for you."}
           {address && balance !== null
             ? ` Balance: ${fromBaseUnits(balance)} ${asset}.`
@@ -310,6 +345,19 @@ function PayFormContent({
           variant="error"
           toastId="payment-amount-error"
         />
+        {status?.kind === "ok" && status.url ? (
+          <div className="flex items-center gap-3 pt-2">
+            <MeawMascot
+              key={status.url}
+              mood="success"
+              size={56}
+              tone="white"
+            />
+            <p className="text-sm text-brand-linen/80">
+              Paid. Meaw tucked it away privately for @{username}.
+            </p>
+          </div>
+        ) : null}
         <ToastFeedback
           message={status?.msg}
           content={

@@ -28,9 +28,9 @@ until someone does.
 * **Anyone getting paid publicly** — a stranger who learns your address can
   follow your money around forever.
 
-## What Mawee changes
+## What Meaw changes
 
-Mawee breaks the link between the payment coming *in* and the money you take
+Meaw breaks the link between the payment coming *in* and the money you take
 *out*. Someone watching the blockchain sees that payments happened — but they
 **can't tell which payment was yours, who sent it, or that it's connected to you
 at all.**
@@ -41,6 +41,6 @@ doesn't get a front-row seat.
 {% hint style="success" %}
 **Privacy isn't about hiding shady stuff.** It's the same reason you use an
 envelope instead of a postcard. Next up:
-[Mawee's Practical Privacy](practical-privacy.md) — exactly what we protect, and
+[Meaw's Practical Privacy](practical-privacy.md) — exactly what we protect, and
 what we don't.
 {% endhint %}

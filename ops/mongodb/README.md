@@ -1,6 +1,6 @@
 # VPS MongoDB
 
-This Compose stack runs MongoDB for the Mawee app on the same VPS. It joins the
+This Compose stack runs MongoDB for the Meaw app on the same VPS. It joins the
 app's `mawee_edge` Docker network, publishes no host ports, enables
 authentication, and keeps database files in the named `mawee_mongo_data`
 volume.

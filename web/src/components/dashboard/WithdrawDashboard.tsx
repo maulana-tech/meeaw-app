@@ -8,6 +8,8 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { getPrivacyKeyring } from "../../features/privacyKeys/session";
+import { SponsorshipNotice } from "../../features/sponsorship/SponsorshipNotice";
+import { useSponsorship } from "../../features/sponsorship/useSponsorship";
 import { ASSETS } from "../../lib/assets";
 import { LINKS_PATH } from "../../lib/auth-routes";
 import { explorerTxUrl } from "../../lib/chain";
@@ -34,6 +36,7 @@ import {
   withdrawAll,
   withdrawNote,
 } from "../../lib/withdraw";
+import { MeawMascot } from "../MeawMascot";
 import { PrivacyPoolStat } from "../PrivacyPoolStat";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -178,6 +181,10 @@ export function WithdrawDashboard() {
       if (!account) throw new Error("Unlock your private account to continue.");
       // Scan the pool the selected payments live in; never mix pools.
       const ring = getPrivacyKeyring();
+      const current = () =>
+        isCurrentRun() &&
+        getAccount() === account &&
+        getPrivacyKeyring() === ring;
       const scan = ring
         ? await scanKeyringNotes(ring, pool, {
             includeRequestRecovery: true,
@@ -196,7 +203,9 @@ export function WithdrawDashboard() {
           scan,
           notes: scan.notes,
           destination: destination.trim(),
+          isCurrent: current,
         });
+        if (!current()) return;
         if (batch.succeeded.length === 0) {
           throw new Error(
             batch.failed[0]?.error ?? "No payments were available to cash out.",
@@ -239,7 +248,9 @@ export function WithdrawDashboard() {
         scan,
         note,
         destination: destination.trim(),
+        isCurrent: current,
       });
+      if (!current()) return;
       const txUrl = explorerTxUrl(withdrawal.txHash);
       toast.success(
         `Cashed out ${fromBaseUnits(target.note.amount)} ${asset}`,
@@ -718,6 +729,9 @@ function WalletWithdrawal({
   onConfirm,
 }: WalletWithdrawalProps) {
   const gasless = useGasless();
+  const sponsorship = useSponsorship({
+    enabled: step === "form" || step === "review",
+  });
   if (step === "form") {
     return (
       <form className="grid gap-5" onSubmit={onReview} noValidate>
@@ -766,6 +780,15 @@ function WalletWithdrawal({
     return (
       <div className="grid gap-5">
         <BackButton label="Edit details" onClick={onBack} />
+        {gasless !== false && (
+          <SponsorshipNotice
+            status={sponsorship.status}
+            loading={sponsorship.loading}
+            onRefresh={() => {
+              void sponsorship.refresh();
+            }}
+          />
+        )}
         <div className={`${linenInsetClass} p-4`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-sm text-foreground/60">Cashing out</span>
@@ -868,6 +891,7 @@ function EmptyState() {
     <DashboardNotice
       label="Nothing yet"
       title="No payments to cash out"
+      art={<MeawMascot size={64} />}
       action={
         <Link href={LINKS_PATH} className={dashButtonSecondary}>
           View payment links

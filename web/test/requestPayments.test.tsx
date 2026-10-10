@@ -91,7 +91,6 @@ import type {
   PaymentOperation,
   PaymentRequest,
   RequestPayload,
-  SignedRequest,
   SignedSubmission,
 } from "../src/features/requests/types";
 import type { MyNote, ScanResult } from "../src/lib/notes";
@@ -191,6 +190,7 @@ describe("request payment browser orchestration", () => {
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
     vi.clearAllMocks();
+    deps.buildMergeSubmission.mockReset();
     deps.walletAddress = baseRequest.addressee.wallet;
     deps.unlocked = true;
     deps.signer = { address: baseRequest.addressee.wallet, walletClient: {} };
@@ -230,6 +230,27 @@ describe("request payment browser orchestration", () => {
     expect(deps.buildPaymentSubmission).toHaveBeenCalledOnce();
     expect(deps.submitPayment).toHaveBeenCalledOnce();
     expect(result.current.operation?.phase).toBe("confirmed");
+  });
+  it.each([
+    16, 17,
+  ])("checks %i funding steps before a request proof", async (count) => {
+    deps.buildMergeSubmission.mockRejectedValueOnce(Error("preparation began"));
+    deps.openRequest.mockResolvedValue({ ...payload, amount: String(count) });
+    deps.scanMyNotes.mockResolvedValue(
+      scan(Array.from({ length: count }, (_, i) => note(i, 1n))),
+    );
+    const { result } = renderHook(() => useRequestPayment(baseRequest), {
+      wrapper,
+    });
+    await act(async () => {
+      await expect(result.current.pay()).rejects.toThrow(
+        count === 17 ? "smaller" : "preparation began",
+      );
+    });
+    expect(deps.beginPayment).toHaveBeenCalledTimes(count === 17 ? 0 : 1);
+    expect(deps.buildMergeSubmission).toHaveBeenCalledTimes(
+      count === 17 ? 0 : 1,
+    );
   });
 
   it("resumes a prepared operation after reload without beginning or repeating its merge", async () => {

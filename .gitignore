@@ -26,7 +26,7 @@ coverage/
 
 backups/
 # local-only
-circuits/build/
+monad-zk/build/
 docs/monad-hackathon/
 design-ref/
 .deploy-candidates/

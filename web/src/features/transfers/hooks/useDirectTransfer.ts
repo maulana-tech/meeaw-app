@@ -53,6 +53,12 @@ export function useDirectTransfer(record: TransferRecord | null) {
         { record, account, pool, signer, ...(keyring ? { keyring } : {}) },
         {
           isCurrent: current,
+          abandon: async (op) => {
+            if (current() && op.sponsorshipAction)
+              await api.sponsorship.cancelUnsigned.mutate({
+                actionId: op.sponsorshipAction.actionId,
+              });
+          },
           operation: () => api.transfers.resume.mutate({ id: record.id }),
           scan: () =>
             keyring
@@ -149,11 +155,18 @@ export function useDirectTransfer(record: TransferRecord | null) {
     if (
       auto.current &&
       operation?.phase === "preparing" &&
+      !operation.sponsorshipPause &&
       !working &&
       wallet.accountUnlocked
     )
       void continueSend();
-  }, [operation?.phase, working, wallet.accountUnlocked, continueSend]);
+  }, [
+    operation?.phase,
+    operation?.sponsorshipPause,
+    working,
+    wallet.accountUnlocked,
+    continueSend,
+  ]);
   useEffect(() => {
     if (!operation || !["confirmed", "failed"].includes(operation.phase))
       return;

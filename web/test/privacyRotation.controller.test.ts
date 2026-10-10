@@ -4,6 +4,51 @@ import type { RotationOperation } from "../src/features/privacyKeys/types";
 import { makePrivacyFixture } from "./helpers/privacyKeyFixtures";
 
 describe("Settings privacy rotation controller", () => {
+  it("retains the accepted authorization after a sponsorship pause without another signature", async () => {
+    const f = await makePrivacyFixture();
+    let pending: RotationOperation | null = null,
+      attempts = 0;
+    const sign = vi.spyOn(f.signer.walletClient, "signTypedData");
+    const controller = createPrivacyRotationController({
+      owner: f.owner,
+      username: f.username,
+      method: "pin",
+      isCurrent: () => true,
+      state: async () => ({ ...f.state, pending }),
+      verifiedState: async () => f.state,
+      bootstrap: async () => f.state,
+      root: async () => f.root.slice(),
+      signer: async () => f.signer,
+      nonce: async () => "0",
+      sponsored: async () => true,
+      prepare: async (intent) =>
+        (pending = {
+          intent,
+          phase: "prepared",
+          txHash: null,
+          updatedAt: new Date().toISOString(),
+        }),
+      submit: async (_id, authorization) => {
+        if (!pending) throw Error("Missing pending operation");
+        pending = {
+          ...pending,
+          registryAuthorization: authorization,
+          sponsorshipPause: "budget",
+        };
+        if (++attempts === 1)
+          throw Error("Gas sponsorship is temporarily unavailable.");
+        return pending;
+      },
+      mark: vi.fn(),
+      wallet: vi.fn(),
+      reconcile: vi.fn(),
+      install: vi.fn(),
+    });
+    await controller.prepare("123456");
+    await expect(controller.confirm()).rejects.toThrow("Gas sponsorship");
+    await controller.confirm();
+    expect(sign).toHaveBeenCalledTimes(2);
+  });
   it("does not admit a rotation if its review was disposed while the signer was loading", async () => {
     const f = await makePrivacyFixture();
     let finish!: (value: typeof f.signer) => void;
@@ -174,7 +219,9 @@ describe("Settings privacy rotation controller", () => {
     });
     await controller.prepare("123456");
     await controller.confirm();
-    controller.clearTerminal({ ...controller.pending()!, phase: "failed" });
+    const pending = controller.pending();
+    if (!pending) throw Error("Expected a pending rotation");
+    controller.clearTerminal({ ...pending, phase: "failed" });
     expect(controller.pending()).toBeNull();
     controller.dispose();
   });
