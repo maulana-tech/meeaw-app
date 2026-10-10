@@ -18,6 +18,7 @@ import { payIntoNote } from "../../lib/deposit";
 import { accountPubkeys, getAccount } from "../../lib/notes";
 import { activePool, type PoolDescriptor } from "../../lib/pools";
 import { useGasless } from "../../lib/useGasless";
+import { AgoraFundingNotice } from "../AgoraFundingNotice";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -215,6 +216,12 @@ export function AddFundsDialog({
             </div>
           ) : null}
         </div>
+
+        <AgoraFundingNotice
+          pool={pool}
+          onRefresh={() => void refresh()}
+          disabled={busy !== null}
+        />
 
         <form className="grid gap-2" onSubmit={shield}>
           <Label className="text-foreground" htmlFor="add-funds-amount">

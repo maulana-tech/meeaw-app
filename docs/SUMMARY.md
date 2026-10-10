@@ -18,6 +18,7 @@
 * [Interface & Features](features.md)
 * [Meaw on your phone](mobile-pwa.md)
 * [Invoices](invoices.md)
+* [Agora AUSD testnet](agora-ausd.md)
 * [Verify a Shared Receipt](receipt-verification.md)
 
 ## Under the Hood

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { agoraAusdToken } from "../src/lib/agora";
 import {
   mirrorScope,
   parsePoolManifest,
@@ -30,6 +31,27 @@ const legacyEnv = {
   tokenDecimals: 6,
   mintable: false,
 };
+
+describe("official Agora pool configuration", () => {
+  it("rejects mock minting and incorrect precision for the official token", () => {
+    const pool = entry(NEW, "active", {
+      asset: "AUSD",
+      token: agoraAusdToken(10143),
+      mintable: true,
+    });
+    expect(() => parse([pool])).toThrow("mock minting");
+    expect(() =>
+      parsePoolManifest({
+        manifest: JSON.stringify([
+          { ...pool, mintable: false, tokenDecimals: 18 },
+        ]),
+        chainId: 10143,
+        legacy: { ...legacyEnv, tokenDecimals: 18 },
+      }),
+    ).toThrow("six decimals");
+    expect(parse([{ ...pool, mintable: false }])[0].asset).toBe("AUSD");
+  });
+});
 
 function parse(manifest: unknown[] | undefined, chainId = 10143) {
   return parsePoolManifest({

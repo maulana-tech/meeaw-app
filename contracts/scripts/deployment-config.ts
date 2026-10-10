@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Hex } from "viem";
+import { agoraAusdToken } from "../../web/src/lib/agora";
 
 export type CandidatePool = Readonly<{
   chainId: number;
@@ -22,6 +23,34 @@ export type CandidatePool = Readonly<{
 // Must match ASSET_SYMBOLS in web/src/lib/assets.ts.
 export const ASSETS = ["USDC", "AUSD", "USDT0", "MUSD"] as const;
 export type AssetSymbol = (typeof ASSETS)[number];
+export function confirmedDeploymentBlock(receipt: {
+  status: "success" | "reverted"; contractAddress?: string | null; blockNumber: bigint;
+}, address: string): number {
+  if (receipt.status !== "success" || receipt.contractAddress?.toLowerCase() !== address.toLowerCase() || receipt.blockNumber < 0n || receipt.blockNumber > BigInt(Number.MAX_SAFE_INTEGER))
+    throw new Error("A matching successful deployment receipt is required.");
+  return Number(receipt.blockNumber);
+}
+export function deploymentAsset(asset?: string, profile?: string): AssetSymbol {
+  if (profile && profile !== "agora-ausd")
+    throw new Error("TOKEN_PROFILE must be agora-ausd or unset.");
+  const chosen = asset ?? (profile === "agora-ausd" ? "AUSD" : "USDC");
+  if (!(ASSETS as readonly string[]).includes(chosen))
+    throw new Error(`ASSET must be one of ${ASSETS.join(", ")}.`);
+  if (profile === "agora-ausd" && chosen !== "AUSD")
+    throw new Error("The Agora profile requires ASSET=AUSD.");
+  return chosen as AssetSymbol;
+}
+export function deploymentToken(input: {
+  asset: string; chainId: number; profile?: string; token?: string;
+}): Hex | undefined {
+  deploymentAsset(input.asset, input.profile);
+  if (input.profile !== "agora-ausd") return input.token as Hex | undefined;
+  const canonical = agoraAusdToken(input.chainId);
+  if (!canonical) throw new Error("Agora AUSD is not configured on this chain.");
+  if (input.token && input.token.toLowerCase() !== canonical)
+    throw new Error("TOKEN_ADDRESS conflicts with the canonical Agora AUSD token.");
+  return canonical;
+}
 export const MAINNET_TOKENS: Record<AssetSymbol, Hex> = {
   USDC: "0x754704bc059f8c67012fed69bc8a327a5aafb603",
   AUSD: "0x00000000efe302beaa2b3e6e1b18d08d69a9012a",
