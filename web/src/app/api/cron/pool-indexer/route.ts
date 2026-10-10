@@ -1,5 +1,6 @@
 import { getServerEnv } from "../../../../env.server";
 import { syncAllPoolIndexes } from "../../../../server/modules/deposits/deposits.service";
+import { reconcileInvoices } from "../../../../server/modules/invoices/invoices.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,8 +13,15 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const result = await syncAllPoolIndexes();
-  console.info("[pool-indexer]", JSON.stringify(result));
-  return Response.json(result, {
-    status: result.status === "degraded" ? 503 : 200,
+  const invoices = await reconcileInvoices().catch(() => ({
+    checked: 0,
+    paid: 0,
+    unavailable: 1,
+  }));
+  const response = { ...result, invoices };
+  console.info("[pool-indexer]", JSON.stringify(response));
+  return Response.json(response, {
+    status:
+      result.status === "degraded" || invoices.unavailable > 0 ? 503 : 200,
   });
 }

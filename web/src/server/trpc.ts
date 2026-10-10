@@ -1,19 +1,24 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { Context } from "./context";
-import { RelayRevertedError } from "./lib/relayOutcome.errors";
+import {
+  RelayNotSubmittedError,
+  RelayRevertedError,
+} from "./lib/relayOutcome.errors";
 import { isSponsorshipError } from "./modules/sponsorship/sponsorship.errors";
 
 const t = initTRPC.context<Context>().create({
   errorFormatter({ shape, error }) {
+    const cause =
+      error.cause instanceof RelayNotSubmittedError
+        ? error.cause.original
+        : error.cause;
     return {
       ...shape,
       data: {
         ...shape.data,
-        sponsorshipReason: isSponsorshipError(error.cause)
-          ? error.cause.reason
-          : null,
-        sponsorshipReleased:
-          isSponsorshipError(error.cause) && error.cause.released,
+        relayNotSubmitted: error.cause instanceof RelayNotSubmittedError,
+        sponsorshipReason: isSponsorshipError(cause) ? cause.reason : null,
+        sponsorshipReleased: isSponsorshipError(cause) && cause.released,
         relayOutcome:
           error.cause instanceof RelayRevertedError
             ? { state: "reverted" as const, txHash: error.cause.txHash }

@@ -5,6 +5,8 @@ const state = vi.hoisted(() => ({
   result: "confirmed",
   simulateFail: false,
   replay: null as unknown,
+  depositPrior: false,
+  admitFail: false,
 }));
 const HASH = `0x${"11".repeat(32)}` as const;
 vi.mock("../src/server/lib/durableRelayer", () => ({
@@ -13,19 +15,25 @@ vi.mock("../src/server/lib/durableRelayer", () => ({
     budget: {
       ledger: {
         findOrdinaryAction: async () => null,
-        readAction: async () => ({
-          intent: {
-            businessDigest: `0x${"11".repeat(32)}`,
-            kind: "withdraw",
-            principal: { kind: "anonymous", key: "shared" },
-          },
-          fence: 1,
-        }),
-        admit: async () => ({
-          chainId: 143,
-          actionId: "withdraw:test",
-          fence: 1,
-        }),
+        readAction: async (_chain: number, actionId: string) =>
+          actionId === "deposit:test" && !state.depositPrior
+            ? null
+            : {
+                intent: {
+                  businessDigest: `0x${"11".repeat(32)}`,
+                  kind: actionId === "deposit:test" ? "deposit" : "withdraw",
+                  principal: { kind: "anonymous", key: "shared" },
+                },
+                fence: 1,
+              },
+        admit: async () => {
+          if (state.admitFail) throw new Error("Budget rejected");
+          return {
+            chainId: 143,
+            actionId: "withdraw:test",
+            fence: 1,
+          };
+        },
         closeAction: async () => {},
       },
     },
@@ -75,6 +83,7 @@ vi.mock("viem", async (original) => {
 
 import { maweePoolAbi } from "../src/lib/abi";
 import { relayWrite } from "../src/server/lib/relayer";
+import { RelayNotSubmittedError } from "../src/server/lib/relayOutcome.errors";
 
 const request = {
   address: "0x2222222222222222222222222222222222222222" as const,
@@ -105,9 +114,44 @@ beforeEach(() => {
   state.result = "confirmed";
   state.simulateFail = false;
   state.replay = null;
+  state.depositPrior = false;
+  state.admitFail = false;
   vi.stubEnv("RELAYER_PRIVATE_KEY", `0x${"11".repeat(32)}`);
 });
 describe("ordinary relay shared durability", () => {
+  it("marks fresh deposit admission failures as not submitted", async () => {
+    state.admitFail = true;
+    const deposit = {
+      address: request.address,
+      abi: maweePoolAbi,
+      functionName: "deposit" as const,
+      args: [HASH, 1n, request.args[4], HASH, "0x1234"] as const,
+    };
+    await expect(
+      relayWrite(deposit, {
+        ...sponsor,
+        kind: "deposit",
+        identity: { ...sponsor.identity, actionId: "deposit:test" },
+      }),
+    ).rejects.toBeInstanceOf(RelayNotSubmittedError);
+    expect(state.events).toEqual(["simulate"]);
+  });
+  it("does not mark an existing deposit operation as safe after uncertainty", async () => {
+    state.depositPrior = true;
+    state.admitFail = true;
+    const deposit = {
+      address: request.address,
+      abi: maweePoolAbi,
+      functionName: "deposit" as const,
+      args: [HASH, 1n, request.args[4], HASH, "0x1234"] as const,
+    };
+    const error = await relayWrite(deposit, {
+      ...sponsor,
+      kind: "deposit",
+      identity: { ...sponsor.identity, actionId: "deposit:test" },
+    }).catch((error) => error);
+    expect(error).not.toBeInstanceOf(RelayNotSubmittedError);
+  });
   it("persists ordinary withdrawal sends before broadcasting", async () => {
     expect((await relayWrite(request, sponsor)).hash).toBe(HASH);
     expect(state.events).toEqual([

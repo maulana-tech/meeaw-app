@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { hexToBytes } from "viem";
 import { z } from "zod";
 import { MeawMascot } from "../../../components/MeawMascot";
 import { PrivacyPoolStat } from "../../../components/PrivacyPoolStat";
@@ -11,6 +12,11 @@ import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { ToastFeedback } from "../../../components/ui/toast-feedback";
+import { invoiceRetrySafe } from "../../../features/invoices/attempt";
+import type {
+  InvoicePaymentIntent,
+  InvoicePaymentLifecycle,
+} from "../../../features/invoices/types";
 import { usePayerWallet } from "../../../features/payerWallet/hooks/usePayerWallet";
 import type { PaymentLink } from "../../../features/paymentLinks/types";
 import { parseRequestAmount } from "../../../features/requests/validation";
@@ -32,7 +38,7 @@ import { fromBaseUnits, toBaseUnits, USDC_DECIMALS } from "../../../lib/crypto";
 import { payIntoNote } from "../../../lib/deposit";
 import { formatAssetUnits } from "../../../lib/paymentAsset";
 import { resolveCheckoutPool } from "../../../lib/paymentLinkAsset";
-import { activePoolFor, activePools } from "../../../lib/pools";
+import { activePoolFor, activePools, resolvePool } from "../../../lib/pools";
 import { useGasless } from "../../../lib/useGasless";
 
 const payInput = z.object({
@@ -49,10 +55,16 @@ function PayFormContent({
   account,
   username,
   link,
+  invoice,
+  onPaid,
+  invoiceLifecycle,
 }: {
   account: MaweeAccount;
   username: string;
   link?: PaymentLink | null;
+  invoice?: InvoicePaymentIntent;
+  onPaid?: (hash: string) => Promise<void>;
+  invoiceLifecycle?: InvoicePaymentLifecycle;
 }) {
   const {
     address,
@@ -69,6 +81,11 @@ function PayFormContent({
   const [poolScope, setPoolScope] = useState(pools[0].scope);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [minting, setMinting] = useState(false);
+  const [submittedFor, setSubmittedFor] = useState("");
+  const invoiceBusy = useRef(false);
+  const startedFor = useRef("");
+  const [uncertainFor, setUncertainFor] = useState("");
+  const mounted = useRef(true);
   const gasless = useGasless();
   const sponsorship = useSponsorship();
   const [status, setStatus] = useState<{
@@ -84,11 +101,19 @@ function PayFormContent({
           link.tokenDecimals ?? USDC_DECIMALS,
         )
       : null;
-  const pool = resolveCheckoutPool(link, poolScope);
+  const pool = invoice
+    ? resolvePool(invoice.poolScope)
+    : resolveCheckoutPool(link, poolScope);
   const asset = ASSETS[pool.asset].label;
   const identity = `${address}:${username}:${link?.id ?? "general"}:${pool.scope}`,
     current = useRef(identity);
   current.current = identity;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const {
     register,
@@ -148,14 +173,18 @@ function PayFormContent({
   }
 
   const onSubmit = handleSubmit(async ({ amount }) => {
+    if (invoice && (invoiceBusy.current || submittedFor === current.current))
+      return;
     setStatus(null);
     if (!address) {
       setStatus({ kind: "err", msg: "Connect your wallet to pay." });
       return;
     }
+    const at = current.current;
     try {
-      const at = current.current;
+      if (invoice) invoiceBusy.current = true;
       const valid = () =>
+        mounted.current &&
         current.current === at &&
         activePoolFor(pool.asset)?.scope === pool.scope;
       const units = parseRequestAmount(amount, pool.tokenDecimals);
@@ -172,13 +201,35 @@ function PayFormContent({
 
       if (!valid())
         throw new Error("Your wallet or payment asset changed. Review again.");
-      const { txHash } = await payIntoNote(
+      const args = [
         signer,
         { notePubkey: account.note_pubkey, viewPubkey: account.view_pubkey },
         units,
         pool,
         valid,
-      );
+      ] as const;
+      const { txHash } = invoice
+        ? await payIntoNote(...args, {
+            salt: BigInt(invoice.salt),
+            envelope: {
+              ephemeralPk: hexToBytes(invoice.ephemeralPk),
+              ciphertext: hexToBytes(invoice.ciphertext),
+            },
+            lifecycle: {
+              onSubmitting: () => {
+                invoiceLifecycle?.onSubmitting();
+                startedFor.current = at;
+                if (mounted.current) setSubmittedFor(at);
+              },
+              onSubmitted: (hash) => invoiceLifecycle?.onSubmitted(hash),
+            },
+          })
+        : await payIntoNote(...args);
+      if (invoice) {
+        if (mounted.current) setSubmittedFor(at);
+        await onPaid?.(txHash);
+      }
+      if (!mounted.current || current.current !== at) return;
       setStatus({
         kind: "ok",
         msg: `Sent ${amount} ${asset} to @${username}. See the proof here.`,
@@ -187,10 +238,29 @@ function PayFormContent({
       reset({ amount: lockedAmount ?? "" });
       void refreshBalance();
     } catch (e) {
+      if (invoice && startedFor.current === at) {
+        if (invoiceRetrySafe(e)) {
+          invoiceLifecycle?.onReleased();
+          startedFor.current = "";
+          if (mounted.current && current.current === at) {
+            setSubmittedFor("");
+            setUncertainFor("");
+          }
+        } else {
+          invoiceLifecycle?.onUncertain();
+          if (mounted.current && current.current === at) {
+            setSubmittedFor(at);
+            setUncertainFor(at);
+          }
+        }
+      }
+      if (!mounted.current || current.current !== at) return;
       setStatus({
         kind: "err",
         msg: e instanceof Error ? e.message : "Payment failed.",
       });
+    } finally {
+      invoiceBusy.current = false;
     }
   });
 
@@ -267,6 +337,7 @@ function PayFormContent({
               type="submit"
               disabled={
                 isSubmitting ||
+                (invoice && submittedFor === identity) ||
                 (gasless !== false &&
                   (sponsorship.loading || !sponsorship.status?.available))
               }
@@ -277,7 +348,17 @@ function PayFormContent({
                   aria-hidden="true"
                 />
               )}
-              {isSubmitting ? "Paying…" : "Pay"}
+              {invoice && uncertainFor === identity
+                ? "Check payment status"
+                : invoice && submittedFor === identity
+                  ? isSubmitting
+                    ? "Paying…"
+                    : "Payment submitted"
+                  : isSubmitting
+                    ? "Paying…"
+                    : invoice
+                      ? `Pay ${lockedAmount} ${asset}`
+                      : "Pay"}
             </Button>
           ) : (
             <Button
@@ -393,7 +474,16 @@ function PayFormContent({
 
 export function PayForm(props: Parameters<typeof PayFormContent>[0]) {
   try {
-    if (props.link) resolveCheckoutPool(props.link);
+    if (props.invoice) {
+      const pool = resolvePool(props.invoice.poolScope);
+      if (
+        !props.link?.amount ||
+        pool.role !== "active" ||
+        activePoolFor(pool.asset)?.scope !== pool.scope ||
+        pool.asset !== props.link.asset
+      )
+        throw new Error("This invoice asset is unavailable.");
+    } else if (props.link) resolveCheckoutPool(props.link);
   } catch {
     return (
       <Card appearance="glass">

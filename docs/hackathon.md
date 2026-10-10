@@ -110,6 +110,12 @@ is an RPC endpoint, not a meaningful integration.
 
 ## Demo plan
 
+Invoice implementation update (10 October 2026): owner creation/list/void,
+USDC/AUSD public checkout, canonical receipt verification and pool-indexer
+reconciliation are implemented locally. This is implementation evidence;
+physical-device and funded-testnet invoice demos still require verification.
+See [Invoices](invoices.md).
+
 The technical demo (≤3 min) walks one full loop against Monad testnet:
 
 1. Sign in with a passkey, claim `@username`.

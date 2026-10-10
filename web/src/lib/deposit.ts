@@ -1,8 +1,9 @@
-import { poolDeposit, type Signer } from "./chain";
+import { type DepositLifecycle, poolDeposit, type Signer } from "./chain";
 import {
   commitment,
   encryptNote,
   fromBE,
+  R,
   randomFieldElement,
   toBE32,
 } from "./crypto";
@@ -27,10 +28,24 @@ export async function payIntoNote(
   units: bigint,
   pool?: PoolDescriptor,
   isCurrent: () => boolean = () => true,
+  fixed?: {
+    salt: bigint;
+    envelope?: { ephemeralPk: Uint8Array; ciphertext: Uint8Array };
+    lifecycle?: DepositLifecycle;
+  },
 ): Promise<{ leafIndex: number; txHash: string }> {
   if (!isCurrent())
     throw new Error("The payment selection changed. Review again.");
-  const salt = randomFieldElement();
+  const salt = fixed?.salt ?? randomFieldElement();
+  if (
+    fixed &&
+    (salt < 0n ||
+      salt >= R ||
+      (fixed.envelope &&
+        (fixed.envelope.ephemeralPk.length !== 32 ||
+          fixed.envelope.ciphertext.length !== 88)))
+  )
+    throw new Error("The invoice note is invalid. Reload this invoice.");
   const ownerPkField = fromBE(recipient.notePubkey);
   const note = toBE32(await commitment(units, ownerPkField, salt));
   const { proof } = await proveDeposit({
@@ -39,14 +54,11 @@ export async function payIntoNote(
     ownerPk: ownerPkField.toString(),
     salt: salt.toString(),
   });
-  const { ephemeralPk, ciphertext } = encryptNote(
-    recipient.viewPubkey,
-    units,
-    salt,
-  );
+  const { ephemeralPk, ciphertext } =
+    fixed?.envelope ?? encryptNote(recipient.viewPubkey, units, salt);
   if (!isCurrent())
     throw new Error("The payment selection changed. Review again.");
-  return poolDeposit(
+  const args = [
     signer,
     note,
     units,
@@ -55,5 +67,8 @@ export async function payIntoNote(
     ciphertext,
     pool,
     isCurrent,
-  );
+  ] as const;
+  return fixed?.lifecycle
+    ? poolDeposit(...args, fixed.lifecycle)
+    : poolDeposit(...args);
 }

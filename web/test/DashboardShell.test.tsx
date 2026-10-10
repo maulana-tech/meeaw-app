@@ -55,6 +55,7 @@ describe("DashboardShell", () => {
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "/dashboard",
       "/links",
+      "/invoices",
       "/withdraw",
       "/history",
       "/requests",

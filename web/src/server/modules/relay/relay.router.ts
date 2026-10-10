@@ -2,7 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { usdcMintable } from "../../../lib/chain";
 import { rateLimit } from "../../lib/rateLimit";
 import { relayerConfigured } from "../../lib/relayer";
-import { RelayRevertedError } from "../../lib/relayOutcome.errors";
+import {
+  RelayNotSubmittedError,
+  RelayRevertedError,
+} from "../../lib/relayOutcome.errors";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -41,6 +44,29 @@ function limit(key: string, max: number, windowMs: number): void {
 }
 
 function mapError(error: unknown): never {
+  if (error instanceof RelayNotSubmittedError) {
+    const original = error.original;
+    const code =
+      original instanceof RelayRateLimitedError
+        ? "TOO_MANY_REQUESTS"
+        : original instanceof RelayRejectedError
+          ? "BAD_REQUEST"
+          : isSponsorshipError(original) ||
+              original instanceof RelayerUnavailableError
+            ? "PRECONDITION_FAILED"
+            : "INTERNAL_SERVER_ERROR";
+    throw new TRPCError({
+      code,
+      message:
+        original instanceof RelayRateLimitedError ||
+        original instanceof RelayRejectedError ||
+        original instanceof RelayerUnavailableError ||
+        isSponsorshipError(original)
+          ? original.message
+          : "The transaction could not be submitted. Try again.",
+      cause: error,
+    });
+  }
   if (error instanceof RelayRevertedError)
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -93,7 +119,11 @@ export const relayRouter = createTRPCRouter({
     .output(depositOutput)
     .mutation(async ({ ctx, input }) => {
       try {
-        limit(`relay:deposit:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
+        try {
+          limit(`relay:deposit:${ctx.ip ?? "unknown"}`, 20, 10 * MINUTE);
+        } catch (error) {
+          throw new RelayNotSubmittedError(error);
+        }
         return await relayDeposit(input, ctx);
       } catch (error) {
         mapError(error);
