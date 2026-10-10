@@ -16,6 +16,7 @@
 
 * [Quickstart](quickstart.md)
 * [Interface & Features](features.md)
+* [Meaw on your phone](mobile-pwa.md)
 * [Verify a Shared Receipt](receipt-verification.md)
 
 ## Under the Hood

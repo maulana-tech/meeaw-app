@@ -15,13 +15,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { usePendingRequestsCount } from "../../features/requests/hooks/usePendingRequestsCount";
 import {
   DASHBOARD_PATH,
   HISTORY_PATH,
   LINKS_PATH,
+  REQUESTS_PATH,
   SETTINGS_PATH,
   WITHDRAW_PATH,
-  REQUESTS_PATH,
 } from "../../lib/auth-routes";
 import { cn } from "../../lib/utils";
 import {
@@ -35,7 +36,6 @@ import {
 } from "../ui/dropdown-menu";
 import { useWallet } from "../WalletProvider";
 import { useDashboardMode } from "./DashboardBackground";
-import { usePendingRequestsCount } from "../../features/requests/hooks/usePendingRequestsCount";
 import { dashFocus, dashIconButton } from "./styles";
 
 const NAV_ITEMS = [
@@ -88,7 +88,7 @@ export function DashboardShell({
 
   if (!navigation) {
     return (
-      <div className="relative min-h-svh overflow-x-clip">
+      <div className="relative min-h-svh overflow-x-clip pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
         <main
           id="main-content"
           className={cn(
@@ -103,10 +103,7 @@ export function DashboardShell({
   }
 
   return (
-    <DashboardNavLayout
-      pathname={pathname}
-      contentClassName={contentClassName}
-    >
+    <DashboardNavLayout pathname={pathname} contentClassName={contentClassName}>
       {children}
     </DashboardNavLayout>
   );
@@ -128,7 +125,7 @@ function DashboardNavLayout({
     "Overview";
 
   return (
-    <div className="relative flex min-h-svh">
+    <div className="relative flex min-h-svh pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <aside className="hidden w-[5.5rem] shrink-0 lg:block">
         <div className="sticky top-14 ml-4 flex h-[calc(100svh-4.5rem)] w-14 flex-col items-center rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) py-4">
           <Link
@@ -194,7 +191,7 @@ function DashboardNavLayout({
         </main>
       </div>
 
-      <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) lg:hidden">
+      <div className="fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] z-40 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) lg:hidden">
         <MobileTabs
           pathname={pathname}
           pendingRequestsCount={pendingRequestsCount}
@@ -256,9 +253,7 @@ function RailLink({
           {label}
           {showBadge ? ` (${badge})` : null}
         </span>
-        {showBadge ? (
-          <span className="sr-only"> ({badge} pending)</span>
-        ) : null}
+        {showBadge ? <span className="sr-only"> ({badge} pending)</span> : null}
       </Link>
     </li>
   );

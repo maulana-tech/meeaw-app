@@ -262,7 +262,9 @@ export function SendTransferDialog({
             <dl className="grid gap-3 text-sm">
               <div className="flex justify-between gap-4">
                 <dt>Send to</dt>
-                <dd className="font-semibold">@{review.recipient.username}</dd>
+                <dd className="min-w-0 break-all text-right font-semibold">
+                  @{review.recipient.username}
+                </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Amount</dt>
@@ -318,9 +320,12 @@ export function SendTransferDialog({
               <Input
                 appearance="linen"
                 id="send-username"
+                className="min-h-11"
                 placeholder="@username"
                 autoComplete="off"
                 autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 maxLength={33}
                 required
                 value={username}
@@ -335,6 +340,7 @@ export function SendTransferDialog({
               <Input
                 appearance="linen"
                 id="send-amount"
+                className="min-h-11"
                 inputMode="decimal"
                 autoComplete="off"
                 placeholder="0.00"

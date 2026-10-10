@@ -3,6 +3,14 @@
 Disusun: 9 Oktober 2026
 Branch kerja: `monad-migration`
 
+Update implementasi 10 Oktober 2026: prioritas PWA + Send AUSD dikerjakan di
+`feature/mobile-pwa`, berbasis checkout yang sudah memuat gasless sponsorship.
+Manifest, ikon, offline fallback, petunjuk install dan shortcut Send AUSD sudah
+ditambahkan. Shortcut mengecek pembayaran tertunda sebelum membuka Send baru.
+Kurs lokal dan angka waktu settlement tidak ditambahkan. Pengujian perangkat HP
+dan pembayaran testnet live masih perlu dilakukan; bounty Agora belum diklaim.
+Panduan aktual: [Meaw on your phone](../../mobile-pwa.md).
+
 ## Ringkasan
 
 Dokumen ini menyusun fitur yang akan dibangun sebelum submission Monad Metropolis.
