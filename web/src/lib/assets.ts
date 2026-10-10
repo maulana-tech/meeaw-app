@@ -4,8 +4,8 @@
 //
 // Mainnet addresses are Monad's canonical tokens (docs.monad.xyz, "Tokens and
 // Bridges"), checked on-chain: 6 decimals and EIP-2612 permit, which the
-// gasless deposit path needs. On testnet none of them exist, so pools there use
-// mock tokens and the manifest address is trusted as configured.
+// gasless deposit path needs. Testnet pools can use mock tokens or Agora's
+// official test AUSD; the manifest identifies which token each pool holds.
 
 export const ASSET_SYMBOLS = ["USDC", "AUSD", "USDT0", "MUSD"] as const;
 export type AssetSymbol = (typeof ASSET_SYMBOLS)[number];

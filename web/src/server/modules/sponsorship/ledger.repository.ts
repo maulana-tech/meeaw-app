@@ -136,6 +136,31 @@ export class SponsorLedgerRepository {
         }
       }
       if (
+        cmd.kind === "settle" &&
+        !doc.actions[ledgerKey(cmd.ticket.actionId)]
+      ) {
+        const archived = await this.archives.findOne({
+          _id: `${chainId}:${cmd.ticket.actionId}`,
+        });
+        const a = archived?.action;
+        const c = a?.children[ledgerKey(cmd.ticket.childId)];
+        if (a) {
+          if (
+            a.intent.chainId !== chainId ||
+            a.phase !== "closed" ||
+            c?.phase !== "settled" ||
+            !c.paid
+          )
+            throw new SponsorshipError("budget");
+          const now = this.clock ? await this.clock.now() : doc.serverNow;
+          // Reuse settlement validation without restoring archived costs into the live budget.
+          const validation = emptyLedger(chainId, now, "complete");
+          validation.actions[ledgerKey(cmd.ticket.actionId)] = a;
+          reduceSponsorCommand(validation, cmd, policy, now);
+          return;
+        }
+      }
+      if (
         (cmd.kind === "close" || cmd.kind === "cancel") &&
         !doc.actions[ledgerKey(cmd.ticket.actionId)]
       ) {

@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InvoicePaymentIntent } from "../src/features/invoices/types";
 import type { PaymentLink } from "../src/features/paymentLinks/types";
+import { AGORA_DEPLOYMENTS } from "../src/lib/agora";
 import type { MaweeAccount } from "../src/lib/chain";
 import type { PoolDescriptor } from "../src/lib/pools";
 import { assetPool } from "./helpers/multiAssetFixtures";
@@ -69,6 +70,33 @@ const link = {
   amount: null,
 } as unknown as PaymentLink;
 describe("managed checkout", () => {
+  it("guides an official AUSD payer to issuer funding and refreshes that token balance", async () => {
+    const official = {
+      ...assetPool("AUSD"),
+      chainId: 10143,
+      token: AGORA_DEPLOYMENTS[10143],
+      mintable: false,
+    };
+    mock.pools = [assetPool("USDC"), official];
+    mock.balance.mockResolvedValue(0n);
+    render(<PayForm account={account} username="alice" link={link} />);
+    expect(
+      await screen.findByRole("link", { name: "Agora testnet faucet" }),
+    ).toHaveAttribute(
+      "href",
+      "https://docs.agora.finance/developer/contract-deployments",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Get 100 test AUSD" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(mock.balance).toHaveBeenCalledOnce());
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Refresh wallet balance" }));
+    await waitFor(() => expect(mock.balance).toHaveBeenCalledTimes(2));
+    expect(mock.balance.mock.calls[1][1].token).toBe(official.token);
+    expect(mock.pay).not.toHaveBeenCalled();
+  });
   it("keeps Pay disabled after a broadcast attempt has an uncertain result", async () => {
     const intent: InvoicePaymentIntent = {
       poolScope: assetPool("AUSD").scope,

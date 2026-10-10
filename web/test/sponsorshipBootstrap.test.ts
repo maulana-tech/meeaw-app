@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { makeDurableSender } from "../src/server/lib/durableRelayer";
 import { SponsorshipBaseline } from "../src/server/modules/sponsorship/bootstrap";
 import { SponsorLedger } from "../src/server/modules/sponsorship/ledger.service";
+import { sponsorFeeEvidence } from "../src/server/modules/sponsorship/reconcile";
 import { SponsorshipRecovery } from "../src/server/modules/sponsorship/recovery";
 import { createSponsorSenderFixture } from "./helpers/sponsorshipSenderFixture";
 
@@ -42,6 +43,79 @@ async function legacy() {
     baseline: new SponsorshipBaseline(f.a, f.journal, f.port, 143),
   };
 }
+async function archivedLegacy() {
+  const s = await legacy();
+  const receipt = s.receipts.get(s.first.txHash);
+  if (!receipt) throw Error("Missing receipt");
+  s.receipts.set(s.second.txHash, {
+    ...receipt,
+    transactionHash: s.second.txHash,
+  });
+  for (let i = 0; i < 4; i++) await s.baseline.advance(20);
+  return s;
+}
+it("finishes a mined legacy wallet slot after its sponsorship settlement was archived", async () => {
+  const s = await archivedLegacy();
+  const before = await s.f.a.repo.snapshot(143);
+  const signatures = s.f.port.sign.mock.calls.length;
+  const sender = makeDurableSender(s.f.journal, s.f.port, undefined, {
+    ledger: s.f.a,
+    policy: () => ({ ready: true, policy: s.f.policy }),
+  });
+  expect((await sender.reconcile(s.unknown)).state).toBe("confirmed");
+  expect(await s.f.journal.active(s.second.walletKey)).toBeNull();
+  expect(s.f.port.sign).toHaveBeenCalledTimes(signatures);
+  const after = await s.f.a.repo.snapshot(143);
+  expect(after.usedWeiStr).toBe(before.usedWeiStr);
+  expect(after.reservedWeiStr).toBe(before.reservedWeiStr);
+  const action = await s.f.a.admit({
+    chainId: 143,
+    actionId: "new-faucet-after-recovery",
+    principal: s.f.principal,
+    businessDigest: `0x${"c".repeat(64)}`,
+    kind: "faucet",
+    maximumChildren: 1,
+  });
+  await sender.prepare({
+    ...s.unknown,
+    operationKey: "ordinary:new-faucet",
+    sponsorship: { action, childId: "one" },
+  });
+});
+it("rejects changed canonical evidence or ticket when settlement is already archived", async () => {
+  const s = await archivedLegacy();
+  const saved = await s.f.journal.read(
+    s.second.walletKey,
+    s.second.operationKey,
+  );
+  const receipt = s.receipts.get(s.second.txHash);
+  if (!saved?.budgetChild || !receipt) throw Error("Missing archived fixture");
+  const evidence = await sponsorFeeEvidence(saved, receipt, s.f.port.block);
+  await expect(
+    s.f.a.settleChild(saved.budgetChild, {
+      ...evidence,
+      blockHash: `0x${"c".repeat(64)}`,
+    }),
+  ).rejects.toMatchObject({ reason: "cost" });
+  await expect(
+    s.f.a.settleChild(saved.budgetChild, {
+      ...evidence,
+      transaction: {
+        ...evidence.transaction,
+        nonce: evidence.transaction.nonce + 1,
+      },
+    }),
+  ).rejects.toMatchObject({ reason: "cost" });
+  await expect(
+    s.f.a.settleChild(
+      { ...saved.budgetChild, childFence: saved.budgetChild.childFence + 1 },
+      evidence,
+    ),
+  ).rejects.toMatchObject({ reason: "budget" });
+  await expect(
+    s.f.a.settleChild(saved.budgetChild, evidence),
+  ).resolves.toBeUndefined();
+});
 it("imports signed legacy liabilities and current-day canonical fees before opening admission", async () => {
   const s = await legacy();
   expect((await s.f.a.status(s.f.principal)).reason).toBe("initializing");
