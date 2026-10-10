@@ -1,6 +1,6 @@
 # Gasless sponsorship verification
 
-Branch: `feature/gasless-sponsorship-budget`; base `5d7917d` (`monad-migration`). Final implementation/review fixes: `7850436`. Local implementation and commits only. No funded network transaction, live migration, deployment, push or merge was performed.
+Branch: `feature/gasless-sponsorship-budget`; base `5d7917d` (`monad-migration`). Final implementation/review fixes: `7850436`. Initial implementation verification was local. No funded network transaction, live migration or deployment was performed. The subsequent authorized PR delivery is recorded below.
 
 ## Final review and corrections
 
@@ -13,7 +13,7 @@ One fresh whole-branch reviewer found four Important findings, no Critical or Mi
 
 Each behavior was reproduced in a failing regression before its correction. Focused regressions passed 33/33 in eight files; ordinary process-crash projection recovery passed 5/5. Exact-fit and one-over cases are also exercised in the Send and request orchestration tests.
 
-## Verification
+## Initial feature verification
 
 - Contracts: 48/48 passed on local Hardhat.
 - Source TypeScript: passed.
@@ -62,3 +62,15 @@ Final: Ruling: partition final full web coverage into keys.test.ts serial plus a
 Final: Ruling: preserve the unexpected mawee database before removing test scratch — metadata showed nine application collections, so gracefully stop and relocate the complete Mongo directory to .superpowers/local-mongo/2026-10-10-gasless-sponsorship-budget, exclude it from local Git, and restart on the same localhost port; no application records were read or deleted — cost if wrong: additional ignored local storage/helper remains, but application data is retained. Preserved helper PID 56632.
 
 Final: Ruling: retain the ignored task scratch because automatic approval review rejected the path-verified recursive deletion as blocked by policy — stop cleanup without trying another deletion mechanism; source commits/tests/build are complete and the Mongo data was already preserved separately — cost if wrong: temporary verification files remain on disk.
+
+## Authorized PR delivery
+
+The user authorized pushing this feature and creating a pull request targeting the repository default branch, `monad-migration`.
+
+- Fetched `origin` and merged its seven new commits through `0c0a195`; merge commit `c0a7d5d` had no conflicts. The feature was zero commits behind the default afterward.
+- Preserved default-branch branding, asset controls, mascot, roadmap and `monad-zk` source-directory rename. Legacy generated `circuits/build` files remain untouched and locally excluded from Git.
+- Installed the updated committed dependency lockfile without modifying it.
+- After synchronization, 51/51 focused tests across 15 suites passed, including affected checkout/cash-out/asset UI, private Send/Pay notices, genuine request/transfer proof construction and sponsorship acceptance.
+- Fresh source TypeScript, local production build and diff checks passed.
+- Earlier complete feature verification remains 656/656 web tests and 48/48 local contract tests. Those full runs preceded default-branch synchronization; the post-sync evidence is the focused run above.
+- Remote delivery creates a PR only; merging into the default or dev branch is not part of this request.
