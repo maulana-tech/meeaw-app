@@ -17,6 +17,9 @@ export const serverEnvSchema = z.object({
   CRON_SECRET: optionalString,
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
+  RESEND_API_KEY: optionalString,
+  EMAIL_FROM: optionalString,
+  APP_URL: optionalString,
   // Hot wallet that submits users' signed/proved transactions and pays gas.
   // Keep it funded with only a small amount of MON.
   RELAYER_PRIVATE_KEY: z.preprocess(
@@ -63,6 +66,9 @@ export function getServerEnv() {
     CRON_SECRET: process.env.CRON_SECRET,
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    APP_URL: process.env.APP_URL,
     RELAYER_PRIVATE_KEY: process.env.RELAYER_PRIVATE_KEY,
     ENVIO_GRAPHQL_URL: process.env.ENVIO_GRAPHQL_URL,
     RELAYER_RPC_URL: process.env.RELAYER_RPC_URL,

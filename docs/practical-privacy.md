@@ -63,6 +63,22 @@ prove an invoice was settled or that the note is still unspent. See
 That's the difference between privacy and secrecy. You're never stuck unable to
 account for your own money.
 
+## Email Notifications
+
+Meaw offers optional email notifications for invoices and payment requests. To
+protect your financial privacy, notifications adhere to strict boundaries:
+
+- **Zero on-chain identifiers**: Emails never contain 0x addresses, transaction
+  hashes, note commitments, or nullifiers.
+- **Zero cryptographic secrets**: Viewing keys, spending secrets, and proofs
+  remain strictly in your browser and are never transmitted in notifications.
+- **High-level context only**: Messages include only the minimal context needed
+  to understand the event — such as the invoice number, formatted amount, or
+  sender/recipient username.
+- **Instant opt-out**: Every outbound email includes a secure, one-click
+  unsubscribe link with a cryptographic token so recipients can opt out without
+  signing in or revealing their identity.
+
 {% hint style="warning" %}
 Meaw is testnet-stage and not yet independently audited. Treat it as a preview of
 how this works, not a place for real funds yet. See

@@ -195,6 +195,14 @@ login or proof upload. Username and generation time remain issuer-provided metad
 the result proves note inclusion, not identity or invoice settlement. See
 [receipt verification](docs/receipt-verification.md) for versions and RPC requirements.
 
+### 8. Email notifications
+
+Users can optionally configure email notifications in Settings to receive alerts
+when an invoice is settled, a payment request is received, or a payment request
+is settled. Outbound notifications maintain strict privacy boundaries: emails
+contain zero blockchain addresses, transaction hashes, note commitments,
+nullifiers, or private keys. Every message includes a one-click unsubscribe link.
+
 ## Privacy Model
 
 What observers can see:
@@ -286,6 +294,8 @@ Useful routes:
 - `/history` - local payment history.
 - `/pay/<username>` - payer checkout.
 - `/pay/<username>/<slug>` - managed payment-link checkout.
+- `/settings` - account management and notification preferences.
+- `/unsubscribe/<token>` - one-click notification unsubscribe.
 
 ## Environment
 
@@ -300,6 +310,11 @@ Important server-only values:
   request.
 - `PRIVY_APP_ID` / `PRIVY_APP_SECRET` - server-only Privy token and wallet
   verification.
+- `RESEND_API_KEY` - Resend API key for optional email notifications (leave empty
+  to run without email).
+- `EMAIL_FROM` - sender address for notifications (optional, e.g. `Meaw <hello@meaw.xyz>`).
+- `APP_URL` - public application URL used for email links and unsubscribe URLs
+  (optional, defaults to `http://localhost:3000`).
 - `MONAD_LOGS_BLOCK_RANGE` - max block span per `eth_getLogs` call.
 - `ENVIO_GRAPHQL_URL` - Envio HyperIndex endpoint; when set it replaces the
   `eth_getLogs` poller for wallet scanning and pool stats.

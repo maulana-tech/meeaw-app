@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { Binary } from "mongodb";
-import { bytesToHex, type Hex, hexToBytes } from "viem";
+import { bytesToHex, formatUnits, type Hex, hexToBytes } from "viem";
 import {
   type InvoiceInput,
   invoiceInput,
@@ -20,6 +20,10 @@ import {
 import { activePoolFor } from "../../../lib/pools";
 import { type DepositDoc, getDb } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
+import {
+  dispatchNotification,
+  formatInvoiceNotification,
+} from "../notifications/notifications.service";
 import { resolveUsername } from "../usernames/usernames.service";
 import { currentWallet } from "../wallets/wallets.service";
 import { verifyInvoiceReceipt, verifyInvoiceRevert } from "./invoiceReceipt";
@@ -30,6 +34,23 @@ import {
   invoiceView,
 } from "./invoices.repository";
 import { invoiceReader } from "./invoices.rpc";
+
+export function notifyInvoiceSettled(invoice: InvoiceDoc): void {
+  const decimals = invoice.pool?.tokenDecimals ?? 6;
+  const amountFormatted = `${formatUnits(BigInt(invoice.amount), decimals)} ${invoice.asset}`;
+  void dispatchNotification({
+    eventKey: `invoice-paid:${invoice._id}`,
+    recipientWallet: invoice.ownerWallet,
+    eventType: "invoicePaid",
+    buildEmail: ({ appUrl, unsubscribeToken }) =>
+      formatInvoiceNotification({
+        invoiceNumber: invoice.number,
+        amountFormatted,
+        appUrl,
+        unsubscribeToken,
+      }),
+  }).catch(console.error);
+}
 
 const missing = () =>
   new TRPCError({ code: "NOT_FOUND", message: "Invoice not found." });
@@ -252,7 +273,10 @@ export async function confirmInvoicePayment(token: string, hash: Hex) {
     },
     { returnDocument: "after" },
   );
-  if (updated) return invoiceView(updated);
+  if (updated) {
+    notifyInvoiceSettled(updated);
+    return invoiceView(updated);
+  }
   const settled = await collection.findOne({ _id: doc._id });
   if (
     settled?.status === "paid" &&
