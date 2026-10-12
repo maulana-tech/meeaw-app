@@ -146,6 +146,28 @@ export type PaymentRequestDoc = {
   updatedAt: Date;
 };
 
+export type NotificationSettingsDoc = {
+  _id: string; // Checksummed EVM address (matches UserDoc._id)
+  privyUserId: string;
+  email: string;
+  enabled: boolean;
+  events: {
+    invoicePaid: boolean;
+    requestReceived: boolean;
+    requestPaid: boolean;
+  };
+  unsubscribeToken: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type NotificationLogDoc = {
+  _id: string; // Unique eventKey (e.g. "invoice-paid:<id>")
+  recipientEmail: string;
+  eventType: "invoicePaid" | "requestReceived" | "requestPaid" | "test";
+  sentAt: Date;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var _maweeMongoClientPromise: Promise<MongoClient> | undefined;
@@ -216,3 +238,18 @@ export async function getPaymentRequests(): Promise<
 > {
   return (await getDb()).collection<PaymentRequestDoc>("payment_requests");
 }
+
+export async function getNotificationSettings(): Promise<
+  Collection<NotificationSettingsDoc>
+> {
+  return (await getDb()).collection<NotificationSettingsDoc>(
+    "notification_settings",
+  );
+}
+
+export async function getNotificationLogs(): Promise<
+  Collection<NotificationLogDoc>
+> {
+  return (await getDb()).collection<NotificationLogDoc>("notification_logs");
+}
+
