@@ -69,11 +69,30 @@ check the JSON without signing in. Proof details stay in the browser; historical
 pool reads distinguish chain-verified, invalid, and unavailable evidence. Older
 unanchored receipts remain locally checkable. See [receipt verification](receipt-verification.md).
 
+## Email Notifications
+
+Get notified when payment events occur without keeping the app open. Email
+notifications are completely opt-in and configured under **Settings**:
+
+* **Opt-in and preferences**: Set your notification email and choose which
+  events trigger an email. A test email option lets you verify setup immediately.
+* **Supported events**:
+  * **Invoice settled**: Sent when an invoice is marked paid into your private balance.
+  * **Payment request received**: Sent when another user sends you a payment request.
+  * **Payment request settled**: Sent when a payment request you created is fulfilled.
+* **One-click unsubscribe**: Every email includes an unsubscribe link
+  (`/unsubscribe/<token>`) that immediately disables all notifications without
+  requiring a login or signature.
+* **Privacy boundaries**: Notification emails never include on-chain data (no 0x
+  addresses, transaction hashes, note commitments, nullifiers, or private keys).
+  Only necessary business context (like an invoice number or username) is included.
+
 ## Settings
 
-Manage your account: your username keys, PIN, and account recovery. This is also
-where [routine privacy-key rotation](privacy-key-rotation.md) lives: new incoming
-payments use a new key while existing balances remain accessible with the same recovery.
+Manage your account: your username keys, PIN, account recovery, and email notification
+preferences. This is also where [routine privacy-key rotation](privacy-key-rotation.md)
+lives: new incoming payments use a new key while existing balances remain accessible
+with the same recovery.
 
 {% hint style="info" %}
 **Receiving needs nothing up front.** You don't need to hold any USDC or do any
