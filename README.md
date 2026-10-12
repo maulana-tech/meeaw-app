@@ -203,6 +203,17 @@ is settled. Outbound notifications maintain strict privacy boundaries: emails
 contain zero blockchain addresses, transaction hashes, note commitments,
 nullifiers, or private keys. Every message includes a one-click unsubscribe link.
 
+### 9. Invoice & receipt PDF export
+
+Both the invoice issuer and the client can export branded A4 vector PDFs generated
+entirely client-side in the browser (zero SSR overhead, zero server file storage).
+The document dynamically adapts its header and content based on payment state:
+pending or overdue invoices export as an official **INVOICE** with due dates, line
+items, and a direct checkout link, while settled invoices export as an official
+**PAYMENT RECEIPT** complete with a **PAID** badge and UTC settlement timestamp.
+Download buttons are available directly from the Invoices dashboard table and the
+public checkout page.
+
 ## Privacy Model
 
 What observers can see:

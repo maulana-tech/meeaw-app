@@ -13,6 +13,11 @@ import { InvoiceCheckout } from "../src/components/invoices/InvoiceCheckout";
 import type { InvoiceView } from "../src/features/invoices/types";
 import { assetPool } from "./helpers/multiAssetFixtures";
 
+const downloadInvoicePdfMock = vi.fn();
+vi.mock("../src/lib/invoicePdf", () => ({
+  downloadInvoicePdf: (...args: unknown[]) => downloadInvoicePdfMock(...args),
+}));
+
 const state = vi.hoisted(() => ({
   get: vi.fn(),
   confirm: vi.fn(),
@@ -81,6 +86,7 @@ const invoice: InvoiceView = {
 };
 beforeEach(() => {
   sessionStorage.clear();
+  downloadInvoicePdfMock.mockReset().mockResolvedValue(undefined);
   state.get.mockReset().mockResolvedValue(invoice);
   state.confirm.mockReset();
   state.pay.mockReset();
@@ -217,5 +223,59 @@ describe("public invoice checkout", () => {
     ).toBeEnabled();
     expect(sessionStorage.getItem(`meaw:invoice-attempt:${token}`)).toBeNull();
     expect(state.pay).not.toHaveBeenCalled();
+  });
+  it("renders download invoice button and invokes downloadInvoicePdf on pending invoice", async () => {
+    view();
+    const downloadButton = await screen.findByRole("button", {
+      name: "Download invoice (PDF)",
+    });
+    expect(downloadButton).toBeEnabled();
+    fireEvent.click(downloadButton);
+    await waitFor(() =>
+      expect(downloadInvoicePdfMock).toHaveBeenCalledWith(invoice, {
+        origin: window.location.origin,
+      }),
+    );
+  });
+  it("renders download receipt buttons in article and aside on paid invoice", async () => {
+    state.get.mockResolvedValue({ ...invoice, status: "paid", checkout: null });
+    view();
+    await screen.findByText("Invoice paid");
+    const downloadButtons = screen.getAllByRole("button", {
+      name: "Download receipt (PDF)",
+    });
+    expect(downloadButtons).toHaveLength(2);
+    expect(
+      screen.queryByRole("button", { name: "Download invoice (PDF)" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(downloadButtons[0]);
+    await waitFor(() =>
+      expect(downloadInvoicePdfMock).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "paid" }),
+        { origin: window.location.origin },
+      ),
+    );
+  });
+  it("shows downloading state while generating PDF", async () => {
+    let finishDownload: () => void = () => {};
+    downloadInvoicePdfMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDownload = resolve;
+        }),
+    );
+    view();
+    const downloadButton = await screen.findByRole("button", {
+      name: "Download invoice (PDF)",
+    });
+    fireEvent.click(downloadButton);
+    expect(screen.getByRole("button", { name: "Downloading…" })).toBeDisabled();
+    await act(async () => {
+      finishDownload();
+    });
+    expect(
+      screen.getByRole("button", { name: "Download invoice (PDF)" }),
+    ).toBeEnabled();
   });
 });

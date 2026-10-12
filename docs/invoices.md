@@ -62,6 +62,28 @@ or removed pools disable checkout; create a replacement invoice in an eligible
 pool. The feature retains the existing pool's privacy properties and does not
 claim complete anonymity or bank cash-out.
 
+## PDF export & payment receipts
+
+Both the invoice issuer and their client can download a branded A4 PDF document
+at any time. Generation runs entirely client-side using dynamic vector graphics
+via `jspdf` (zero SSR overhead, zero server storage of PDF files, and no backend
+rendering latency).
+
+The document styling reflects Meaw's warm, editorial design tokens (Linen
+`#F5F3EA`, Obsidian `#1A1F12`, Ash `#6B6E5D`, Line `#D6D6C8`, and Tint `#EDE9DF`):
+
+- **Pending & Overdue invoices**: Exported as an official **INVOICE** featuring the
+  invoice number, issue date, due date, seller and client details, itemized line items
+  with amounts and quantities, total due, notes, and a direct checkout payment link.
+- **Settled invoices**: Once paid on-chain, the export automatically transitions into
+  an official **PAYMENT RECEIPT** with a prominent **PAID** status badge, the UTC
+  settlement timestamp, transaction confirmation details, and settled amount.
+
+The PDF export is accessible from:
+1. **Invoices dashboard**: Via the **Download PDF** action in each invoice row's action menu.
+2. **Public checkout page**: Via the **Download Invoice (PDF)** button while payment is pending,
+   and the **Download Receipt (PDF)** button once payment is confirmed.
+
 ## Operations
 
 Migration `20261010150000-invoices.js` creates invoice uniqueness/owner/recovery
@@ -82,6 +104,7 @@ unmatched records with checkedAt ordering. RPC failures retain existing status.
 The public status-check endpoint uses the mirror as a locator and revalidates
 canonical evidence; it cannot move funds.
 
-No PDF, email, fractional quantities, editable drafts or additional assets are
-included in this release. Physical-device checkout and funded testnet settlement
-must be tested separately from local component, Mongo and RPC-boundary tests.
+Fractional quantities, editable drafts or additional assets are not included in this release.
+Physical-device checkout and funded testnet settlement must be tested separately from
+local component, Mongo and RPC-boundary tests.
+
