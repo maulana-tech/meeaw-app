@@ -223,4 +223,56 @@ describe("EmailNotificationsRow Component", () => {
       "Test email sent! Check your inbox.",
     );
   });
+
+  it("renders 'Checking' badge when query.isLoading is true", () => {
+    mocks.isLoading = true;
+    render(<EmailNotificationsRow />);
+
+    expect(screen.getByText("Checking")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Service not configured"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not snap back to privy email when user clears the email input", async () => {
+    const user = userEvent.setup();
+    mocks.privyUser = { email: { address: "privy-user@example.com" } };
+    mocks.queryData = { serviceAvailable: true, settings: null };
+
+    render(<EmailNotificationsRow />);
+
+    const masterToggle = screen.getByLabelText(/Enable email notifications/i);
+    await user.click(masterToggle);
+
+    const emailInput = screen.getByLabelText(/Notification Email/i);
+    expect(emailInput).toHaveValue("privy-user@example.com");
+
+    await user.clear(emailInput);
+    expect(emailInput).toHaveValue("");
+  });
+
+  it("allows saving preferences when enabled is false and email is empty", async () => {
+    const user = userEvent.setup();
+    mocks.queryData = { serviceAvailable: true, settings: null };
+
+    render(<EmailNotificationsRow />);
+
+    const saveBtn = screen.getByRole("button", { name: /Save preferences/i });
+    await user.click(saveBtn);
+
+    await waitFor(() => {
+      expect(mocks.updateMutateAsync).toHaveBeenCalledWith({
+        email: "",
+        enabled: false,
+        events: {
+          invoicePaid: true,
+          requestReceived: true,
+          requestPaid: true,
+        },
+      });
+    });
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Notification preferences saved",
+    );
+  });
 });

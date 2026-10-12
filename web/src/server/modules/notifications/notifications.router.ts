@@ -15,15 +15,28 @@ import {
 } from "./notifications.repository";
 import { sendTestEmail } from "./notifications.service";
 
-const updateSettingsInput = z.object({
-  email: z.string().trim().email(),
-  enabled: z.boolean(),
-  events: z.object({
-    invoicePaid: z.boolean(),
-    requestReceived: z.boolean(),
-    requestPaid: z.boolean(),
-  }),
-});
+const updateSettingsInput = z
+  .object({
+    email: z.string().trim(),
+    enabled: z.boolean(),
+    events: z.object({
+      invoicePaid: z.boolean(),
+      requestReceived: z.boolean(),
+      requestPaid: z.boolean(),
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.enabled || data.email.length > 0) {
+      const emailCheck = z.string().email().safeParse(data.email);
+      if (!emailCheck.success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid email",
+          path: ["email"],
+        });
+      }
+    }
+  });
 
 export const notificationsRouter = createTRPCRouter({
   getSettings: protectedProcedure.query(async ({ ctx }) => {

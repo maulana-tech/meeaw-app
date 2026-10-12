@@ -118,6 +118,36 @@ describe("notificationsRouter", () => {
       expect(mockCurrentWallet).not.toHaveBeenCalled();
     });
 
+    it("allows empty email on updateSettings when enabled is false", async () => {
+      mockCurrentWallet.mockResolvedValue({
+        address: "0x1111111111111111111111111111111111111111",
+      });
+      mockUpsertNotificationSettings.mockResolvedValue({
+        _id: "0x1111111111111111111111111111111111111111",
+        privyUserId: "user-123",
+        email: "",
+        enabled: false,
+        events: {
+          invoicePaid: true,
+          requestReceived: true,
+          requestPaid: true,
+        },
+        unsubscribeToken: "token-123",
+      });
+      const caller = notificationsRouter.createCaller(createAuthContext());
+      const res = await caller.updateSettings({
+        email: "",
+        enabled: false,
+        events: {
+          invoicePaid: true,
+          requestReceived: true,
+          requestPaid: true,
+        },
+      });
+      expect(res.enabled).toBe(false);
+      expect(res.email).toBe("");
+    });
+
     it("rejects empty token on unsubscribe", async () => {
       const caller = notificationsRouter.createCaller(createAuthContext(null));
       await expect(caller.unsubscribe({ token: "" })).rejects.toMatchObject({

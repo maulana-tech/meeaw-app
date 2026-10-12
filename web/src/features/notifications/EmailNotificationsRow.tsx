@@ -2,7 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { Loader } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { dashButtonPrimary, dashCell } from "../../components/dashboard/styles";
 import { Badge } from "../../components/ui/badge";
@@ -35,38 +35,32 @@ export function EmailNotificationsRow() {
     requestReceived: true,
     requestPaid: true,
   });
-  const [initialized, setInitialized] = useState(false);
+
+  const hasPrefilledRef = useRef(false);
+  const userEditedRef = useRef(false);
 
   useEffect(() => {
-    if (query.data && !initialized) {
-      if (query.data.settings) {
-        setEmail(query.data.settings.email);
-        setEnabled(query.data.settings.enabled);
-        setEvents(query.data.settings.events);
-      } else {
-        const privyEmail = user?.email?.address || user?.google?.email || "";
-        if (privyEmail) {
-          setEmail(privyEmail);
-        }
-      }
-      setInitialized(true);
-    }
-  }, [query.data, initialized, user]);
+    if (hasPrefilledRef.current || userEditedRef.current) return;
 
-  useEffect(() => {
-    if (!query.data?.settings && !email) {
+    if (query.data?.settings) {
+      setEmail(query.data.settings.email);
+      setEnabled(query.data.settings.enabled);
+      setEvents(query.data.settings.events);
+      hasPrefilledRef.current = true;
+    } else if (query.data && !query.data.settings) {
       const privyEmail = user?.email?.address || user?.google?.email || "";
       if (privyEmail) {
         setEmail(privyEmail);
+        hasPrefilledRef.current = true;
       }
     }
-  }, [user, query.data, email]);
+  }, [query.data, user]);
 
   const serviceAvailable = query.data?.serviceAvailable ?? false;
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) {
+    if (enabled && (!email.trim() || !email.includes("@"))) {
       toast.error("Please enter a valid email address.");
       return;
     }
@@ -101,7 +95,15 @@ export function EmailNotificationsRow() {
     <section className={`${dashCell} p-6`}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="dashboard-tile-title">Email notifications</h2>
-        {!serviceAvailable ? (
+        {query.isLoading ? (
+          <Badge
+            variant="outline"
+            className="gap-1.5 border-(--dash-line) text-(--dash-ash)"
+          >
+            <Loader className="size-3 animate-spin" aria-hidden="true" />
+            Checking
+          </Badge>
+        ) : !serviceAvailable ? (
           <Badge
             variant="outline"
             className="border-(--dash-line) text-(--dash-ash)"
@@ -161,7 +163,10 @@ export function EmailNotificationsRow() {
                 id="notify-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  userEditedRef.current = true;
+                  setEmail(e.target.value);
+                }}
                 placeholder="you@example.com"
                 appearance="linen"
                 className="max-w-md"
