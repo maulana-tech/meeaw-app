@@ -1,11 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Copy, ExternalLink, Plus, QrCode } from "lucide-react";
+import { Copy, Download, ExternalLink, Plus, QrCode } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { invoiceStatus } from "../../features/invoices/input";
 import type { InvoiceView } from "../../features/invoices/types";
 import { SIGN_IN_PATH } from "../../lib/auth-routes";
+import { downloadInvoicePdf } from "../../lib/invoicePdf";
 import { formatAssetUnits } from "../../lib/paymentAsset";
 import { api } from "../../trpc/client";
 import { DashboardPageHeader } from "../dashboard/DashboardPageHeader";
@@ -154,7 +155,7 @@ export function InvoicesDashboard() {
     </>
   );
 }
-function InvoiceRow({
+export function InvoiceRow({
   invoice,
   origin,
   onChanged,
@@ -166,6 +167,7 @@ function InvoiceRow({
   const [qrOpen, setQrOpen] = useState(false),
     [voidOpen, setVoidOpen] = useState(false),
     [working, setWorking] = useState(false),
+    [downloading, setDownloading] = useState(false),
     [message, setMessage] = useState("");
   const trigger = useRef<HTMLButtonElement>(null),
     alive = useRef(true),
@@ -191,6 +193,18 @@ function InvoiceRow({
     } catch {
       if (alive.current)
         setMessage("Copy failed. Open the invoice and copy its address.");
+    }
+  }
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadInvoicePdf(invoice, { origin });
+    } catch (e) {
+      if (alive.current) {
+        setMessage(e instanceof Error ? e.message : "Failed to generate PDF.");
+      }
+    } finally {
+      if (alive.current) setDownloading(false);
     }
   }
   async function cancel() {
@@ -260,6 +274,15 @@ function InvoiceRow({
           onClick={() => setQrOpen(true)}
         >
           <QrCode aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className={`${dashButtonSecondary} min-h-11`}
+          disabled={downloading}
+          onClick={() => void handleDownload()}
+        >
+          <Download aria-hidden="true" className="size-4" />
+          {downloading ? "Downloading…" : "Download PDF"}
         </button>
         {invoice.status === "pending" && (
           <button
