@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { type Hex, hexToBytes } from "viem";
@@ -9,6 +10,7 @@ import { invoiceStatus } from "../../features/invoices/input";
 import type { InvoiceView } from "../../features/invoices/types";
 import type { PaymentLink } from "../../features/paymentLinks/types";
 import { chain, explorerTxUrl } from "../../lib/chain";
+import { downloadInvoicePdf } from "../../lib/invoicePdf";
 import { formatAssetUnits } from "../../lib/paymentAsset";
 import { api } from "../../trpc/client";
 import { DashboardBackground } from "../dashboard/DashboardBackground";
@@ -53,6 +55,7 @@ export function InvoiceCheckout({ token }: { token: string }) {
     token: string;
     active: boolean;
   } | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const session = useRef(token),
     mounted = useRef(true);
   session.current = token;
@@ -74,6 +77,19 @@ export function InvoiceCheckout({ token }: { token: string }) {
   const invoice = confirmed?.token === token ? confirmed.invoice : query.data;
   const hash = receipt?.token === token ? receipt.hash : null;
   const unresolved = uncertain?.token === token && uncertain.active;
+  async function handleDownloadPdf() {
+    if (!invoice) return;
+    setDownloading(true);
+    try {
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      await downloadInvoicePdf(invoice, { origin });
+    } catch (err) {
+      console.error("PDF download failed:", err);
+    } finally {
+      if (mounted.current) setDownloading(false);
+    }
+  }
   async function confirm(txHash?: Hex) {
     const at = token;
     setChecking(true);
@@ -336,6 +352,21 @@ export function InvoiceCheckout({ token }: { token: string }) {
                 Invoice details are visible to anyone with this link. The
                 recipient's private balance and spending history stay protected.
               </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-(--dash-line) pt-5">
+                <button
+                  type="button"
+                  className={`${dashButtonSecondary} min-h-11`}
+                  disabled={downloading}
+                  onClick={() => void handleDownloadPdf()}
+                >
+                  <Download aria-hidden="true" className="size-4" />
+                  {downloading
+                    ? "Downloading…"
+                    : invoice.status === "paid"
+                      ? "Download receipt (PDF)"
+                      : "Download invoice (PDF)"}
+                </button>
+              </div>
             </article>
             <aside className="grid gap-4" aria-label="Invoice payment">
               {checkout}
@@ -359,6 +390,15 @@ export function InvoiceCheckout({ token }: { token: string }) {
                       Payment was confirmed after this invoice was voided.
                     </p>
                   )}
+                  <button
+                    type="button"
+                    className={`${dashButtonSecondary} mt-4 w-full min-h-11`}
+                    disabled={downloading}
+                    onClick={() => void handleDownloadPdf()}
+                  >
+                    <Download aria-hidden="true" className="size-4" />
+                    {downloading ? "Downloading…" : "Download receipt (PDF)"}
+                  </button>
                 </section>
               )}
               {invoice.status === "void" && (
