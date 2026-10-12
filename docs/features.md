@@ -42,9 +42,11 @@ deployment prerequisites. Legacy balances remain withdrawal-only.
 
 Create numbered USDC/AUSD invoices with clients, line items and due dates. Share
 a link or QR; a matching canonical payment changes the invoice to Paid. Pending
-invoices can be voided, and Overdue is derived from the UTC due date. Details are
-visible to the server and link holders. See [Invoices](invoices.md) for checkout,
-uncertain-transaction recovery and deployment requirements.
+invoices can be voided, and Overdue is derived from the UTC due date. Both the
+invoice issuer and the client can export branded A4 PDFs at any point (as an
+official invoice when pending, or as an official payment receipt once settled).
+Details are visible to the server and link holders. See [Invoices](invoices.md)
+for checkout, uncertain-transaction recovery, PDF exports, and deployment requirements.
 
 ## Payment Requests
 
