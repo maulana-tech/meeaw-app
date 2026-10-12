@@ -20,7 +20,26 @@ import {
 import { type RelayIntent, runtimeSender } from "../../lib/durableRelayer";
 import { relayerAddress, relayerConfigured } from "../../lib/relayer";
 import { RelayBusyError } from "../../lib/relayJournal";
+import {
+  dispatchNotification,
+  formatRequestPaidNotification,
+} from "../notifications/notifications.service";
 import { accountSpendGate } from "../privacyKeys/spendGate";
+
+export function notifyRequestPaid(requestDoc: PaymentRequestDoc): void {
+  void dispatchNotification({
+    eventKey: `request-paid:${requestDoc._id}`,
+    recipientWallet: requestDoc.requesterWallet,
+    eventType: "requestPaid",
+    buildEmail: ({ appUrl, unsubscribeToken }) =>
+      formatRequestPaidNotification({
+        addresseeUsername: requestDoc.addressee.username,
+        appUrl,
+        unsubscribeToken,
+      }),
+  }).catch(console.error);
+}
+
 import {
   operationSponsorship,
   pauseOperationSponsorship,
@@ -446,6 +465,9 @@ async function process(
     );
     const latest = changed ?? (await requests.findOne({ _id: doc._id }));
     if (!latest) throw new RequestNotFoundError();
+    if (final && changed) {
+      notifyRequestPaid(latest);
+    }
     return project(latest);
   } catch (e) {
     if (isSponsorshipError(e)) {
