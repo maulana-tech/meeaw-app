@@ -3,6 +3,7 @@
 import { Loader, LockKeyhole, LogOut } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { EmailNotificationsRow } from "../../features/notifications/EmailNotificationsRow";
 import { usePrivacyKeyRotation } from "../../features/privacyKeys/usePrivacyKeyRotation";
 import { useChangeRecoveryPin } from "../../features/recovery/hooks/useChangeRecoveryPin";
 import { SponsorshipSettingsRow } from "../../features/sponsorship/SponsorshipSettingsRow";
@@ -47,6 +48,7 @@ export function SettingsDashboard() {
       <div className={`${dashLedger} max-w-3xl`}>
         <IdentityTile username={username} onClaim={openUsernameModal} />
         <SponsorshipSettingsRow />
+        <EmailNotificationsRow />
         <RecoveryTile
           method={passkeyProtected ? "passkey" : "pin"}
           protectedRecovery={passkeyProtected || Boolean(escrowQuery.data)}

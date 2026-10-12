@@ -17,9 +17,28 @@ import type {
 import { resolvePool } from "../../../lib/pools";
 import { getPaymentRequests } from "../../db/mongo";
 import { rateLimit } from "../../lib/rateLimit";
+import {
+  dispatchNotification,
+  formatRequestReceivedNotification,
+} from "../notifications/notifications.service";
 import { RegistryLookupFailedError } from "../usernames/usernames.errors";
 import { resolveUsername } from "../usernames/usernames.service";
 import { currentWallet } from "../wallets/wallets.service";
+
+export function notifyRequestReceived(record: SignedRequest): void {
+  void dispatchNotification({
+    eventKey: `request-received:${record.id}`,
+    recipientWallet: record.addressee.wallet,
+    eventType: "requestReceived",
+    buildEmail: ({ appUrl, unsubscribeToken }) =>
+      formatRequestReceivedNotification({
+        requesterUsername: record.requester.username,
+        appUrl,
+        unsubscribeToken,
+      }),
+  }).catch(console.error);
+}
+
 import {
   RequestConflictError,
   RequestNotFoundError,
@@ -138,9 +157,7 @@ export async function createRequest(
 
   const wallet = await callerWallet(privyUserId);
   if (!wallet)
-    throw new RequestRejectedError(
-      "No Meaw wallet is linked to this account.",
-    );
+    throw new RequestRejectedError("No Meaw wallet is linked to this account.");
   if (record.requester.wallet.toLowerCase() !== wallet)
     throw new RequestRejectedError("Sign the request with your own account.");
 
@@ -165,7 +182,10 @@ export async function createRequest(
     requests,
     toRequestDoc(record, digest, now),
   );
-  if (outcome.kind === "inserted") return toPaymentRequest(outcome.doc);
+  if (outcome.kind === "inserted") {
+    notifyRequestReceived(record);
+    return toPaymentRequest(outcome.doc);
+  }
   if (outcome.existing && sameRecord(outcome.existing, wallet, digest))
     return toPaymentRequest(outcome.existing);
   throw new RequestConflictError("This request already exists.");
