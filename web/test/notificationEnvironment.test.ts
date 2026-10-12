@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  down as migrationDown,
+  up as migrationUp,
+} from "../migrations/20261012160000-notifications.js";
 import { serverEnvSchema } from "../src/env.server";
 import {
   getNotificationLogs,
   getNotificationSettings,
 } from "../src/server/db/mongo";
-import {
-  down as migrationDown,
-  up as migrationUp,
-} from "../migrations/20261012160000-notifications.js";
 
 describe("Notification Environment Schema", () => {
   it("parses optional RESEND_API_KEY, EMAIL_FROM, and APP_URL", () => {

@@ -252,4 +252,3 @@ export async function getNotificationLogs(): Promise<
 > {
   return (await getDb()).collection<NotificationLogDoc>("notification_logs");
 }
-
