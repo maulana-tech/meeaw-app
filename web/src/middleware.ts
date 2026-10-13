@@ -60,6 +60,7 @@ export const config = {
     "/withdraw/:path*",
     "/history/:path*",
     "/requests/:path*",
+    "/settings/:path*",
     "/invoices/:path*",
   ],
 };
