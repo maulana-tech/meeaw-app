@@ -306,13 +306,13 @@ function Row({
 
 function ClaimMock() {
   return (
-    <MockWindow title="mawee.xyz">
+    <MockWindow title="meaw.xyz">
       <p className="text-lg font-normal">Claim your username</p>
       <p className="mt-1 text-sm text-starlight/55">
         This becomes your payment link.
       </p>
       <div className="mt-5 flex items-center rounded-none border border-violet/60 bg-void px-3.5 py-3 font-landing text-sm">
-        <span className="text-starlight/45">mawee.xyz/pay/</span>
+        <span className="text-starlight/45">meaw.xyz/pay/</span>
         <span className="text-starlight">dinar</span>
         <span className="ml-0.5 h-4 w-px bg-violet motion-safe:animate-pulse" />
       </div>
@@ -392,7 +392,7 @@ function FauxQr() {
 
 function PayMock() {
   return (
-    <MockWindow title="mawee.xyz/pay/dinar">
+    <MockWindow title="meaw.xyz/pay/dinar">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-starlight/55">Pay @dinar</p>
