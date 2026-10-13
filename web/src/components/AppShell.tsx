@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { isProtectedRoute } from "../lib/auth-routes";
 import { chain } from "../lib/chain";
+import { BackLink } from "./BackLink";
 import { DashboardBackground } from "./dashboard/DashboardBackground";
 import { DashboardShell } from "./dashboard/DashboardShell";
 import { PinDialog } from "./PinDialog";
@@ -98,33 +99,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (pathname === "/verify") {
-    return (
-      <div
-        className="theme-product min-h-svh bg-(--dash-bg) text-(--dash-fg)"
-        data-product-theme=""
-      >
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
-          <header className="mb-6">
-            <Link
-              href="/"
-              aria-label="Meaw home"
-              className="font-heading text-3xl font-bold tracking-tight"
-            >
-              mawee
-            </Link>
-          </header>
-          {children}
-        </div>
-      </div>
-    );
-  }
-  if (isPay) {
+  // Standalone public pages share one shell: back link, the cat, content.
+  if (isPay || pathname === "/verify" || pathname.startsWith("/unsubscribe/")) {
     return (
       <div className="theme-product contents" data-product-theme="">
         <DashboardBackground>
           <DashboardShell contentClassName="flex min-h-svh max-w-3xl flex-col">
-            <header className="mb-0 flex min-w-0 items-center justify-center">
+            <header className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center">
+              <BackLink className="justify-self-start" />
               <Link href="/" aria-label="Meaw home">
                 <Image
                   src="/assets/mawee-white.svg"

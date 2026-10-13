@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { useReceiptVerification } from "../../features/receipts/useReceiptVerification";
 import { ASSETS } from "../../lib/assets";
 import { formatAssetUnits } from "../../lib/paymentAsset";
-import { Button } from "../ui/button";
+import { dashButtonPrimary, dashButtonSecondary } from "../dashboard/styles";
 
 const explanations: Record<string, string> = {
   "file-too-large":
@@ -65,17 +65,21 @@ export function VerifyReceipt() {
   }
   return (
     <section
-      className="w-full min-w-0 rounded-2xl border border-brand-linen/20 bg-brand-linen/5 p-5 text-brand-linen sm:p-8"
+      className="w-full min-w-0 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) p-6 text-(--dash-fg) sm:p-8"
       aria-label="Receipt verification"
     >
       <div className="mb-7 max-w-xl">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-linen/60">
+        <p className="dashboard-tile-title flex items-center gap-2">
+          <span
+            className="size-1.5 rounded-full bg-(--dash-accent)"
+            aria-hidden="true"
+          />
           Meaw Verify
         </p>
-        <h1 className="font-heading text-3xl font-semibold">
+        <h1 className="mt-5 text-3xl font-normal tracking-tight">
           Check a payment receipt
         </h1>
-        <p className="mt-3 text-sm leading-6 text-brand-linen/70">
+        <p className="mt-3 text-sm leading-6 text-(--dash-ash)">
           Choose the JSON proof shared with the PDF. Its private details stay in
           this browser; only public pool and block coordinates are sent for the
           chain check.
@@ -96,17 +100,17 @@ export function VerifyReceipt() {
             if (file) void loadFile(file);
             else remove();
           }}
-          className="min-h-12 w-full min-w-0 rounded-lg border border-brand-linen/25 bg-brand-obsidian px-3 py-3 text-sm text-brand-linen file:mr-3 file:rounded-md file:border-0 file:bg-brand-linen file:px-3 file:py-2 file:font-semibold file:text-brand-obsidian focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen"
+          className="min-h-14 w-full min-w-0 cursor-pointer rounded-(--dash-radius-sm) border border-dashed border-(--dash-line-strong) bg-(--dash-tint) px-3 py-3 text-sm text-(--dash-ash) transition-colors hover:border-(--dash-fg) file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-(--dash-fg) file:px-4 file:py-2 file:text-xs file:font-semibold file:tracking-[0.08em] file:text-(--dash-surface) file:uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)"
         />
       </label>
-      <p className="mt-2 text-xs text-brand-linen/60">
+      <p className="mt-2 text-xs text-(--dash-ash)">
         JSON only · maximum 64 KiB · no account or wallet required
       </p>
       {(busy || result) && (
         <div
           aria-live="polite"
           aria-atomic="true"
-          className="mt-7 border-t border-brand-linen/20 pt-6"
+          className="mt-7 border-t border-(--dash-line) pt-6"
         >
           <div className="flex items-center gap-2">
             {busy ? (
@@ -116,19 +120,19 @@ export function VerifyReceipt() {
               />
             ) : (
               <Icon
-                className={`size-5 ${result?.status === "verified" ? "text-emerald-300" : result?.status === "invalid" ? "text-red-300" : "text-amber-200"}`}
+                className={`size-5 ${result?.status === "verified" ? "text-(--dash-fg)" : result?.status === "invalid" ? "text-destructive" : "text-(--dash-ash)"}`}
                 aria-hidden="true"
               />
             )}
             <h2 className="text-lg font-semibold">{title}</h2>
           </div>
           {message && (
-            <p className="mt-2 text-sm leading-6 text-brand-linen/75">
+            <p className="mt-2 text-sm leading-6 text-(--dash-ash)">
               {message}
             </p>
           )}
           {result?.status === "verified" && (
-            <p className="mt-2 text-sm leading-6 text-brand-linen/75">
+            <p className="mt-2 text-sm leading-6 text-(--dash-ash)">
               The disclosed note matches the pool at its confirmed historical
               block. Compare the fingerprint below with the PDF.
             </p>
@@ -138,8 +142,8 @@ export function VerifyReceipt() {
       {bundle && (
         <div className="mt-6 grid min-w-0 gap-5">
           <div>
-            <p className="text-xs text-brand-linen/60">Disclosed amount</p>
-            <p className="mt-1 font-heading text-3xl font-semibold tabular-nums">
+            <p className="text-xs text-(--dash-ash)">Disclosed amount</p>
+            <p className="mt-1 text-3xl font-normal tracking-tight tabular-nums">
               {formatAssetUnits(
                 BigInt(bundle.amount),
                 bundle.tokenDecimals ?? 6,
@@ -149,20 +153,20 @@ export function VerifyReceipt() {
           </div>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-brand-linen/60">Username</dt>
+              <dt className="text-(--dash-ash)">Username</dt>
               <dd className="mt-1 break-words">
                 {bundle.username ? `@${bundle.username}` : "Not supplied"}
               </dd>
-              <dd className="mt-1 text-xs text-brand-linen/60">
+              <dd className="mt-1 text-xs text-(--dash-ash)">
                 Provided by receipt issuer
               </dd>
             </div>
             <div>
-              <dt className="text-brand-linen/60">Receipt generated</dt>
+              <dt className="text-(--dash-ash)">Receipt generated</dt>
               <dd className="mt-1 break-words">{bundle.disclosedAt}</dd>
             </div>
             <div>
-              <dt className="text-brand-linen/60">Network</dt>
+              <dt className="text-(--dash-ash)">Network</dt>
               <dd className="mt-1">
                 {bundle.network === "eip155:143"
                   ? "Monad Mainnet"
@@ -173,7 +177,7 @@ export function VerifyReceipt() {
             </div>
             {bundle.version === 2 && (
               <div>
-                <dt className="text-brand-linen/60">Checked block</dt>
+                <dt className="text-(--dash-ash)">Checked block</dt>
                 <dd className="mt-1 tabular-nums">
                   {bundle.anchor.blockNumber.toLocaleString("en-US")}
                 </dd>
@@ -182,30 +186,30 @@ export function VerifyReceipt() {
           </dl>
           {result && "identity" in result && result.identity && (
             <div className="min-w-0">
-              <p className="text-xs text-brand-linen/60">Proof fingerprint</p>
-              <code className="mt-2 block break-all rounded-lg border border-brand-linen/15 p-3 text-xs leading-6">
+              <p className="text-xs text-(--dash-ash)">Proof fingerprint</p>
+              <code className="mt-2 block break-all rounded-lg border border-(--dash-line) p-3 text-xs leading-6">
                 {result.identity.fingerprint}
               </code>
-              <p className="mt-2 font-mono text-xs text-brand-linen/75">
+              <p className="mt-2 font-mono text-xs text-(--dash-ash)">
                 {result.identity.reference}
               </p>
             </div>
           )}
-          <details className="min-w-0 border-t border-brand-linen/20 pt-4">
-            <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-linen">
+          <details className="min-w-0 border-t border-(--dash-line) pt-4">
+            <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--dash-fg)">
               Technical details
             </summary>
             <dl className="mt-3 grid min-w-0 gap-3 text-xs leading-6">
               <div>
-                <dt className="text-brand-linen/60">Pool</dt>
+                <dt className="text-(--dash-ash)">Pool</dt>
                 <dd className="break-all font-mono">{bundle.pool}</dd>
               </div>
               <div>
-                <dt className="text-brand-linen/60">Commitment</dt>
+                <dt className="text-(--dash-ash)">Commitment</dt>
                 <dd className="break-all font-mono">{bundle.commitmentHex}</dd>
               </div>
               <div>
-                <dt className="text-brand-linen/60">Checks</dt>
+                <dt className="text-(--dash-ash)">Checks</dt>
                 <dd>
                   Local proof: {result?.local ?? "checking"} · Chain:{" "}
                   {result?.chain ?? "checking"}
@@ -213,7 +217,7 @@ export function VerifyReceipt() {
               </div>
             </dl>
           </details>
-          <p className="text-xs leading-5 text-brand-linen/60">
+          <p className="text-xs leading-5 text-(--dash-ash)">
             Inclusion does not prove an invoice was paid, the issuer’s identity,
             current ownership, or an unspent balance.
           </p>
@@ -224,17 +228,21 @@ export function VerifyReceipt() {
           {!busy &&
             bundle?.version === 2 &&
             result?.status === "unavailable" && (
-              <Button onClick={() => void retry()} className="min-h-11">
+              <button
+                type="button"
+                onClick={() => void retry()}
+                className={dashButtonPrimary}
+              >
                 Retry verification
-              </Button>
+              </button>
             )}
-          <Button
-            variant="outline"
-            className="min-h-11 border-brand-linen/30 bg-transparent text-brand-linen hover:bg-brand-linen/10"
+          <button
+            type="button"
+            className={dashButtonSecondary}
             onClick={remove}
           >
             Remove receipt
-          </Button>
+          </button>
         </div>
       )}
     </section>

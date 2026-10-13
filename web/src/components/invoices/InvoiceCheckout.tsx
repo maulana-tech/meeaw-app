@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { type Hex, hexToBytes } from "viem";
@@ -13,6 +14,7 @@ import { chain, explorerTxUrl } from "../../lib/chain";
 import { downloadInvoicePdf } from "../../lib/invoicePdf";
 import { formatAssetUnits } from "../../lib/paymentAsset";
 import { api } from "../../trpc/client";
+import { BackLink } from "../BackLink";
 import { DashboardBackground } from "../dashboard/DashboardBackground";
 import {
   dashButtonPrimary,
@@ -234,9 +236,18 @@ export function InvoiceCheckout({ token }: { token: string }) {
         className="mx-auto min-h-svh max-w-5xl px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6"
       >
         <header className="mb-8 flex items-center justify-between gap-4">
-          <Link href="/" className="text-xl font-medium tracking-tight">
-            Meaw
-          </Link>
+          <div className="flex items-center gap-3">
+            <BackLink />
+            <Link href="/" aria-label="Meaw home">
+              <Image
+                src="/assets/mawee-white.svg"
+                alt="Meaw"
+                width={40}
+                height={40}
+                className="size-10"
+              />
+            </Link>
+          </div>
           {chain.testnet && (
             <p className="text-xs text-(--dash-ash)">
               Testnet invoice · test funds
