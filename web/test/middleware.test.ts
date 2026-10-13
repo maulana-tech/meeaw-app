@@ -2,6 +2,7 @@ import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import {
+  DASHBOARD_PATHS,
   PRIVY_ACCESS_TOKEN_COOKIE,
   PRIVY_SESSION_COOKIE,
 } from "../src/lib/auth-routes";
@@ -14,6 +15,11 @@ function request(pathname: string, cookie?: string) {
 }
 
 describe("route middleware", () => {
+  it.each(DASHBOARD_PATHS)("runs for every dashboard route: %s", (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url })).toBe(
+      true,
+    );
+  });
   it("runs authentication middleware for the Requests route group", () => {
     expect(
       unstable_doesMiddlewareMatch({

@@ -218,7 +218,7 @@ export default function PrivacyPolicyPage() {
               How Meaw processes personal data across accounts, payments,
               verification, and Business Passport services.
             </p>
-            <dl className="mt-10 flex flex-col gap-4 border-t border-ed-line pt-6 text-sm sm:flex-row sm:gap-12">
+            <dl className="mt-10 flex flex-col gap-4 border-t border-line pt-6 text-sm sm:flex-row sm:gap-12">
               <div>
                 <dt className="text-olive/70">Effective date</dt>
                 <dd className="mt-1 font-semibold">September 30, 2026</dd>
@@ -237,7 +237,7 @@ export default function PrivacyPolicyPage() {
               aria-label="Privacy policy sections"
               className="sticky top-8 border-l border-line pl-5"
             >
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-muted-text">
+              <p className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-ink/60">
                 On this page
               </p>
               <ol className="space-y-2.5 text-sm leading-5">
@@ -245,7 +245,7 @@ export default function PrivacyPolicyPage() {
                   <li key={id}>
                     <a
                       href={`#${id}`}
-                      className="group flex gap-2 text-muted-text transition-colors duration-150 hover:text-olive-deep"
+                      className="group flex gap-2 text-ink/60 transition-colors duration-150 hover:text-olive-deep"
                     >
                       <span className="w-5 shrink-0 tabular-nums text-olive/70">
                         {index + 1}.

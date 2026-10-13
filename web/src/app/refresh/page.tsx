@@ -41,7 +41,7 @@ function RefreshSession() {
       className="grid min-h-svh place-content-center justify-items-center gap-4"
       aria-live="polite"
     >
-      <MeawMascot mood="loading" size={72} />
+      <MeawMascot mood="loading" size={72} tone="white" />
       <p>Refreshing your secure session…</p>
     </main>
   );
@@ -55,7 +55,7 @@ export default function RefreshPage() {
           className="grid min-h-svh place-content-center justify-items-center gap-4"
           aria-live="polite"
         >
-          <MeawMascot mood="loading" size={72} />
+          <MeawMascot mood="loading" size={72} tone="white" />
           <p>Refreshing your secure session…</p>
         </main>
       }
