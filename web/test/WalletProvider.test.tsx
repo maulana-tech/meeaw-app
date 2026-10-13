@@ -257,6 +257,19 @@ describe("WalletProvider Privy session", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
   });
 
+  it("keeps a restored session on the page it was opened on", async () => {
+    mocks.pathname = "/invoices";
+    render(
+      <WalletProvider>
+        <Probe />
+      </WalletProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("yes"),
+    );
+    expect(mocks.restore).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
   it("leaves a payer's Privy session alone on a pay link", async () => {
     mocks.pathname = "/pay/alice";
     mocks.restore.mockResolvedValue(null);

@@ -20,7 +20,7 @@ import {
 import { unlockPrivacyKeyring } from "../features/privacyKeys/reauthenticate";
 import { getPrivacyKeyring } from "../features/privacyKeys/session";
 import type { PrivacyKeyState } from "../features/privacyKeys/types";
-import { DASHBOARD_PATH } from "../lib/auth-routes";
+import { DASHBOARD_PATH, SIGN_IN_PATH } from "../lib/auth-routes";
 import {
   registerUsernameCache,
   type Signer,
@@ -200,13 +200,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setPinModalOpen(true);
   }, []);
 
+  // Only the sign-in page hands off to the dashboard. A restored session on
+  // any other page (a refresh on /invoices, /privacy, ...) stays put.
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const routeToDashboard = useCallback(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname !== DASHBOARD_PATH
-    ) {
-      router.replace(DASHBOARD_PATH);
-    }
+    if (pathnameRef.current === SIGN_IN_PATH) router.replace(DASHBOARD_PATH);
   }, [router]);
 
   const activateMapping = useCallback(
