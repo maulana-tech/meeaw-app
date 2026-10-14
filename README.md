@@ -16,6 +16,12 @@ This repository is the testnet implementation. It contains the Solidity
 contracts, zero-knowledge circuits, browser app, payment-link database, and
 Privy authentication with user-owned embedded wallets.
 
+## Demo & Presentation
+
+- **Technical Demo:** [Watch on YouTube](https://youtu.be/ck0RBT5zqgY)
+- **Pitch Deck:** [Watch on YouTube](https://youtu.be/6qk1y3rpcao)
+- **Live:** [meeaw-monad-demo.vercel.app](https://meeaw-monad-demo.vercel.app)
+
 ## Monad Metropolis Hackathon
 
 Meaw submits to the **Consumer Products & Payments** track ($30k, 3 winners of
