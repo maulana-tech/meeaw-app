@@ -54,7 +54,7 @@ The browser prover, Solidity verifiers and contract tests must all use the same 
 Vitest, `node` environment by default (`DepositForm.test.tsx` uses happy-dom; add others to `environmentMatchGlobs` in `vitest.config.ts` if needed). `server-only` is stubbed; `@` aliases `web/src`. Use `test/renderWithTRPC.tsx` to render components that call tRPC.
 
 ### Deployment
-Push to `main` → GitHub Actions builds the root `Dockerfile` image to GHCR and SSH-deploys `docker-compose.yml` (migrate → web → pool-indexer loop hitting the cron route every 60s, behind Caddy) to a Lightsail box. `ops/mongodb/` has the VPS MongoDB setup.
+Vercel project `lanaas-projects/meeaw-app` (root directory `web`) deploys `monad-migration` to production on every push (https://meeaw-app.vercel.app); other branches get preview URLs. Env vars live in Vercel (`vercel env ls`). `.github/workflows/cron.yml` calls `/api/cron/pool-indexer` and `/api/cron/request-payments` every 5 minutes with the `CRON_SECRET` repo secret, because Vercel Hobby crons run only daily. MongoDB must be reachable from Vercel (Atlas); run `migrate:up` against it after schema changes. The older Docker/Lightsail path (`deploy.yml`, `docker-compose.yml`, `ops/mongodb/`) still exists but only triggers on `main`.
 
 ## Conventions
 - Formatting: Biome (2-space, double quotes, organized imports).
