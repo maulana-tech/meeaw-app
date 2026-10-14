@@ -1,0 +1,27 @@
+name: Cron
+
+# Vercel Hobby only runs its own crons once a day, so GitHub Actions calls the
+# two cron routes instead. GitHub's floor is every 5 minutes and it may run
+# late under load; Envio serves balances in real time, so that is enough.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        route: [pool-indexer, request-payments]
+    steps:
+      - name: Call /api/cron/${{ matrix.route }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://meeaw-app.vercel.app' }}
+        run: |
+          curl -fsS --max-time 280 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/cron/${{ matrix.route }}"
