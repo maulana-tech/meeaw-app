@@ -20,7 +20,7 @@ Privy authentication with user-owned embedded wallets.
 
 - **Technical Demo:** [Watch on YouTube](https://youtu.be/ck0RBT5zqgY)
 - **Pitch Deck:** [Watch on YouTube](https://youtu.be/6qk1y3rpcao)
-- **Live:** [meeaw-monad-demo.vercel.app](https://meeaw-monad-demo.vercel.app)
+- **Live:** [meaw-monad-demo.vercel.app](https://meaw-monad-demo.vercel.app)
 
 ## Monad Metropolis Hackathon
 
